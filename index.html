@@ -205,6 +205,23 @@
   .mlist li { margin: 0; }
   .empty { color: var(--muted); font-size: 14px; }
   .facts { font-size: 14px; color: var(--muted); padding-left: 18px; }
+  .sheet h3.section { margin: 22px 0 2px; font-size: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
+  .scenes { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+  .scenes button {
+    border: 1px solid var(--line); border-radius: 12px; padding: 10px; text-align: left;
+    background: var(--bg); font-size: 14px; line-height: 1.3;
+  }
+  .scenes button b { display: block; font-size: 22px; margin-bottom: 2px; }
+  #scene {
+    display: flex; align-items: center; gap: 10px; padding: 8px 16px;
+    background: var(--fix-bg); color: var(--fix-text); border-bottom: 1px solid var(--fix-line); font-size: 14px;
+  }
+  #scene[hidden] { display: none; }
+  #scene span { flex: 1; min-width: 0; }
+  #scene button {
+    border: 0; border-radius: 9px; padding: 6px 10px; font-size: 13px; font-weight: 600;
+    background: var(--fix-line); color: #3a2b05; flex: none;
+  }
 </style>
 </head>
 <body>
@@ -214,6 +231,9 @@
     <b id="buddyName">Sam</b>
     <small id="status">English · B1</small>
   </div>
+  <button class="icon-btn" id="roleBtn" aria-label="ฝึกสถานการณ์">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h18v7a9 9 0 0 1-18 0z"/><path d="M8 9h.01M16 9h.01"/><path d="M8.5 14a4 4 0 0 0 7 0"/></svg>
+  </button>
   <button class="icon-btn badge" id="mistakesBtn" aria-label="คำที่พลาด">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
   </button>
@@ -226,6 +246,11 @@
   <span id="quotaText">วันนี้ใช้ไป 0 ครั้ง</span>
   <div class="bar"><i id="quotaBar"></i></div>
 </button>
+
+<div id="scene" hidden>
+  <span id="sceneText"></span>
+  <button type="button" id="sceneEnd">จบและขอคำแนะนำ</button>
+</div>
 
 <main id="chat" aria-live="polite"></main>
 
@@ -279,6 +304,25 @@
     <div class="hint">ดูตัวเลข RPD ของโมเดลที่ใช้ได้ที่ aistudio.google.com/rate-limit (ใส่ 0 ถ้าไม่รู้) · แอปนับเฉพาะในเครื่องนี้ · รีเซ็ตเที่ยงคืนเวลาสหรัฐฯ ฝั่งตะวันตก</div>
     <label class="check"><input id="sVoice" type="checkbox"> อ่านคำตอบออกเสียงอัตโนมัติ</label>
     <label class="check"><input id="sAutoSend" type="checkbox"> พูดจบแล้วส่งทันที</label>
+
+    <h3 class="section">🔔 ให้เพื่อนทักมาก่อน (แจ้งเตือน)</h3>
+    <div class="hint" id="pushStatus">กำลังตรวจสอบ…</div>
+    <label for="sPerDay">ทักวันละกี่ครั้ง (ช่วง 9:00–21:00)</label>
+    <select id="sPerDay"><option value="1">1 ครั้ง</option><option value="2">2 ครั้ง</option><option value="3">3 ครั้ง</option></select>
+    <div class="actions">
+      <button class="btn primary" type="button" id="pushOn">เปิดการแจ้งเตือน</button>
+      <button class="btn" type="button" id="pushTest" hidden>ส่งทดสอบตอนนี้</button>
+      <button class="btn danger" type="button" id="pushOff" hidden>ปิด</button>
+    </div>
+
+    <h3 class="section">💾 สำรองข้อมูล</h3>
+    <div class="hint">บันทึกแชต ความจำ คำที่พลาด และการตั้งค่าเป็นไฟล์ เก็บไว้ใน "ไฟล์" ของ iPhone หรือ iCloud แล้วนำกลับมาได้ (ไม่รวมรูป)</div>
+    <div class="actions">
+      <button class="btn" type="button" id="exportBtn">ส่งออกข้อมูล</button>
+      <button class="btn" type="button" id="importBtn">นำเข้าข้อมูล</button>
+      <input type="file" id="importInput" accept="application/json,.json" hidden>
+    </div>
+
     <div class="actions">
       <button class="btn primary" value="save">บันทึก</button>
       <button class="btn" value="cancel" formnovalidate>ยกเลิก</button>
@@ -296,6 +340,20 @@
     <div class="actions">
       <button class="btn primary" id="quizBtn">ให้เพื่อนทดสอบคำที่พลาด</button>
       <button class="btn" id="closeMistakes">ปิด</button>
+    </div>
+  </div>
+</dialog>
+
+<dialog id="roles">
+  <div class="sheet">
+    <h2>ฝึกสถานการณ์จริง</h2>
+    <div class="hint">เลือกสถานการณ์ แล้วเพื่อนจะเล่นเป็นอีกฝ่าย พอเสร็จกด "จบและขอคำแนะนำ" เพื่อรับคำติชมเป็นภาษาไทย</div>
+    <div class="scenes" id="sceneList"></div>
+    <label for="customScene">หรือพิมพ์สถานการณ์เอง</label>
+    <input id="customScene" type="text" maxlength="120" placeholder="เช่น ซื้อตั๋วรถไฟที่ญี่ปุ่น">
+    <div class="actions">
+      <button class="btn primary" id="customStart">เริ่มสถานการณ์นี้</button>
+      <button class="btn" id="closeRoles">ปิด</button>
     </div>
   </div>
 </dialog>
@@ -323,7 +381,20 @@
     autoSend: true,
     rate: 0.95,
     dailyLimit: 0,                // free requests per day from AI Studio; 0 = unknown
+    perDay: 2,                    // how many times a day the buddy may message first (push)
   };
+  const SCENES = [
+    { icon: '🍜', th: 'สั่งอาหารที่ร้าน', en: 'The user is a customer at a restaurant. You are the waiter: greet them, take the order, answer questions about the menu, and bring the bill at the end.' },
+    { icon: '🏨', th: 'เช็กอินโรงแรม', en: 'You are the hotel receptionist. The user is checking in: ask for the booking name, explain breakfast time, Wi-Fi, and handle a small problem with the room.' },
+    { icon: '✈️', th: 'ตม. และสนามบิน', en: 'You are an immigration officer at the airport. Ask the user the usual questions: purpose of visit, how long, where they will stay, return ticket.' },
+    { icon: '🗺️', th: 'ถามทาง', en: 'You are a local person on the street. The user is a tourist asking for directions. Give realistic directions with landmarks and check they understood.' },
+    { icon: '🛍️', th: 'ซื้อของ ต่อราคา', en: 'You are a friendly shop owner at a market. The user wants to buy something and may try to bargain. Talk about sizes, colours and price.' },
+    { icon: '💼', th: 'สัมภาษณ์งาน', en: 'You are a job interviewer. Ask the user typical interview questions one at a time (introduce yourself, strengths, why this job) and react to their answers.' },
+    { icon: '🏥', th: 'ไปหาหมอ', en: 'You are a doctor at a clinic. The user is a patient: ask about symptoms, how long, give simple advice and explain how to take medicine.' },
+    { icon: '🐾', th: 'คลินิกสัตว์ (คุณเป็นหมอ)', en: 'You are a worried pet owner at a veterinary clinic; the USER is the veterinarian. Describe your pet\'s symptoms bit by bit and ask the vet questions about diagnosis and care.' },
+    { icon: '📞', th: 'โทรจองโต๊ะ', en: 'You are a restaurant staff member answering the phone. The user is calling to book a table: date, time, number of people, name, special requests.' },
+    { icon: '🎉', th: 'เจอเพื่อนใหม่ในปาร์ตี้', en: 'You are someone the user just met at a party. Make small talk: names, where you are from, work or study, hobbies, and suggest meeting again.' },
+  ];
   const PHOTO_MAX_SIDE = 1024;
   const HISTORY_SENT = 24;        // messages sent to the model each turn
   const HISTORY_KEPT = 300;       // messages kept on the phone
@@ -337,7 +408,8 @@
   const save = (key, value) => { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} };
 
   let settings = { ...DEFAULT_SETTINGS, ...load('lb_settings', {}) };
-  let state = { messages: [], facts: [], mistakes: [], lastSeen: 0, ...load('lb_state', {}) };
+  let state = { messages: [], facts: [], mistakes: [], lastSeen: 0, scene: null, ...load('lb_state', {}) };
+  let push = { id: '', enabled: false, lastSync: 0, ...load('lb_push', {}) };
   const persist = () => {
     state.messages = state.messages.slice(-HISTORY_KEPT);
     save('lb_state', { ...state, messages: state.messages.map(({ photoData, ...m }) => m) });
@@ -508,7 +580,10 @@ Mistakes they made recently (gently re-use these patterns so they practise):
 ${recent}
 
 If the user sends a photo, react to it like a friend would, and naturally teach 1–2 useful ${settings.lang} words for things in it. If they ask you to read text in the photo, help them. Earlier photos appear as "[sent a photo]" because you can only see the newest one.
-
+${state.scene ? `
+ROLE-PLAY IS ON. Scenario: ${state.scene.en}
+Stay in this role (not as ${settings.name}) until told it has ended. Act like a real person in that place, keep each turn short and realistic, move the situation forward step by step, and use phrases people really say there. Still fill "correction" for the user's mistakes.
+` : ''}
 Always answer with JSON only:
 {
   "reply": "your chat message in ${settings.lang}",
@@ -600,6 +675,7 @@ Only correct real errors in the user's last message (grammar, wrong word, unnatu
     renderAll();
     updateHeader();
     if (settings.voice) speak(ai.reply);
+    syncPush(false);
   }
 
   async function run(userText, hiddenTurn, photo) {
@@ -813,6 +889,8 @@ Only correct real errors in the user's last message (grammar, wrong word, unnatu
     $('sPersona').value = settings.persona;
     $('sRate').value = settings.rate;
     $('sLimit').value = settings.dailyLimit || '';
+    $('sPerDay').value = String(settings.perDay || 2);
+    renderPush();
     $('sVoice').checked = settings.voice;
     $('sAutoSend').checked = settings.autoSend;
     $('settings').showModal();
@@ -836,6 +914,7 @@ Only correct real errors in the user's last message (grammar, wrong word, unnatu
     save('lb_settings', settings);
     updateHeader();
     renderQuota();
+    syncPush(true);
     renderAll();
     if (!hadWorker && settings.workerUrl) { unlockSpeech(); maybeGreet(); }
   });
@@ -868,10 +947,202 @@ Only correct real errors in the user's last message (grammar, wrong word, unnatu
     run(null, '[App note, not from the user: the user tapped "quiz me". Give ONE short, friendly quiz question that practises one of their recent mistakes (fill-in-the-blank or "how would you say…"). Wait for their answer before giving the next one. Set "correction" to null.]');
   });
 
+  // ---------- role-play ----------
+  function renderScene() {
+    $('scene').hidden = !state.scene;
+    if (state.scene) $('sceneText').textContent = `${state.scene.icon} กำลังฝึก: ${state.scene.th}`;
+  }
+  function startScene(scene) {
+    $('roles').close();
+    if (busy) return;
+    state.scene = scene;
+    persist();
+    renderScene();
+    unlockSpeech();
+    notice(`เริ่มฝึก: ${scene.icon} ${scene.th}`);
+    run(null, `[App note, not from the user: the user chose a role-play. ${scene.en} Start the scene now with your first line in character. Set "correction" to null.]`);
+  }
+  const sceneList = $('sceneList');
+  for (const s of SCENES) {
+    const b = el('button');
+    b.type = 'button';
+    b.append(el('b', '', s.icon), s.th);
+    b.addEventListener('click', () => startScene(s));
+    sceneList.append(b);
+  }
+  $('roleBtn').addEventListener('click', () => { $('customScene').value = ''; $('roles').showModal(); });
+  $('closeRoles').addEventListener('click', () => $('roles').close());
+  $('customStart').addEventListener('click', () => {
+    const t = $('customScene').value.trim();
+    if (!t) { $('customScene').focus(); return; }
+    startScene({ icon: '🎭', th: t, en: `Situation chosen by the user (written in Thai or ${settings.lang}): "${t}". Play the other person in this situation.` });
+  });
+  $('sceneEnd').addEventListener('click', () => {
+    if (busy || !state.scene) return;
+    const scene = state.scene;
+    state.scene = null;
+    persist();
+    renderScene();
+    run(null, `[App note, not from the user: the role-play "${scene.th}" has ended. Step out of the role and, as ${settings.name}, give friendly feedback. For THIS message only, write "reply" in Thai: what they did well, 2–3 useful ${settings.lang} phrases for this situation (with Thai meaning), and one thing to practise. Keep it short. Set "correction" to null.]`);
+  });
+
+  // ---------- backup ----------
+  async function exportData() {
+    const data = {
+      app: 'language-buddy', version: 1, exported: new Date().toISOString(),
+      settings, state: { ...state, messages: state.messages.map(({ photoData, ...m }) => m) },
+    };
+    const name = `language-buddy-${new Date().toISOString().slice(0, 10)}.json`;
+    const file = new File([JSON.stringify(data, null, 1)], name, { type: 'application/json' });
+    try {
+      if (navigator.canShare?.({ files: [file] })) { await navigator.share({ files: [file], title: name }); return; }
+    } catch (e) { if (e.name === 'AbortError') return; }
+    const a = el('a');
+    a.href = URL.createObjectURL(file);
+    a.download = name;
+    document.body.append(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  }
+  async function importData(file) {
+    let data;
+    try { data = JSON.parse(await file.text()); } catch { alert('ไฟล์นี้อ่านไม่ได้'); return; }
+    if (data?.app !== 'language-buddy' || !data.state || !Array.isArray(data.state.messages)) { alert('ไฟล์นี้ไม่ใช่ข้อมูลสำรองของ Language Buddy'); return; }
+    const n = data.state.messages.length;
+    if (!confirm(`นำเข้าข้อมูลจาก ${String(data.exported || '').slice(0, 10)} (${n} ข้อความ)?\nข้อมูลในเครื่องตอนนี้จะถูกแทนที่`)) return;
+    state = { messages: [], facts: [], mistakes: [], lastSeen: 0, scene: null, ...data.state };
+    settings = { ...DEFAULT_SETTINGS, ...data.settings, workerUrl: data.settings?.workerUrl || settings.workerUrl };
+    save('lb_settings', settings);
+    persist();
+    $('settings').close();
+    updateHeader(); renderQuota(); renderScene(); renderAll();
+    notice(`นำเข้าแล้ว ${n} ข้อความ`);
+    syncPush(true);
+  }
+  $('exportBtn').addEventListener('click', exportData);
+  $('importBtn').addEventListener('click', () => $('importInput').click());
+  $('importInput').addEventListener('change', (e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) importData(f); });
+
+  // ---------- push: the buddy messages first ----------
+  const pushSupported = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+  const standalone = navigator.standalone === true || matchMedia('(display-mode: standalone)').matches;
+  const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const workerBase = () => settings.workerUrl.replace(/\/+$/, '');
+  const savePush = () => save('lb_push', push);
+  function pushProfile() {
+    return {
+      name: settings.name, persona: settings.persona, lang: settings.lang, level: settings.level,
+      tz: Intl.DateTimeFormat().resolvedOptions().timeZone, perDay: Number(settings.perDay) || 0,
+      facts: state.facts.slice(-20),
+      recent: state.messages.slice(-6).map((m) => ({ role: m.role, text: (m.photo ? '[sent a photo] ' : '') + (m.text || '') })),
+    };
+  }
+  async function pushApi(path, payload, method = 'POST') {
+    const url = `${workerBase()}/push/${path}` + (method === 'GET' ? `?id=${encodeURIComponent(push.id)}` : '');
+    const res = await fetch(url, method === 'GET' ? {} : { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: push.id, ...payload }) });
+    let data = {};
+    try { data = await res.json(); } catch {}
+    if (!res.ok) { const err = new Error(data.error || `HTTP ${res.status}`); err.status = res.status; throw err; }
+    return data;
+  }
+  // Keep the worker's copy of the profile fresh (at most every 10 minutes) and mark the user active.
+  async function syncPush(force) {
+    if (!push.enabled || !settings.workerUrl) return;
+    if (!force && Date.now() - push.lastSync < 10 * 60 * 1000) return;
+    try {
+      await pushApi('sync', { profile: pushProfile() });
+      push.lastSync = Date.now();
+      savePush();
+    } catch (e) {
+      if (e.status === 404) { push.enabled = false; savePush(); renderPush(); }
+    }
+  }
+  // Messages the buddy sent while the app was closed go into the chat when it opens.
+  async function fetchInbox() {
+    if (!push.enabled || !settings.workerUrl) return;
+    try {
+      const { messages = [] } = await pushApi('inbox', null, 'GET');
+      if (!messages.length) return;
+      for (const m of messages) state.messages.push({ role: 'model', text: String(m.text), t: Number(m.t) || Date.now() });
+      state.messages.sort((a, b) => a.t - b.t);
+      state.lastSeen = Date.now();
+      persist();
+      renderAll();
+      if (settings.voice && document.visibilityState === 'visible') speak(messages[messages.length - 1].text);
+    } catch {}
+  }
+  function renderPush() {
+    const status = $('pushStatus');
+    let text, canOn = false;
+    if (!settings.workerUrl) text = 'ใส่ลิงก์ Worker ก่อน';
+    else if (isIOS && !standalone) text = 'บน iPhone ต้อง "เพิ่มไปยังหน้าจอโฮม" แล้วเปิดแอปจากไอคอนก่อน ถึงจะเปิดการแจ้งเตือนได้ (iOS 16.4 ขึ้นไป)';
+    else if (!pushSupported) text = 'เครื่อง/เบราว์เซอร์นี้ไม่รองรับการแจ้งเตือนของเว็บแอป';
+    else if (Notification.permission === 'denied') text = 'การแจ้งเตือนถูกปิดไว้ ไปที่ การตั้งค่า > การแจ้งเตือน > Buddy แล้วเปิด "อนุญาตการแจ้งเตือน"';
+    else if (push.enabled) text = `✅ เปิดอยู่ — ${settings.name} จะทักมาวันละไม่เกิน ${settings.perDay} ครั้ง ช่วง 9:00–21:00 (ไม่ทักซ้ำถ้ายังไม่ได้อ่าน และไม่ทักถ้าเพิ่งคุยกันไป)`;
+    else { text = 'ยังไม่ได้เปิด'; canOn = true; }
+    status.textContent = text;
+    $('pushOn').hidden = push.enabled || !canOn;
+    $('pushTest').hidden = $('pushOff').hidden = !push.enabled;
+  }
+  const b64ToBytes = (s) => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((s.length + 3) % 4)), (c) => c.charCodeAt(0));
+  $('pushOn').addEventListener('click', async () => {
+    const btn = $('pushOn');
+    btn.disabled = true;
+    try {
+      const perm = await Notification.requestPermission();   // must run right after the tap on iOS
+      if (perm !== 'granted') { renderPush(); return; }
+      const { key } = await (await fetch(`${workerBase()}/push/key`)).json();
+      if (!key) throw new Error('Worker ยังไม่ได้ตั้งค่าระบบแจ้งเตือน');
+      const reg = await navigator.serviceWorker.ready;
+      const old = await reg.pushManager.getSubscription();
+      if (old) await old.unsubscribe();
+      const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(key) });
+      push.id = push.id || crypto.randomUUID();
+      settings.perDay = Number($('sPerDay').value) || 2;
+      save('lb_settings', settings);
+      await pushApi('subscribe', { sub: sub.toJSON(), profile: pushProfile() });
+      push.enabled = true;
+      push.lastSync = Date.now();
+      savePush();
+    } catch (e) {
+      alert('เปิดการแจ้งเตือนไม่สำเร็จ: ' + e.message);
+    } finally {
+      btn.disabled = false;
+      renderPush();
+    }
+  });
+  $('pushTest').addEventListener('click', async () => {
+    const btn = $('pushTest');
+    btn.disabled = true;
+    btn.textContent = 'กำลังส่ง…';
+    try {
+      await pushApi('test', { profile: pushProfile() });
+      btn.textContent = 'ส่งแล้ว ✓ ดูแจ้งเตือน';
+    } catch (e) {
+      alert('ส่งทดสอบไม่สำเร็จ: ' + e.message);
+      btn.textContent = 'ส่งทดสอบตอนนี้';
+    } finally {
+      setTimeout(() => { btn.disabled = false; btn.textContent = 'ส่งทดสอบตอนนี้'; }, 4000);
+    }
+  });
+  $('pushOff').addEventListener('click', async () => {
+    try { await pushApi('unsubscribe', {}); } catch {}
+    try { const reg = await navigator.serviceWorker.ready; await (await reg.pushManager.getSubscription())?.unsubscribe(); } catch {}
+    push.enabled = false;
+    savePush();
+    renderPush();
+  });
+  $('sPerDay').addEventListener('change', () => {
+    settings.perDay = Number($('sPerDay').value) || 2;
+    save('lb_settings', settings);
+    renderPush();
+    syncPush(true);
+  });
+
   // ---------- start ----------
   $('quota').addEventListener('click', openSettings);
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') { renderQuota(); maybeGreet(); }
+    if (document.visibilityState === 'visible') { renderQuota(); fetchInbox().then(maybeGreet); syncPush(false); }
     else { state.lastSeen = state.messages.length ? Date.now() : state.lastSeen; persist(); }
   });
   if ('serviceWorker' in navigator && location.protocol !== 'file:') {
@@ -879,8 +1150,10 @@ Only correct real errors in the user's last message (grammar, wrong word, unnatu
   }
   updateHeader();
   renderQuota();
+  renderScene();
   renderAll();
-  maybeGreet();
+  fetchInbox().then(maybeGreet);
+  syncPush(false);
 })();
 </script>
 </body>

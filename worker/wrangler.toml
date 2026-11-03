@@ -16,5 +16,21 @@ region = "aws:us-east-1"
 [observability]
 enabled = true
 
-# The API key is a secret and never goes in this file:
+# "Buddy messages first": push subscriptions and pending messages.
+[[kv_namespaces]]
+binding = "BUDDY"
+id = "ac833d27c435440eacd64d2abd7eaa79"
+
+# The cron calls this Worker's own fetch handler through SELF, so the Gemini request
+# runs where [placement] puts it (cron runs elsewhere).
+[[services]]
+binding = "SELF"
+service = "language-buddy"
+
+[triggers]
+crons = ["*/30 * * * *"]   # keep in sync with CRON_MINUTES in worker.js
+
+# Secrets never go in this file:
 #   npx wrangler secret put GEMINI_API_KEY
+#   node make-vapid.mjs | npx wrangler secret put VAPID_PRIVATE_JWK
+#   npx wrangler secret put INTERNAL_KEY   (any long random string)
