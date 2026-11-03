@@ -7,7 +7,22 @@
 //   GEMINI_MODEL    (Text, optional)    defaults to gemini-3.5-flash-lite
 
 const MAX_TURNS = 60;
-const MAX_BODY_CHARS = 60000;
+const MAX_BODY_CHARS = 1500000;   // room for one resized photo
+const MAX_IMAGE_CHARS = 1400000;  // base64 length of a single photo
+const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+
+// Each turn may have text parts and (from the app) one photo as inlineData.
+function cleanParts(parts) {
+  const out = [];
+  for (const p of Array.isArray(parts) ? parts.slice(0, 4) : []) {
+    if (typeof p?.text === 'string') out.push({ text: p.text.slice(0, 4000) });
+    else if (p?.inlineData && IMAGE_TYPES.includes(p.inlineData.mimeType) &&
+             typeof p.inlineData.data === 'string' && p.inlineData.data.length <= MAX_IMAGE_CHARS) {
+      out.push({ inlineData: { mimeType: p.inlineData.mimeType, data: p.inlineData.data } });
+    }
+  }
+  return out.length ? out : [{ text: '' }];
+}
 
 export default {
   async fetch(request, env) {
@@ -41,7 +56,7 @@ export default {
     }
     const clean = contents.map((c) => ({
       role: c.role === 'model' ? 'model' : 'user',
-      parts: [{ text: String(c.parts?.[0]?.text ?? '').slice(0, 4000) }],
+      parts: cleanParts(c.parts),
     }));
 
     const model = env.GEMINI_MODEL || 'gemini-3.5-flash-lite';
@@ -61,6 +76,7 @@ export default {
 
     const text = (data.candidates?.[0]?.content?.parts || []).map((p) => p.text || '').join('');
     if (!text) return json({ error: 'Gemini returned an empty answer (maybe blocked by safety filters)' }, 502);
-    return json({ text });
+    const u = data.usageMetadata || {};
+    return json({ text, usage: { prompt: u.promptTokenCount || 0, output: u.candidatesTokenCount || 0, total: u.totalTokenCount || 0 } });
   },
 };

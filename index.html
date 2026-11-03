@@ -96,6 +96,17 @@
     display: grid; place-items: center;
   }
 
+  #quota {
+    display: block; width: 100%; border: 0; text-align: left;
+    padding: 6px 16px 8px; background: var(--bg); border-bottom: 1px solid var(--line);
+    font-size: 12px; color: var(--muted);
+  }
+  #quota .bar { height: 4px; border-radius: 2px; background: var(--surface-2); margin-top: 5px; overflow: hidden; }
+  #quota .bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .3s; }
+  #quota.warn .bar i { background: var(--fix-line); }
+  #quota.out { color: var(--danger); }
+  #quota.out .bar i { background: var(--danger); }
+
   #chat {
     flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch;
     padding: 16px 16px 8px;
@@ -111,6 +122,8 @@
   .me .bubble { background: var(--me); color: var(--me-text); border-bottom-right-radius: 6px; }
   .bot .bubble { background: var(--surface); border-bottom-left-radius: 6px; }
   .bot .bubble.speakable { cursor: pointer; }
+  .bubble img { display: block; max-width: 220px; max-height: 260px; border-radius: 12px; margin: 2px 0 4px; }
+  .bubble .photo-tag { opacity: .8; font-size: 14px; }
   .meta { font-size: 11px; color: var(--muted); margin: 2px 6px 6px; }
   .fix {
     margin-top: 4px; padding: 8px 11px; border-radius: 12px;
@@ -138,8 +151,13 @@
   footer {
     padding: 8px 10px calc(env(safe-area-inset-bottom) + 8px);
     background: var(--bg); border-top: 1px solid var(--line);
-    display: flex; align-items: flex-end; gap: 8px;
+    display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px;
   }
+  #preview { flex-basis: 100%; display: none; align-items: center; gap: 10px; padding: 0 4px; }
+  #preview.show { display: flex; }
+  #preview img { width: 56px; height: 56px; object-fit: cover; border-radius: 10px; }
+  #preview span { flex: 1; font-size: 13px; color: var(--muted); }
+  #photoInput { display: none; }
   #input {
     flex: 1; resize: none; border: 1px solid var(--line); border-radius: 20px;
     padding: 9px 14px; font: inherit; font-size: 16px; line-height: 1.35;
@@ -204,9 +222,25 @@
   </button>
 </header>
 
+<button id="quota" type="button" aria-label="โควตาวันนี้">
+  <span id="quotaText">วันนี้ใช้ไป 0 ครั้ง</span>
+  <div class="bar"><i id="quotaBar"></i></div>
+</button>
+
 <main id="chat" aria-live="polite"></main>
 
 <footer>
+  <div id="preview">
+    <img id="previewImg" alt="">
+    <span>รูปพร้อมส่ง — พิมพ์คำถามเพิ่มได้</span>
+    <button class="icon-btn" id="previewClear" aria-label="ลบรูป">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+    </button>
+  </div>
+  <input type="file" id="photoInput" accept="image/*">
+  <button class="round" id="photo" aria-label="ส่งรูป">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+  </button>
   <button class="round" id="mic" aria-label="พูด">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v1a7 7 0 0 0 14 0v-1"/><path d="M12 18v4"/></svg>
   </button>
@@ -240,6 +274,9 @@
     <textarea id="sPersona"></textarea>
     <label for="sRate">ความเร็วเสียงพูด</label>
     <input id="sRate" type="range" min="0.6" max="1.2" step="0.05">
+    <label for="sLimit">โควตาฟรีต่อวัน (จำนวนครั้ง)</label>
+    <input id="sLimit" type="number" min="0" step="1" inputmode="numeric" placeholder="เช่น 1000">
+    <div class="hint">ดูตัวเลข RPD ของโมเดลที่ใช้ได้ที่ aistudio.google.com/rate-limit (ใส่ 0 ถ้าไม่รู้) · แอปนับเฉพาะในเครื่องนี้ · รีเซ็ตเที่ยงคืนเวลาสหรัฐฯ ฝั่งตะวันตก</div>
     <label class="check"><input id="sVoice" type="checkbox"> อ่านคำตอบออกเสียงอัตโนมัติ</label>
     <label class="check"><input id="sAutoSend" type="checkbox"> พูดจบแล้วส่งทันที</label>
     <div class="actions">
@@ -285,7 +322,9 @@
     voice: true,
     autoSend: true,
     rate: 0.95,
+    dailyLimit: 0,                // free requests per day from AI Studio; 0 = unknown
   };
+  const PHOTO_MAX_SIDE = 1024;
   const HISTORY_SENT = 24;        // messages sent to the model each turn
   const HISTORY_KEPT = 300;       // messages kept on the phone
   const GREET_AFTER_MS = 3 * 60 * 60 * 1000;
@@ -301,13 +340,66 @@
   let state = { messages: [], facts: [], mistakes: [], lastSeen: 0, ...load('lb_state', {}) };
   const persist = () => {
     state.messages = state.messages.slice(-HISTORY_KEPT);
-    save('lb_state', state);
+    save('lb_state', { ...state, messages: state.messages.map(({ photoData, ...m }) => m) });
   };
+
+  // ---------- quota (counted on this device; Gemini resets at midnight Pacific time) ----------
+  const pacificDay = (d = new Date()) => d.toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
+  let usage = load('lb_usage', {});
+  function todayUsage() {
+    const day = pacificDay();
+    if (usage.day !== day) usage = { day, requests: 0, photos: 0, tokens: 0, out: false };
+    return usage;
+  }
+  function nextReset() {
+    const today = pacificDay(), t = new Date();
+    t.setSeconds(0, 0);
+    for (let i = 0; i < 1500 && pacificDay(t) === today; i++) t.setMinutes(t.getMinutes() + 1);
+    return t;
+  }
+  function recordUsage(tokens, hadPhoto) {
+    const u = todayUsage();
+    u.requests += 1;
+    u.tokens += tokens || 0;
+    if (hadPhoto) u.photos += 1;
+    save('lb_usage', u);
+    renderQuota();
+  }
+  function markQuotaOut() {
+    todayUsage().out = true;
+    save('lb_usage', usage);
+    renderQuota();
+  }
+  function renderQuota() {
+    const u = todayUsage(), limit = Number(settings.dailyLimit) || 0;
+    const reset = nextReset().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+    const box = $('quota'), n = u.requests.toLocaleString('th-TH');
+    let text, pct;
+    if (u.out) {
+      text = `โควตาฟรีวันนี้หมดแล้ว (ใช้ไป ${n} ครั้ง) · ใช้ได้อีกครั้งหลัง ${reset} น.`;
+      pct = 100;
+    } else if (limit) {
+      const left = Math.max(limit - u.requests, 0);
+      text = `วันนี้ใช้ไป ${n} / ${limit.toLocaleString('th-TH')} ครั้ง · เหลือ ${left.toLocaleString('th-TH')} · รีเซ็ต ${reset} น.`;
+      pct = Math.min(100, (u.requests / limit) * 100);
+    } else {
+      text = `วันนี้ใช้ไป ${n} ครั้ง · แตะเพื่อใส่โควตาต่อวัน`;
+      pct = 0;
+    }
+    if (u.photos) text += ` · รูป ${u.photos}`;
+    $('quotaText').textContent = text;
+    $('quotaBar').style.width = pct + '%';
+    box.classList.toggle('out', !!u.out || (limit && u.requests >= limit));
+    box.classList.toggle('warn', !u.out && limit && u.requests >= limit * 0.8 && u.requests < limit);
+    box.title = `โทเค็นวันนี้ ${u.tokens.toLocaleString('th-TH')}`;
+  }
 
   // ---------- dom ----------
   const $ = (id) => document.getElementById(id);
   const chat = $('chat'), input = $('input'), sendBtn = $('send'), micBtn = $('mic');
   let busy = false;
+  let pendingPhoto = null;        // { dataUrl, mimeType, data } waiting to be sent
+  const photoCache = {};          // message time -> dataUrl; photos are not saved to storage (too big)
 
   const fmtTime = (t) => new Date(t).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
   const scrollDown = () => requestAnimationFrame(() => { chat.scrollTop = chat.scrollHeight; });
@@ -330,7 +422,16 @@
 
   function renderMessage(m) {
     const row = el('div', 'row ' + (m.role === 'user' ? 'me' : 'bot'));
-    const bubble = el('div', 'bubble', m.text);
+    const bubble = el('div', 'bubble');
+    if (m.photo) {
+      if (photoCache[m.t]) {
+        const img = el('img');
+        img.src = photoCache[m.t];
+        img.alt = 'รูปที่ส่ง';
+        bubble.append(img);
+      } else bubble.append(el('div', 'photo-tag', '📷 ส่งรูป'));
+    }
+    if (m.text) bubble.append(m.text);
     if (m.role === 'model') {
       bubble.classList.add('speakable');
       bubble.title = 'แตะเพื่อฟังอีกครั้ง';
@@ -406,6 +507,8 @@ ${facts}
 Mistakes they made recently (gently re-use these patterns so they practise):
 ${recent}
 
+If the user sends a photo, react to it like a friend would, and naturally teach 1–2 useful ${settings.lang} words for things in it. If they ask you to read text in the photo, help them. Earlier photos appear as "[sent a photo]" because you can only see the newest one.
+
 Always answer with JSON only:
 {
   "reply": "your chat message in ${settings.lang}",
@@ -416,10 +519,15 @@ Only correct real errors in the user's last message (grammar, wrong word, unnatu
   }
 
   function buildContents(extraUserTurn) {
-    const hist = state.messages.slice(-HISTORY_SENT).map((m) => ({
-      role: m.role === 'user' ? 'user' : 'model',
-      parts: [{ text: m.text }],
-    }));
+    const recent = state.messages.slice(-HISTORY_SENT);
+    const hist = recent.map((m, i) => {
+      const parts = [];
+      const isNewest = i === recent.length - 1 && !extraUserTurn;
+      if (m.photo && isNewest && m.photoData) parts.push({ inlineData: m.photoData });
+      const text = (m.photo && !(isNewest && m.photoData) ? '[sent a photo] ' : '') + (m.text || '');
+      parts.push({ text: text || '(photo)' });
+      return { role: m.role === 'user' ? 'user' : 'model', parts };
+    });
     if (extraUserTurn) hist.push({ role: 'user', parts: [{ text: extraUserTurn }] });
     // Gemini wants the first turn to be the user's; keep the buddy's opening line by adding a placeholder.
     if (hist.length && hist[0].role !== 'user') hist.unshift({ role: 'user', parts: [{ text: '(opened the chat)' }] });
@@ -437,17 +545,28 @@ Only correct real errors in the user's last message (grammar, wrong word, unnatu
 
   async function askAI(extraUserTurn) {
     if (!settings.workerUrl) { showSetupNotice(); return null; }
+    const contents = buildContents(extraUserTurn);
+    const hadPhoto = contents.some((c) => c.parts.some((p) => p.inlineData));
     const res = await fetch(settings.workerUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ system: systemPrompt(), contents: buildContents(extraUserTurn) }),
+      body: JSON.stringify({ system: systemPrompt(), contents }),
     });
     let data = {};
     try { data = await res.json(); } catch {}
     if (!res.ok) {
       const msg = data.error || `HTTP ${res.status}`;
-      throw new Error(res.status === 429 ? 'โควตาฟรีของวันนี้/นาทีนี้หมดชั่วคราว ลองใหม่อีกสักครู่' : msg);
+      if (res.status === 429) {
+        if (/per\s*day|perday|daily/i.test(msg)) {
+          markQuotaOut();
+          throw new Error('โควตาฟรีของวันนี้หมดแล้ว ใช้ได้อีกครั้งหลังเวลารีเซ็ตด้านบน');
+        }
+        throw new Error('ส่งถี่เกินไป (โควตาต่อนาที) รอประมาณ 1 นาทีแล้วลองใหม่');
+      }
+      if (res.status === 413) throw new Error('รูปใหญ่เกินไป ลองรูปอื่น');
+      throw new Error(msg);
     }
+    recordUsage(data.usage?.total, hadPhoto);
     return parseReply(data.text || '');
   }
 
@@ -478,13 +597,18 @@ Only correct real errors in the user's last message (grammar, wrong word, unnatu
     if (settings.voice) speak(ai.reply);
   }
 
-  async function run(userText, hiddenTurn) {
+  async function run(userText, hiddenTurn, photo) {
     if (busy) return;
     busy = true;
     refreshSend();
     let userMsg = null;
-    if (userText) {
-      userMsg = { role: 'user', text: userText, t: Date.now() };
+    if (userText || photo) {
+      userMsg = { role: 'user', text: userText || '', t: Date.now() };
+      if (photo) {
+        userMsg.photo = true;
+        userMsg.photoData = { mimeType: photo.mimeType, data: photo.data };
+        photoCache[userMsg.t] = photo.dataUrl;
+      }
       state.messages.push(userMsg);
       persist();
       renderMessage(userMsg);
@@ -496,8 +620,9 @@ Only correct real errors in the user's last message (grammar, wrong word, unnatu
       if (ai) applyAI(ai, userMsg);
     } catch (e) {
       typing(false);
-      notice('ส่งไม่สำเร็จ: ' + e.message, true, userText ? null : 'ลองอีกครั้ง', () => run(null, hiddenTurn));
+      notice('ส่งไม่สำเร็จ: ' + e.message, true, userMsg ? null : 'ลองอีกครั้ง', () => run(null, hiddenTurn));
     } finally {
+      if (userMsg) delete userMsg.photoData;   // the model only sees each photo once
       busy = false;
       refreshSend();
     }
@@ -505,12 +630,60 @@ Only correct real errors in the user's last message (grammar, wrong word, unnatu
 
   function send() {
     const text = input.value.trim();
-    if (!text || busy) return;
+    if ((!text && !pendingPhoto) || busy) return;
+    const photo = pendingPhoto;
     input.value = '';
+    clearPhoto();
     autoGrow();
     unlockSpeech();
-    run(text);
+    run(text, null, photo);
   }
+
+  // ---------- photos ----------
+  // Shrink to PHOTO_MAX_SIDE and re-encode as JPEG so uploads stay small.
+  async function preparePhoto(file) {
+    const url = URL.createObjectURL(file);
+    try {
+      const img = await new Promise((resolve, reject) => {
+        const i = new Image();
+        i.onload = () => resolve(i);
+        i.onerror = () => reject(new Error('เปิดรูปนี้ไม่ได้'));
+        i.src = url;
+      });
+      const scale = Math.min(1, PHOTO_MAX_SIDE / Math.max(img.naturalWidth, img.naturalHeight));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(img.naturalWidth * scale);
+      canvas.height = Math.round(img.naturalHeight * scale);
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+      return { dataUrl, mimeType: 'image/jpeg', data: dataUrl.split(',')[1] };
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }
+  function clearPhoto() {
+    pendingPhoto = null;
+    $('preview').classList.remove('show');
+    $('previewImg').removeAttribute('src');
+    $('photoInput').value = '';
+    refreshSend();
+  }
+  $('photo').addEventListener('click', () => { unlockSpeech(); $('photoInput').click(); });
+  $('previewClear').addEventListener('click', clearPhoto);
+  $('photoInput').addEventListener('change', async (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    try {
+      pendingPhoto = await preparePhoto(file);
+      $('previewImg').src = pendingPhoto.dataUrl;
+      $('preview').classList.add('show');
+      input.focus();
+    } catch (err) {
+      clearPhoto();
+      notice(err.message, true);
+    }
+    refreshSend();
+  });
 
   // Buddy writes first when you come back after a while.
   function maybeGreet() {
@@ -612,7 +785,7 @@ Only correct real errors in the user's last message (grammar, wrong word, unnatu
     input.style.height = 'auto';
     input.style.height = Math.min(input.scrollHeight, 120) + 'px';
   }
-  function refreshSend() { sendBtn.disabled = busy || !input.value.trim(); }
+  function refreshSend() { sendBtn.disabled = busy || (!input.value.trim() && !pendingPhoto); }
   input.addEventListener('input', () => { autoGrow(); refreshSend(); });
   input.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(); }
@@ -634,6 +807,7 @@ Only correct real errors in the user's last message (grammar, wrong word, unnatu
     $('sName').value = settings.name;
     $('sPersona').value = settings.persona;
     $('sRate').value = settings.rate;
+    $('sLimit').value = settings.dailyLimit || '';
     $('sVoice').checked = settings.voice;
     $('sAutoSend').checked = settings.autoSend;
     $('settings').showModal();
@@ -650,11 +824,13 @@ Only correct real errors in the user's last message (grammar, wrong word, unnatu
       name: $('sName').value.trim() || DEFAULT_SETTINGS.name,
       persona: $('sPersona').value.trim() || DEFAULT_SETTINGS.persona,
       rate: Number($('sRate').value),
+      dailyLimit: Math.max(0, Math.floor(Number($('sLimit').value) || 0)),
       voice: $('sVoice').checked,
       autoSend: $('sAutoSend').checked,
     };
     save('lb_settings', settings);
     updateHeader();
+    renderQuota();
     renderAll();
     if (!hadWorker && settings.workerUrl) { unlockSpeech(); maybeGreet(); }
   });
@@ -688,14 +864,16 @@ Only correct real errors in the user's last message (grammar, wrong word, unnatu
   });
 
   // ---------- start ----------
+  $('quota').addEventListener('click', openSettings);
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') maybeGreet();
+    if (document.visibilityState === 'visible') { renderQuota(); maybeGreet(); }
     else { state.lastSeen = state.messages.length ? Date.now() : state.lastSeen; persist(); }
   });
   if ('serviceWorker' in navigator && location.protocol !== 'file:') {
     navigator.serviceWorker.register('sw.js').catch(() => {});
   }
   updateHeader();
+  renderQuota();
   renderAll();
   maybeGreet();
 })();
