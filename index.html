@@ -1,1308 +1,190 @@
 <!doctype html>
-<html lang="th">
+<html lang="th" data-theme="dark">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
 <title>Language Buddy</title>
-<meta name="description" content="เพื่อน AI สำหรับฝึกภาษา">
-<meta name="theme-color" content="#f6f4ef" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#16181d" media="(prefers-color-scheme: dark)">
+<meta name="description" content="เพื่อน AI สำหรับฝึกภาษา: คุย แก้ไวยากรณ์ ทบทวนคำศัพท์ และฝึกสถานการณ์จริง">
+<meta name="theme-color" content="#10131a">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Buddy">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https: http://localhost:* http://127.0.0.1:*; media-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-<style>
-  :root {
-    --bg: #f6f4ef;
-    --surface: #ffffff;
-    --surface-2: #eeebe4;
-    --text: #1d1f24;
-    --muted: #6b6f78;
-    --line: #e2ded5;
-    --accent: #2f6f5e;
-    --accent-text: #ffffff;
-    --me: #2f6f5e;
-    --me-text: #ffffff;
-    --fix-bg: #fff6e0;
-    --fix-line: #e9c46a;
-    --fix-text: #5c4510;
-    --danger: #b23b3b;
-    --shadow: 0 1px 2px rgba(0,0,0,.06), 0 4px 16px rgba(0,0,0,.05);
-  }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #16181d;
-      --surface: #20232a;
-      --surface-2: #2a2e37;
-      --text: #eceef2;
-      --muted: #9aa0ab;
-      --line: #313641;
-      --accent: #5fb39b;
-      --accent-text: #0f1a16;
-      --me: #2f6f5e;
-      --me-text: #ffffff;
-      --fix-bg: #2e2818;
-      --fix-line: #8a6d24;
-      --fix-text: #f1dca2;
-      --danger: #e07070;
-      --shadow: 0 1px 2px rgba(0,0,0,.4);
-    }
-  }
-  * { box-sizing: border-box; }
-  html, body { height: 100%; margin: 0; }
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font: 16px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans Thai", "Leelawadee UI", sans-serif;
-    -webkit-text-size-adjust: 100%;
-    display: flex;
-    flex-direction: column;
-    height: 100dvh;
-    overflow: hidden;
-  }
-  button { font: inherit; color: inherit; cursor: pointer; }
-
-  header {
-    display: flex; align-items: center; gap: 12px;
-    padding: calc(env(safe-area-inset-top) + 10px) 16px 10px;
-    background: var(--bg);
-    border-bottom: 1px solid var(--line);
-  }
-  .avatar {
-    width: 40px; height: 40px; border-radius: 50%;
-    background: var(--accent); color: var(--accent-text);
-    display: grid; place-items: center; font-weight: 700; font-size: 18px; flex: none;
-  }
-  .who { flex: 1; min-width: 0; }
-  .who b { display: block; font-size: 17px; }
-  .who small { color: var(--muted); font-size: 13px; }
-  .icon-btn {
-    width: 40px; height: 40px; border-radius: 12px; border: 0;
-    background: transparent; display: grid; place-items: center; flex: none;
-  }
-  .icon-btn:active { background: var(--surface-2); }
-  .icon-btn svg { width: 22px; height: 22px; }
-  .badge {
-    position: relative;
-  }
-  .badge[data-count]::after {
-    content: attr(data-count);
-    position: absolute; top: 4px; right: 2px;
-    min-width: 17px; height: 17px; padding: 0 4px; border-radius: 9px;
-    background: var(--fix-line); color: #3a2b05; font-size: 11px; font-weight: 700;
-    display: grid; place-items: center;
-  }
-
-  #quota {
-    display: block; width: 100%; border: 0; text-align: left;
-    padding: 6px 16px 8px; background: var(--bg); border-bottom: 1px solid var(--line);
-    font-size: 12px; color: var(--muted);
-  }
-  #quota .bar { height: 4px; border-radius: 2px; background: var(--surface-2); margin-top: 5px; overflow: hidden; }
-  #quota .bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .3s; }
-  #quota.warn .bar i { background: var(--fix-line); }
-  #quota.out { color: var(--danger); }
-  #quota.out .bar i { background: var(--danger); }
-
-  #chat {
-    flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch;
-    padding: 16px 16px 8px;
-    display: flex; flex-direction: column; gap: 6px;
-  }
-  .row { display: flex; flex-direction: column; max-width: 86%; }
-  .row.me { align-self: flex-end; align-items: flex-end; }
-  .row.bot { align-self: flex-start; align-items: flex-start; }
-  .bubble {
-    padding: 9px 13px; border-radius: 18px; white-space: pre-wrap; word-wrap: break-word;
-    box-shadow: var(--shadow);
-  }
-  .me .bubble { background: var(--me); color: var(--me-text); border-bottom-right-radius: 6px; }
-  .bot .bubble { background: var(--surface); border-bottom-left-radius: 6px; }
-  .bot .bubble.speakable { cursor: pointer; }
-  .bubble img { display: block; max-width: 220px; max-height: 260px; border-radius: 12px; margin: 2px 0 4px; }
-  .bubble .photo-tag { opacity: .8; font-size: 14px; }
-  .meta { font-size: 11px; color: var(--muted); margin: 2px 6px 6px; }
-  .fix {
-    margin-top: 4px; padding: 8px 11px; border-radius: 12px;
-    background: var(--fix-bg); color: var(--fix-text);
-    border: 1px solid var(--fix-line); font-size: 14px; max-width: 100%;
-  }
-  .fix .right { font-weight: 600; }
-  .fix .wrong { text-decoration: line-through; opacity: .75; }
-  .fix .why { margin-top: 3px; }
-  .typing { display: inline-flex; gap: 4px; padding: 14px 16px; }
-  .typing i { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); animation: b 1.2s infinite; }
-  .typing i:nth-child(2) { animation-delay: .15s; }
-  .typing i:nth-child(3) { animation-delay: .3s; }
-  @keyframes b { 0%, 60%, 100% { opacity: .3; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-3px); } }
-  .notice {
-    align-self: center; text-align: center; color: var(--muted); font-size: 13px;
-    max-width: 340px; padding: 8px 12px;
-  }
-  .notice.err { color: var(--danger); }
-  .notice button {
-    margin-top: 8px; border: 0; border-radius: 10px; padding: 8px 14px;
-    background: var(--accent); color: var(--accent-text); font-weight: 600;
-  }
-
-  footer {
-    padding: 8px 10px calc(env(safe-area-inset-bottom) + 8px);
-    background: var(--bg); border-top: 1px solid var(--line);
-    display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px;
-  }
-  #preview { flex-basis: 100%; display: none; align-items: center; gap: 10px; padding: 0 4px; }
-  #preview.show { display: flex; }
-  #preview img { width: 56px; height: 56px; object-fit: cover; border-radius: 10px; }
-  #preview span { flex: 1; font-size: 13px; color: var(--muted); }
-  #photoInput { display: none; }
-  #input {
-    flex: 1; resize: none; border: 1px solid var(--line); border-radius: 20px;
-    padding: 9px 14px; font: inherit; font-size: 16px; line-height: 1.35;
-    background: var(--surface); color: var(--text); max-height: 120px; min-height: 40px;
-    outline: none;
-  }
-  #input:focus { border-color: var(--accent); }
-  .round {
-    width: 42px; height: 42px; border-radius: 50%; border: 0; flex: none;
-    display: grid; place-items: center; background: var(--surface-2);
-  }
-  .round svg { width: 22px; height: 22px; }
-  #send { background: var(--accent); color: var(--accent-text); }
-  #send:disabled { opacity: .4; }
-  #mic.on { background: var(--danger); color: #fff; animation: pulse 1.2s infinite; }
-  @keyframes pulse { 50% { box-shadow: 0 0 0 6px rgba(178,59,59,.25); } }
-
-  dialog {
-    border: 0; padding: 0; width: min(520px, 100%); max-height: 88dvh;
-    border-radius: 18px; background: var(--surface); color: var(--text);
-    box-shadow: 0 10px 40px rgba(0,0,0,.3);
-  }
-  dialog::backdrop { background: rgba(0,0,0,.4); }
-  .sheet { padding: 18px 16px calc(env(safe-area-inset-bottom) + 16px); }
-  .sheet h2 { margin: 0 0 12px; font-size: 19px; }
-  .sheet label { display: block; font-size: 13px; color: var(--muted); margin: 12px 0 4px; }
-  .sheet input, .sheet select, .sheet textarea {
-    width: 100%; font: inherit; font-size: 16px; padding: 9px 11px;
-    border: 1px solid var(--line); border-radius: 10px;
-    background: var(--bg); color: var(--text);
-  }
-  .sheet textarea { resize: vertical; min-height: 70px; }
-  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  .check { display: flex; align-items: center; gap: 8px; margin-top: 14px; font-size: 15px; }
-  .check input { width: 20px; height: 20px; }
-  .actions { display: flex; gap: 8px; margin-top: 18px; flex-wrap: wrap; }
-  .btn {
-    border: 0; border-radius: 10px; padding: 10px 16px; font-weight: 600;
-    background: var(--surface-2);
-  }
-  .btn.primary { background: var(--accent); color: var(--accent-text); }
-  .btn.danger { color: var(--danger); }
-  .hint { font-size: 12px; color: var(--muted); margin-top: 4px; }
-  .mlist { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
-  .mlist li { margin: 0; }
-  .empty { color: var(--muted); font-size: 14px; }
-  .facts { font-size: 14px; color: var(--muted); padding-left: 18px; }
-  .sheet h3.section { margin: 22px 0 2px; font-size: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
-  .times { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-  .times input { padding: 9px 6px; text-align: center; }
-  .scenes { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
-  .scenes button {
-    border: 1px solid var(--line); border-radius: 12px; padding: 10px; text-align: left;
-    background: var(--bg); font-size: 14px; line-height: 1.3;
-  }
-  .scenes button b { display: block; font-size: 22px; margin-bottom: 2px; }
-  #scene {
-    display: flex; align-items: center; gap: 10px; padding: 8px 16px;
-    background: var(--fix-bg); color: var(--fix-text); border-bottom: 1px solid var(--fix-line); font-size: 14px;
-  }
-  #scene[hidden] { display: none; }
-  #scene span { flex: 1; min-width: 0; }
-  #scene button {
-    border: 0; border-radius: 9px; padding: 6px 10px; font-size: 13px; font-weight: 600;
-    background: var(--fix-line); color: #3a2b05; flex: none;
-  }
-</style>
+<link rel="stylesheet" href="css/app.css">
+<script type="module" src="js/main.js"></script>
 </head>
 <body>
-<header>
-  <div class="avatar" id="avatar">S</div>
-  <div class="who">
-    <b id="buddyName">Sam</b>
-    <small id="status">English · B1</small>
-  </div>
-  <button class="icon-btn" id="roleBtn" aria-label="ฝึกสถานการณ์">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h18v7a9 9 0 0 1-18 0z"/><path d="M8 9h.01M16 9h.01"/><path d="M8.5 14a4 4 0 0 0 7 0"/></svg>
-  </button>
-  <button class="icon-btn badge" id="mistakesBtn" aria-label="คำที่พลาด">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
-  </button>
-  <button class="icon-btn" id="settingsBtn" aria-label="ตั้งค่า">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-  </button>
-</header>
+<div class="app">
+  <nav class="nav" aria-label="เมนูหลัก">
+    <div class="nav-brand"><img src="icons/icon-192.png" alt=""> Language Buddy</div>
+    <a href="#home" data-view="home" data-icon="home"><span>หน้าหลัก</span></a>
+    <a href="#chat" data-view="chat" data-icon="chat"><span>แชต</span><span class="dot" id="chatDot" hidden></span></a>
+    <a href="#review" data-view="review" data-icon="review"><span>ทบทวน</span><span class="dot" id="dueDot" hidden></span></a>
+    <a href="#roleplay" data-view="roleplay" data-icon="mask"><span>สถานการณ์</span></a>
+    <a href="#me" data-view="me" data-icon="me"><span>ฉัน</span></a>
+  </nav>
 
-<button id="quota" type="button" aria-label="โควตาวันนี้">
-  <span id="quotaText">วันนี้ใช้ไป 0 ครั้ง</span>
-  <div class="bar"><i id="quotaBar"></i></div>
-</button>
+  <main class="main">
+    <section id="view-home" class="view" hidden><div class="scroll"><div class="wrap" id="homeBody"></div></div></section>
 
-<div id="scene" hidden>
-  <span id="sceneText"></span>
-  <button type="button" id="sceneEnd">จบและขอคำแนะนำ</button>
+    <section id="view-chat" class="view chat-view" hidden aria-label="แชต">
+      <header class="chat-head">
+        <div class="avatar" id="avatar" aria-hidden="true">S</div>
+        <div class="who grow"><b id="buddyName">Sam</b><small id="buddyStatus"></small></div>
+        <a class="icon-btn" href="#roleplay" aria-label="ฝึกสถานการณ์" data-icon="mask"></a>
+        <a class="icon-btn" href="#settings" aria-label="ตั้งค่า" data-icon="gear"></a>
+      </header>
+      <button class="quota" id="quota" type="button" aria-label="โควตาวันนี้ แตะเพื่อตั้งค่า">
+        <span id="quotaText">Gemini วันนี้ 0 ครั้ง</span>
+        <div class="bar" id="quotaBarWrap"><i id="quotaBar"></i></div>
+      </button>
+      <div class="scene-bar" id="sceneBar" hidden>
+        <span id="sceneText"></span>
+        <button type="button" class="btn sm" id="sceneEnd">จบและขอคำแนะนำ</button>
+      </div>
+      <div class="messages" id="messages" aria-live="polite"></div>
+      <div class="composer">
+        <div class="preview" id="preview" hidden>
+          <img id="previewImg" alt="รูปที่เลือก">
+          <span class="grow xs muted">รูปพร้อมส่ง — พิมพ์คำถามเพิ่มได้</span>
+          <button class="icon-btn" id="previewClear" type="button" aria-label="ลบรูป" data-icon="x"></button>
+        </div>
+        <div class="inner">
+          <input type="file" id="photoInput" class="photo-input" accept="image/*">
+          <button class="round" id="photoBtn" type="button" aria-label="ส่งรูป" data-icon="camera"></button>
+          <button class="round" id="micBtn" type="button" aria-label="พูด" data-icon="mic"></button>
+          <textarea id="chatInput" rows="1" placeholder="พิมพ์หรือกดไมค์เพื่อพูด…" enterkeyhint="send" aria-label="ข้อความ"></textarea>
+          <button class="round send" id="sendBtn" type="button" aria-label="ส่ง" disabled data-icon="send"></button>
+        </div>
+      </div>
+    </section>
+
+    <section id="view-review" class="view" hidden><div class="scroll"><div class="wrap" id="reviewBody"></div></div></section>
+    <section id="view-roleplay" class="view" hidden><div class="scroll"><div class="wrap" id="roleBody"></div></div></section>
+    <section id="view-me" class="view" hidden><div class="scroll"><div class="wrap" id="meBody"></div></div></section>
+
+    <section id="view-settings" class="view" hidden>
+      <div class="scroll"><div class="wrap">
+        <div class="page-head"><div><h1>ตั้งค่า</h1><p>โปรไฟล์ ภาษา เพื่อน AI การแจ้งเตือน และข้อมูลของคุณ</p></div></div>
+        <form id="settingsForm" novalidate>
+          <div class="card set-group">
+            <h3>👤 โปรไฟล์ผู้เรียน</h3>
+            <label class="field"><span>ชื่อของคุณ (ให้เพื่อน AI เรียก)</span><input class="input" id="sLearner" type="text" maxlength="40" autocomplete="nickname"></label>
+            <label class="field"><span>เป้าหมาย</span><input class="input" id="sGoalText" type="text" maxlength="200" placeholder="เช่น สอบ IELTS 7 ให้ได้ภายในปีนี้ / ใช้คุยงาน / เที่ยวต่างประเทศ"></label>
+            <div class="grid cols-4" style="grid-template-columns:repeat(3,minmax(0,1fr))">
+              <label class="field"><span>นาที/วัน</span><input class="input" id="sGoalMin" type="number" min="1" max="240" inputmode="numeric"></label>
+              <label class="field"><span>ข้อความ/วัน</span><input class="input" id="sGoalMsg" type="number" min="1" max="200" inputmode="numeric"></label>
+              <label class="field"><span>ทบทวน/วัน</span><input class="input" id="sGoalRev" type="number" min="1" max="200" inputmode="numeric"></label>
+            </div>
+          </div>
+
+          <div class="card set-group">
+            <h3>🌐 ภาษาและระดับ</h3>
+            <div class="grid md-2">
+              <label class="field"><span>ภาษาที่ฝึก</span><select class="input" id="sLang"></select></label>
+              <label class="field"><span>ระดับ (IELTS หรือ CEFR)</span><select class="input" id="sLevel"></select></label>
+            </div>
+            <label class="field" id="variantBox"><span>สำเนียงและคำศัพท์</span>
+              <select class="input" id="sVariant">
+                <option value="American">🇺🇸 อเมริกัน (color, apartment, vacation)</option>
+                <option value="British">🇬🇧 บริติช (colour, flat, holiday)</option>
+              </select></label>
+            <label class="field"><span>รูปแบบการแก้คำผิด</span>
+              <select class="input" id="sFeedback">
+                <option value="gentle">แก้เฉพาะข้อผิดชัดเจน (ไม่ขัดจังหวะ)</option>
+                <option value="detailed">ละเอียด — แก้ทั้งข้อผิดและสำนวนที่ไม่เป็นธรรมชาติ</option>
+              </select></label>
+          </div>
+
+          <div class="card set-group">
+            <h3>🤖 เพื่อน AI</h3>
+            <label class="field"><span>ชื่อเพื่อน AI</span><input class="input" id="sName" type="text" maxlength="20"></label>
+            <label class="field"><span>นิสัย/บุคลิก</span><textarea class="input" id="sPersona" maxlength="400"></textarea></label>
+            <label class="field"><span>AI ที่ใช้คุย</span>
+              <select class="input" id="sAi">
+                <option value="auto">อัตโนมัติ (แนะนำ) — Gemini ก่อน ถ้าไม่ได้สลับไป Groq</option>
+                <option value="groq">Groq ก่อน (เร็วกว่า) — ถ้าไม่ได้สลับไป Gemini</option>
+                <option value="gemini">Gemini อย่างเดียว</option>
+              </select></label>
+            <div class="hint">รูปใช้ Gemini เสมอ (Groq ดูรูปไม่ได้) · ข้อความทักผ่านการแจ้งเตือนใช้ Groq ก่อน เพื่อประหยัดโควตา Gemini</div>
+            <label class="field"><span>ความเร็วเสียงพูด</span><input class="range" id="sRate" type="range" min="0.6" max="1.2" step="0.05"></label>
+            <label class="check"><input id="sVoice" type="checkbox"> อ่านคำตอบออกเสียงอัตโนมัติ</label>
+            <label class="check"><input id="sAutoSend" type="checkbox"> พูดจบแล้วส่งทันที</label>
+          </div>
+
+          <div class="card set-group">
+            <h3>🔔 ให้เพื่อนทักมาก่อน (แจ้งเตือน)</h3>
+            <div class="hint" id="pushStatus">กำลังตรวจสอบ…</div>
+            <label class="field"><span>ให้ทักเมื่อไหร่</span>
+              <select class="input" id="sPushMode">
+                <option value="random">🎲 สุ่มเวลา เหมือนเพื่อนทักมาเอง</option>
+                <option value="fixed">🕐 กำหนดเวลาเอง</option>
+              </select></label>
+            <div id="pushRandom">
+              <div class="grid" style="grid-template-columns:repeat(3,minmax(0,1fr))">
+                <label class="field"><span>ตั้งแต่</span><select class="input" id="sFrom"></select></label>
+                <label class="field"><span>ถึง</span><select class="input" id="sTo"></select></label>
+                <label class="field"><span>วันละ</span><select class="input" id="sPerDay"><option value="1">1 ครั้ง</option><option value="2">2 ครั้ง</option><option value="3">3 ครั้ง</option></select></label>
+              </div>
+            </div>
+            <div id="pushFixed" hidden>
+              <label class="field"><span>เวลาที่ให้ทัก (สูงสุด 3 เวลา เว้นว่างได้)</span></label>
+              <div class="times">
+                <input class="input" type="time" id="sTime1" step="300" aria-label="เวลาที่ 1">
+                <input class="input" type="time" id="sTime2" step="300" aria-label="เวลาที่ 2">
+                <input class="input" type="time" id="sTime3" step="300" aria-label="เวลาที่ 3">
+              </div>
+              <div class="hint">ข้อความอาจมาช้ากว่าเวลาที่ตั้งได้ไม่เกิน 10 นาที และจะไม่ทักถ้าคุณกำลังคุยอยู่ในแอปพอดี</div>
+            </div>
+            <div class="row wrap-ok" style="margin-top:12px">
+              <button class="btn primary" type="button" id="pushOn">เปิดการแจ้งเตือน</button>
+              <button class="btn" type="button" id="pushTest" hidden>ส่งทดสอบตอนนี้</button>
+              <button class="btn danger" type="button" id="pushOff" hidden>ปิด</button>
+            </div>
+          </div>
+
+          <div class="card set-group">
+            <h3>🎨 หน้าตา</h3>
+            <label class="field"><span>ธีม</span>
+              <select class="input" id="sTheme">
+                <option value="dark">มืด</option>
+                <option value="light">สว่าง</option>
+                <option value="auto">ตามเครื่อง</option>
+              </select></label>
+          </div>
+
+          <div class="card set-group">
+            <h3>☁️ การเชื่อมต่อ</h3>
+            <label class="field"><span>ลิงก์ Cloudflare Worker</span><input class="input" id="sWorker" type="url" placeholder="https://language-buddy.xxx.workers.dev" autocomplete="off" inputmode="url"></label>
+            <label class="field"><span>รหัสเข้าใช้ Worker (ถ้าตั้งไว้)</span><input class="input" id="sAccess" type="password" autocomplete="off" maxlength="100"></label>
+            <div class="hint">ใส่เฉพาะเมื่อตั้ง ACCESS_CODE ไว้ที่ Worker — กันคนอื่นใช้โควตาของคุณ (ไม่รวมในไฟล์สำรอง)</div>
+            <label class="field"><span>โควตาฟรีของ Gemini ต่อวัน (จำนวนครั้ง)</span><input class="input" id="sLimit" type="number" min="0" step="1" inputmode="numeric" placeholder="เช่น 1000"></label>
+            <div class="hint">ดูตัวเลข RPD ได้ที่ aistudio.google.com/rate-limit · แอปนับเฉพาะในเครื่องนี้ · รีเซ็ตเที่ยงคืนเวลาแปซิฟิก</div>
+          </div>
+
+          <div class="card set-group">
+            <h3>💾 ข้อมูลของคุณ</h3>
+            <div class="hint">ข้อมูลทั้งหมดเก็บในเครื่องนี้ ส่งออกเป็นไฟล์เก็บไว้ใน "ไฟล์" หรือ iCloud แล้วนำกลับมาได้ (ไม่รวมรูป)</div>
+            <div class="row wrap-ok" style="margin-top:12px">
+              <button class="btn" type="button" id="exportBtn">ส่งออกข้อมูล</button>
+              <button class="btn" type="button" id="importBtn">นำเข้าข้อมูล</button>
+              <button class="btn danger" type="button" id="resetBtn">ล้างข้อมูลการเรียน</button>
+              <input type="file" id="importInput" accept="application/json,.json" hidden>
+            </div>
+          </div>
+
+          <div class="save-bar">
+            <button class="btn primary grow" type="submit">บันทึก</button>
+            <button class="btn" type="button" id="cancelSettings">ยกเลิก</button>
+          </div>
+        </form>
+      </div></div>
+    </section>
+  </main>
 </div>
-
-<main id="chat" aria-live="polite"></main>
-
-<footer>
-  <div id="preview">
-    <img id="previewImg" alt="">
-    <span>รูปพร้อมส่ง — พิมพ์คำถามเพิ่มได้</span>
-    <button class="icon-btn" id="previewClear" aria-label="ลบรูป">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
-    </button>
-  </div>
-  <input type="file" id="photoInput" accept="image/*">
-  <button class="round" id="photo" aria-label="ส่งรูป">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-  </button>
-  <button class="round" id="mic" aria-label="พูด">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v1a7 7 0 0 0 14 0v-1"/><path d="M12 18v4"/></svg>
-  </button>
-  <textarea id="input" rows="1" placeholder="พิมพ์หรือกดไมค์เพื่อพูด…" enterkeyhint="send"></textarea>
-  <button class="round" id="send" aria-label="ส่ง" disabled>
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="M5 12l7-7 7 7"/></svg>
-  </button>
-</footer>
-
-<dialog id="settings">
-  <form class="sheet" method="dialog" id="settingsForm">
-    <h2>ตั้งค่า</h2>
-    <label for="sWorker">ลิงก์ Cloudflare Worker</label>
-    <input id="sWorker" type="url" placeholder="https://language-buddy.xxx.workers.dev" autocomplete="off">
-    <div class="hint">ได้จากขั้นตอน deploy Worker ใน README</div>
-    <div class="grid2">
-      <div>
-        <label for="sLang">ภาษาที่ฝึก</label>
-        <select id="sLang"></select>
-      </div>
-      <div>
-        <label for="sLevel">ระดับ</label>
-        <select id="sLevel"></select>
-      </div>
-    </div>
-    <div id="variantBox">
-      <label for="sVariant">สำเนียงและคำศัพท์</label>
-      <select id="sVariant">
-        <option value="American">🇺🇸 อเมริกัน (color, apartment, vacation)</option>
-        <option value="British">🇬🇧 บริติช (colour, flat, holiday)</option>
-      </select>
-    </div>
-    <label for="sName">ชื่อเพื่อน AI</label>
-    <input id="sName" type="text" maxlength="20">
-    <label for="sPersona">นิสัย/บุคลิก</label>
-    <textarea id="sPersona"></textarea>
-    <label for="sRate">ความเร็วเสียงพูด</label>
-    <input id="sRate" type="range" min="0.6" max="1.2" step="0.05">
-    <label for="sAi">AI ที่ใช้คุย</label>
-    <select id="sAi">
-      <option value="auto">อัตโนมัติ (แนะนำ) — Gemini ก่อน ถ้าไม่ได้สลับไป Groq</option>
-      <option value="groq">Groq ก่อน (เร็วกว่า) — ถ้าไม่ได้สลับไป Gemini</option>
-      <option value="gemini">Gemini อย่างเดียว</option>
-    </select>
-    <div class="hint">รูปใช้ Gemini เสมอ (Groq ดูรูปไม่ได้) · ข้อความทักผ่านการแจ้งเตือนใช้ Groq ก่อน เพื่อประหยัดโควตา Gemini</div>
-    <label for="sLimit">โควตาฟรีของ Gemini ต่อวัน (จำนวนครั้ง)</label>
-    <input id="sLimit" type="number" min="0" step="1" inputmode="numeric" placeholder="เช่น 1000">
-    <div class="hint">ดูตัวเลข RPD ของโมเดลที่ใช้ได้ที่ aistudio.google.com/rate-limit (ใส่ 0 ถ้าไม่รู้) · แอปนับเฉพาะในเครื่องนี้ · รีเซ็ตเที่ยงคืนเวลาสหรัฐฯ ฝั่งตะวันตก</div>
-    <label class="check"><input id="sVoice" type="checkbox"> อ่านคำตอบออกเสียงอัตโนมัติ</label>
-    <label class="check"><input id="sAutoSend" type="checkbox"> พูดจบแล้วส่งทันที</label>
-
-    <h3 class="section">🔔 ให้เพื่อนทักมาก่อน (แจ้งเตือน)</h3>
-    <div class="hint" id="pushStatus">กำลังตรวจสอบ…</div>
-    <label for="sPushMode">ให้ทักเมื่อไหร่</label>
-    <select id="sPushMode">
-      <option value="random">🎲 สุ่มเวลา เหมือนเพื่อนทักมาเอง</option>
-      <option value="fixed">🕐 กำหนดเวลาเอง</option>
-    </select>
-    <div id="pushRandom">
-      <div class="grid2">
-        <div>
-          <label for="sFrom">ตั้งแต่</label>
-          <select id="sFrom" class="hour"></select>
-        </div>
-        <div>
-          <label for="sTo">ถึง</label>
-          <select id="sTo" class="hour"></select>
-        </div>
-      </div>
-      <label for="sPerDay">วันละกี่ครั้ง</label>
-      <select id="sPerDay"><option value="1">1 ครั้ง</option><option value="2">2 ครั้ง</option><option value="3">3 ครั้ง</option></select>
-    </div>
-    <div id="pushFixed" hidden>
-      <label>เวลาที่ให้ทัก (สูงสุด 3 เวลา เว้นว่างได้)</label>
-      <div class="times">
-        <input type="time" id="sTime1" step="300">
-        <input type="time" id="sTime2" step="300">
-        <input type="time" id="sTime3" step="300">
-      </div>
-      <div class="hint">ข้อความอาจมาช้ากว่าเวลาที่ตั้งได้ไม่เกิน 10 นาที และจะไม่ทักถ้าคุณกำลังคุยอยู่ในแอปพอดี</div>
-    </div>
-    <div class="actions">
-      <button class="btn primary" type="button" id="pushOn">เปิดการแจ้งเตือน</button>
-      <button class="btn" type="button" id="pushTest" hidden>ส่งทดสอบตอนนี้</button>
-      <button class="btn danger" type="button" id="pushOff" hidden>ปิด</button>
-    </div>
-
-    <h3 class="section">💾 สำรองข้อมูล</h3>
-    <div class="hint">บันทึกแชต ความจำ คำที่พลาด และการตั้งค่าเป็นไฟล์ เก็บไว้ใน "ไฟล์" ของ iPhone หรือ iCloud แล้วนำกลับมาได้ (ไม่รวมรูป)</div>
-    <div class="actions">
-      <button class="btn" type="button" id="exportBtn">ส่งออกข้อมูล</button>
-      <button class="btn" type="button" id="importBtn">นำเข้าข้อมูล</button>
-      <input type="file" id="importInput" accept="application/json,.json" hidden>
-    </div>
-
-    <div class="actions">
-      <button class="btn primary" value="save">บันทึก</button>
-      <button class="btn" value="cancel" formnovalidate>ยกเลิก</button>
-      <button class="btn danger" type="button" id="resetBtn">ล้างแชตและความจำ</button>
-    </div>
-  </form>
-</dialog>
-
-<dialog id="mistakes">
-  <div class="sheet">
-    <h2>สมุดคำที่พลาด</h2>
-    <ul class="mlist" id="mList"></ul>
-    <h2 style="margin-top:18px">สิ่งที่เพื่อนจำเกี่ยวกับคุณ</h2>
-    <ul class="facts" id="fList"></ul>
-    <div class="actions">
-      <button class="btn primary" id="quizBtn">ให้เพื่อนทดสอบคำที่พลาด</button>
-      <button class="btn" id="closeMistakes">ปิด</button>
-    </div>
-  </div>
-</dialog>
-
-<dialog id="roles">
-  <div class="sheet">
-    <h2>ฝึกสถานการณ์จริง</h2>
-    <div class="hint">เลือกสถานการณ์ แล้วเพื่อนจะเล่นเป็นอีกฝ่าย พอเสร็จกด "จบและขอคำแนะนำ" เพื่อรับคำติชมเป็นภาษาไทย</div>
-    <div class="scenes" id="sceneList"></div>
-    <label for="customScene">หรือพิมพ์สถานการณ์เอง</label>
-    <input id="customScene" type="text" maxlength="120" placeholder="เช่น ซื้อตั๋วรถไฟที่ญี่ปุ่น">
-    <div class="actions">
-      <button class="btn primary" id="customStart">เริ่มสถานการณ์นี้</button>
-      <button class="btn" id="closeRoles">ปิด</button>
-    </div>
-  </div>
-</dialog>
-
-<script>
-(() => {
-  'use strict';
-
-  const LANGS = {
-    English:  { code: 'en-US', label: 'English (อังกฤษ)' },
-    Japanese: { code: 'ja-JP', label: '日本語 (ญี่ปุ่น)' },
-    Chinese:  { code: 'zh-CN', label: '中文 (จีน)' },
-    Korean:   { code: 'ko-KR', label: '한국어 (เกาหลี)' },
-    French:   { code: 'fr-FR', label: 'Français (ฝรั่งเศส)' },
-    Spanish:  { code: 'es-ES', label: 'Español (สเปน)' },
-    German:   { code: 'de-DE', label: 'Deutsch (เยอรมัน)' },
-  };
-  const DEFAULT_SETTINGS = {
-    workerUrl: '',
-    lang: 'English',
-    level: 'B1',                  // CEFR (A1–C2) or, for English, an IELTS band such as 'IELTS 6.5'
-    variant: 'American',          // English only: American or British
-    name: 'Sam',
-    persona: 'A kind, playful friend from abroad. Casual, warm, a little teasing. Loves hearing about the user\'s day, food and hobbies.',
-    voice: true,
-    autoSend: true,
-    rate: 0.95,
-    dailyLimit: 0,                // free requests per day from AI Studio; 0 = unknown
-    perDay: 2,                    // how many times a day the buddy may message first (push)
-    pushMode: 'random',           // random: perDay times between pushFrom..pushTo; fixed: at pushTimes
-    pushFrom: 9,
-    pushTo: 21,
-    pushTimes: ['08:00', '19:00'],
-    ai: 'auto',                   // which AI the worker tries first: auto (Gemini → Groq), groq, gemini
-  };
-  const SCENES = [
-    { icon: '🎓', th: 'สอบพูด IELTS (Speaking)', englishOnly: true,
-      en: 'You are an IELTS Speaking examiner running a full mock test. Part 1: ask 4–5 short questions about familiar topics (home, work or study, hobbies), one at a time. Part 2: give a cue card (a topic plus 3–4 bullet points), tell the user to prepare and speak for 1–2 minutes, then ask one short follow-up. Part 3: ask 3–4 deeper discussion questions linked to the Part 2 topic. Say which part you are starting. Behave like a real examiner: neutral and polite, no teaching during the test, one question per turn.',
-      feedback: 'As an IELTS examiner, estimate the user\'s band for each criterion — Fluency and Coherence, Lexical Resource, Grammatical Range and Accuracy (pronunciation cannot be judged from text, say so) — and an overall band, based only on what they wrote. Then give 3 specific ways to reach the next half band, each with a better version of one of their own sentences.' },
-    { icon: '🍜', th: 'สั่งอาหารที่ร้าน', en: 'The user is a customer at a restaurant. You are the waiter: greet them, take the order, answer questions about the menu, and bring the bill at the end.' },
-    { icon: '🏨', th: 'เช็กอินโรงแรม', en: 'You are the hotel receptionist. The user is checking in: ask for the booking name, explain breakfast time, Wi-Fi, and handle a small problem with the room.' },
-    { icon: '✈️', th: 'ตม. และสนามบิน', en: 'You are an immigration officer at the airport. Ask the user the usual questions: purpose of visit, how long, where they will stay, return ticket.' },
-    { icon: '🗺️', th: 'ถามทาง', en: 'You are a local person on the street. The user is a tourist asking for directions. Give realistic directions with landmarks and check they understood.' },
-    { icon: '🛍️', th: 'ซื้อของ ต่อราคา', en: 'You are a friendly shop owner at a market. The user wants to buy something and may try to bargain. Talk about sizes, colours and price.' },
-    { icon: '💼', th: 'สัมภาษณ์งาน', en: 'You are a job interviewer. Ask the user typical interview questions one at a time (introduce yourself, strengths, why this job) and react to their answers.' },
-    { icon: '🏥', th: 'ไปหาหมอ', en: 'You are a doctor at a clinic. The user is a patient: ask about symptoms, how long, give simple advice and explain how to take medicine.' },
-    { icon: '🐾', th: 'คลินิกสัตว์ (คุณเป็นหมอ)', en: 'You are a worried pet owner at a veterinary clinic; the USER is the veterinarian. Describe your pet\'s symptoms bit by bit and ask the vet questions about diagnosis and care.' },
-    { icon: '📞', th: 'โทรจองโต๊ะ', en: 'You are a restaurant staff member answering the phone. The user is calling to book a table: date, time, number of people, name, special requests.' },
-    { icon: '🎉', th: 'เจอเพื่อนใหม่ในปาร์ตี้', en: 'You are someone the user just met at a party. Make small talk: names, where you are from, work or study, hobbies, and suggest meeting again.' },
-  ];
-  const CEFR = {
-    A1: 'เริ่มต้น', A2: 'พื้นฐาน', B1: 'กลาง', B2: 'กลาง-สูง', C1: 'สูง', C2: 'เชี่ยวชาญ',
-  };
-  // IELTS band → CEFR, following the official IELTS/CEFR alignment (B1 4.0–5.0, B2 5.5–6.5, C1 7.0–8.0, C2 8.5+).
-  const IELTS = [['3.5', 'A2'], ['4.0', 'B1'], ['4.5', 'B1'], ['5.0', 'B1'], ['5.5', 'B2'], ['6.0', 'B2'], ['6.5', 'B2'],
-    ['7.0', 'C1'], ['7.5', 'C1'], ['8.0', 'C1'], ['8.5', 'C2'], ['9.0', 'C2']];
-  const isEnglish = () => settings.lang === 'English';
-  const ieltsBand = (level = settings.level) => (/^IELTS /.test(level) ? level.slice(6) : null);
-  const cefrOf = (level = settings.level) => (ieltsBand(level) ? (IELTS.find(([b]) => b === ieltsBand(level)) || [0, 'B1'])[1] : level);
-  // Speech uses the accent the user chose for English.
-  const speechCode = () => (isEnglish() ? (settings.variant === 'British' ? 'en-GB' : 'en-US') : LANGS[settings.lang]?.code || 'en-US');
-  function levelText() {
-    const band = isEnglish() && ieltsBand();
-    return band ? `IELTS band ${band} (about CEFR ${cefrOf()})` : `CEFR ${cefrOf()}`;
-  }
-  function variantText() {
-    if (!isEnglish()) return '';
-    return settings.variant === 'British'
-      ? 'Use British English: British spelling (colour, organise, travelling), vocabulary (flat, holiday, lorry, queue, mobile) and natural British expressions. When correcting, treat American spelling or words as fine but mention the British form in "why" if it helps.'
-      : 'Use American English: American spelling (color, organize, traveling), vocabulary (apartment, vacation, truck, line, cell phone) and natural American expressions. When correcting, treat British spelling or words as fine but mention the American form in "why" if it helps.';
-  }
-  function ieltsText() {
-    const band = isEnglish() && ieltsBand();
-    if (!band) return '';
-    return `The user is preparing for IELTS and is around band ${band}. Use vocabulary and grammar a band ${band} speaker can follow, and now and then naturally use (and briefly invite them to try) a word, collocation or structure typical of the next half band up. In "why", when useful, say which IELTS criterion the mistake affects (Grammatical Range and Accuracy, Lexical Resource, Fluency and Coherence).`;
-  }
-  const PHOTO_MAX_SIDE = 1024;
-  const HISTORY_SENT = 24;        // messages sent to the model each turn
-  const HISTORY_KEPT = 300;       // messages kept on the phone
-  const GREET_AFTER_MS = 3 * 60 * 60 * 1000;
-
-  // ---------- storage ----------
-  const load = (key, fallback) => {
-    try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }
-    catch { return fallback; }
-  };
-  const save = (key, value) => { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} };
-
-  let settings = { ...DEFAULT_SETTINGS, ...load('lb_settings', {}) };
-  let state = { messages: [], facts: [], mistakes: [], lastSeen: 0, scene: null, ...load('lb_state', {}) };
-  let push = { id: '', enabled: false, lastSync: 0, ...load('lb_push', {}) };
-  const persist = () => {
-    state.messages = state.messages.slice(-HISTORY_KEPT);
-    save('lb_state', { ...state, messages: state.messages.map(({ photoData, ...m }) => m) });
-  };
-
-  // ---------- quota (counted on this device; Gemini resets at midnight Pacific time) ----------
-  const pacificDay = (d = new Date()) => d.toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
-  let usage = load('lb_usage', {});
-  function todayUsage() {
-    const day = pacificDay();
-    if (usage.day !== day) usage = { day, requests: 0, photos: 0, tokens: 0, out: false, groq: 0 };
-    usage.groq = usage.groq || 0;
-    return usage;
-  }
-  function nextReset() {
-    const today = pacificDay(), t = new Date();
-    t.setSeconds(0, 0);
-    for (let i = 0; i < 1500 && pacificDay(t) === today; i++) t.setMinutes(t.getMinutes() + 1);
-    return t;
-  }
-  // `requests` counts Gemini calls (the limit in settings is Gemini's); Groq calls are counted apart.
-  function recordUsage(tokens, hadPhoto, provider) {
-    const u = todayUsage();
-    if (provider === 'groq') u.groq += 1;
-    else u.requests += 1;
-    u.tokens += tokens || 0;
-    if (hadPhoto) u.photos += 1;
-    save('lb_usage', u);
-    renderQuota();
-  }
-  function markQuotaOut() {
-    todayUsage().out = true;
-    save('lb_usage', usage);
-    renderQuota();
-  }
-  function renderQuota() {
-    const u = todayUsage(), limit = Number(settings.dailyLimit) || 0;
-    const reset = nextReset().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
-    const box = $('quota'), n = u.requests.toLocaleString('th-TH');
-    let text, pct;
-    if (u.out) {
-      text = `Gemini วันนี้หมดแล้ว (ใช้ไป ${n} ครั้ง) · ใช้ได้อีกครั้งหลัง ${reset} น.` + (settings.ai !== 'gemini' ? ' · ตอนนี้คุยผ่าน Groq' : '');
-      pct = 100;
-    } else if (limit) {
-      const left = Math.max(limit - u.requests, 0);
-      text = `Gemini วันนี้ ${n} / ${limit.toLocaleString('th-TH')} ครั้ง · เหลือ ${left.toLocaleString('th-TH')} · รีเซ็ต ${reset} น.`;
-      pct = Math.min(100, (u.requests / limit) * 100);
-    } else {
-      text = `Gemini วันนี้ ${n} ครั้ง · แตะเพื่อใส่โควตาต่อวัน`;
-      pct = 0;
-    }
-    if (u.groq) text += ` · Groq ${u.groq.toLocaleString('th-TH')}`;
-    if (u.photos) text += ` · รูป ${u.photos}`;
-    $('quotaText').textContent = text;
-    $('quotaBar').style.width = pct + '%';
-    box.classList.toggle('out', !!u.out || (limit && u.requests >= limit));
-    box.classList.toggle('warn', !u.out && limit && u.requests >= limit * 0.8 && u.requests < limit);
-    box.title = `โทเค็นวันนี้ ${u.tokens.toLocaleString('th-TH')}`;
-  }
-
-  // ---------- dom ----------
-  const $ = (id) => document.getElementById(id);
-  const chat = $('chat'), input = $('input'), sendBtn = $('send'), micBtn = $('mic');
-  let busy = false;
-  let pendingPhoto = null;        // { dataUrl, mimeType, data } waiting to be sent
-  const photoCache = {};          // message time -> dataUrl; photos are not saved to storage (too big)
-
-  const fmtTime = (t) => new Date(t).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
-  const scrollDown = () => requestAnimationFrame(() => { chat.scrollTop = chat.scrollHeight; });
-
-  function el(tag, cls, text) {
-    const n = document.createElement(tag);
-    if (cls) n.className = cls;
-    if (text != null) n.textContent = text;
-    return n;
-  }
-
-  function fixCard(c) {
-    const box = el('div', 'fix');
-    const line = el('div');
-    line.append(el('span', 'wrong', c.wrong), ' → ', el('span', 'right', c.right));
-    box.append(line);
-    if (c.why) box.append(el('div', 'why', '💡 ' + c.why));
-    return box;
-  }
-
-  function renderMessage(m) {
-    const row = el('div', 'row ' + (m.role === 'user' ? 'me' : 'bot'));
-    const bubble = el('div', 'bubble');
-    if (m.photo) {
-      if (photoCache[m.t]) {
-        const img = el('img');
-        img.src = photoCache[m.t];
-        img.alt = 'รูปที่ส่ง';
-        bubble.append(img);
-      } else bubble.append(el('div', 'photo-tag', '📷 ส่งรูป'));
-    }
-    if (m.text) bubble.append(m.text);
-    if (m.role === 'model') {
-      bubble.classList.add('speakable');
-      bubble.title = 'แตะเพื่อฟังอีกครั้ง';
-      bubble.addEventListener('click', () => speak(m.text));
-    }
-    row.append(bubble);
-    if (m.correction) row.append(fixCard(m.correction));
-    row.append(el('div', 'meta', fmtTime(m.t) + (m.ai === 'groq' ? ' · Groq' : '')));
-    chat.append(row);
-    return row;
-  }
-
-  function renderAll() {
-    chat.textContent = '';
-    state.messages.forEach(renderMessage);
-    if (!settings.workerUrl) showSetupNotice();
-    scrollDown();
-  }
-
-  function notice(text, isErr, btnLabel, onClick) {
-    const n = el('div', 'notice' + (isErr ? ' err' : ''), text);
-    if (btnLabel) {
-      n.append(document.createElement('br'));
-      const b = el('button', '', btnLabel);
-      b.addEventListener('click', onClick);
-      n.append(b);
-    }
-    chat.append(n);
-    scrollDown();
-    return n;
-  }
-
-  function showSetupNotice() {
-    notice('ยังไม่ได้ใส่ลิงก์ Cloudflare Worker — ใส่ในหน้าตั้งค่าก่อนเริ่มคุย', false, 'เปิดตั้งค่า', openSettings);
-  }
-
-  function typing(on) {
-    let t = $('typing');
-    if (on && !t) {
-      t = el('div', 'row bot');
-      t.id = 'typing';
-      const b = el('div', 'bubble typing');
-      b.append(el('i'), el('i'), el('i'));
-      t.append(b);
-      chat.append(t);
-      scrollDown();
-    } else if (!on && t) t.remove();
-  }
-
-  function updateHeader() {
-    $('buddyName').textContent = settings.name || 'Buddy';
-    $('avatar').textContent = (settings.name || 'B').trim().charAt(0).toUpperCase();
-    const flag = isEnglish() ? (settings.variant === 'British' ? ' 🇬🇧' : ' 🇺🇸') : '';
-    $('status').textContent = `${settings.lang}${flag} · ${ieltsBand() && isEnglish() ? 'IELTS ' + ieltsBand() : cefrOf()}`;
-    const n = state.mistakes.length;
-    if (n) $('mistakesBtn').dataset.count = n > 99 ? '99+' : n;
-    else delete $('mistakesBtn').dataset.count;
-    document.documentElement.lang = 'th';
-  }
-
-  // ---------- AI ----------
-  function systemPrompt() {
-    const facts = state.facts.length ? state.facts.map((f) => '- ' + f).join('\n') : '(nothing yet)';
-    const recent = state.mistakes.slice(-8).map((m) => `- "${m.wrong}" → "${m.right}"`).join('\n') || '(none yet)';
-    return `You are ${settings.name}, the user's friend who chats with them in ${settings.lang} so they can practise. You are not a teacher or an assistant — you are a person with your own life, opinions and little stories.
-
-Personality: ${settings.persona}
-
-The user is Thai and their ${settings.lang} level is ${levelText()}. Use vocabulary and grammar that fit that level.
-${variantText()}
-${ieltsText()} Keep messages short like real chat (1–3 sentences), natural and warm. Usually end with a question or a hook that keeps the conversation going, but vary it. Share small things about "your" day sometimes so it feels two-way. Never switch to Thai in "reply" unless the user is clearly stuck and asks.
-
-What you remember about the user:
-${facts}
-
-Mistakes they made recently (gently re-use these patterns so they practise):
-${recent}
-
-If the user sends a photo, react to it like a friend would, and naturally teach 1–2 useful ${settings.lang} words for things in it. If they ask you to read text in the photo, help them. Earlier photos appear as "[sent a photo]" because you can only see the newest one.
-${state.scene ? `
-ROLE-PLAY IS ON. Scenario: ${state.scene.en}
-Stay in this role (not as ${settings.name}) until told it has ended. Act like a real person in that place, keep each turn short and realistic, move the situation forward step by step, and use phrases people really say there. Still fill "correction" for the user's mistakes.
-` : ''}
-Always answer with JSON only:
-{
-  "reply": "your chat message in ${settings.lang}",
-  "correction": null or {"wrong": "the part of the user's LAST message that was wrong", "right": "the corrected version", "why": "short explanation in Thai (1 sentence)"},
-  "remember": ["new durable facts about the user worth remembering, in English, e.g. 'likes fishing'; empty array if none"]
-}
-Only correct real errors in the user's last message (grammar, wrong word, unnatural phrasing). If it was fine or the user wrote in Thai, set "correction" to null. Do not mention the correction inside "reply".`;
-  }
-
-  function buildContents(extraUserTurn) {
-    const recent = state.messages.slice(-HISTORY_SENT);
-    const hist = recent.map((m, i) => {
-      const parts = [];
-      const isNewest = i === recent.length - 1 && !extraUserTurn;
-      if (m.photo && isNewest && m.photoData) parts.push({ inlineData: m.photoData });
-      const text = (m.photo && !(isNewest && m.photoData) ? '[sent a photo] ' : '') + (m.text || '');
-      parts.push({ text: text || '(photo)' });
-      return { role: m.role === 'user' ? 'user' : 'model', parts };
-    });
-    if (extraUserTurn) hist.push({ role: 'user', parts: [{ text: extraUserTurn }] });
-    // Gemini wants the first turn to be the user's; keep the buddy's opening line by adding a placeholder.
-    if (hist.length && hist[0].role !== 'user') hist.unshift({ role: 'user', parts: [{ text: '(opened the chat)' }] });
-    return hist;
-  }
-
-  function parseReply(text) {
-    const cleaned = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/```$/, '').trim();
-    try {
-      const j = JSON.parse(cleaned);
-      if (j && typeof j.reply === 'string') return j;
-    } catch {}
-    return { reply: text.trim(), correction: null, remember: [] };
-  }
-
-  async function askAI(extraUserTurn) {
-    if (!settings.workerUrl) { showSetupNotice(); return null; }
-    const contents = buildContents(extraUserTurn);
-    const hadPhoto = contents.some((c) => c.parts.some((p) => p.inlineData));
-    const body = JSON.stringify({ system: systemPrompt(), contents, ai: settings.ai });
-    let res, data;
-    // Google sometimes rejects the Cloudflare server that relays the request ("location is not
-    // supported"); a fresh request usually goes out through another one, so try again quietly.
-    for (let attempt = 0; attempt < 4; attempt++) {
-      if (attempt) await new Promise((r) => setTimeout(r, 400 * attempt));
-      res = await fetch(settings.workerUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
-      data = {};
-      try { data = await res.json(); } catch {}
-      if (res.ok || !/location is not supported/i.test(data.error || '')) break;
-    }
-    // Gemini said its daily quota is gone, even if Groq answered instead.
-    if ((data.fellBack || []).some((f) => f.provider === 'gemini' && f.status === 429 && /per\s*day|perday|daily/i.test(f.error || ''))) markQuotaOut();
-    if (!res.ok) {
-      const msg = data.error || `HTTP ${res.status}`;
-      if (res.status === 429) {
-        if (/per\s*day|perday|daily/i.test(msg)) {
-          markQuotaOut();
-          throw new Error('โควตาฟรีของวันนี้หมดแล้ว ใช้ได้อีกครั้งหลังเวลารีเซ็ตด้านบน');
-        }
-        throw new Error('ส่งถี่เกินไป (โควตาต่อนาที) รอประมาณ 1 นาทีแล้วลองใหม่');
-      }
-      if (res.status === 413) throw new Error('รูปใหญ่เกินไป ลองรูปอื่น');
-      if (/location is not supported/i.test(msg)) throw new Error('Google ปฏิเสธการเชื่อมต่อชั่วคราว ลองส่งใหม่อีกครั้ง');
-      throw new Error(msg);
-    }
-    recordUsage(data.usage?.total, hadPhoto, data.provider);
-    return { ...parseReply(data.text || ''), provider: data.provider };
-  }
-
-  function applyAI(ai, userMsg) {
-    if (userMsg && ai.correction && ai.correction.wrong && ai.correction.right &&
-        ai.correction.wrong.trim() !== ai.correction.right.trim()) {
-      userMsg.correction = {
-        wrong: String(ai.correction.wrong),
-        right: String(ai.correction.right),
-        why: String(ai.correction.why || ''),
-      };
-      state.mistakes.push({ ...userMsg.correction, t: Date.now() });
-      state.mistakes = state.mistakes.slice(-100);
-    }
-    if (Array.isArray(ai.remember)) {
-      for (const f of ai.remember) {
-        const s = String(f).trim();
-        if (s && !state.facts.some((x) => x.toLowerCase() === s.toLowerCase())) state.facts.push(s);
-      }
-      state.facts = state.facts.slice(-40);
-    }
-    const botMsg = { role: 'model', text: ai.reply, t: Date.now() };
-    if (ai.provider === 'groq') botMsg.ai = 'groq';
-    state.messages.push(botMsg);
-    state.lastSeen = Date.now();
-    persist();
-    renderAll();
-    updateHeader();
-    if (settings.voice) speak(ai.reply);
-    syncPush(false);
-  }
-
-  async function run(userText, hiddenTurn, photo) {
-    if (busy) return;
-    busy = true;
-    refreshSend();
-    let userMsg = null;
-    if (userText || photo) {
-      userMsg = { role: 'user', text: userText || '', t: Date.now() };
-      if (photo) {
-        userMsg.photo = true;
-        userMsg.photoData = { mimeType: photo.mimeType, data: photo.data };
-        photoCache[userMsg.t] = photo.dataUrl;
-      }
-      state.messages.push(userMsg);
-      persist();
-      renderMessage(userMsg);
-    }
-    typing(true);
-    try {
-      const ai = await askAI(hiddenTurn);
-      typing(false);
-      if (ai) applyAI(ai, userMsg);
-    } catch (e) {
-      typing(false);
-      notice('ส่งไม่สำเร็จ: ' + e.message, true, userMsg ? null : 'ลองอีกครั้ง', () => run(null, hiddenTurn));
-    } finally {
-      if (userMsg) delete userMsg.photoData;   // the model only sees each photo once
-      busy = false;
-      refreshSend();
-    }
-  }
-
-  function send() {
-    const text = input.value.trim();
-    if ((!text && !pendingPhoto) || busy) return;
-    const photo = pendingPhoto;
-    input.value = '';
-    clearPhoto();
-    autoGrow();
-    unlockSpeech();
-    run(text, null, photo);
-  }
-
-  // ---------- photos ----------
-  // Shrink to PHOTO_MAX_SIDE and re-encode as JPEG so uploads stay small.
-  async function preparePhoto(file) {
-    const url = URL.createObjectURL(file);
-    try {
-      const img = await new Promise((resolve, reject) => {
-        const i = new Image();
-        i.onload = () => resolve(i);
-        i.onerror = () => reject(new Error('เปิดรูปนี้ไม่ได้'));
-        i.src = url;
-      });
-      const scale = Math.min(1, PHOTO_MAX_SIDE / Math.max(img.naturalWidth, img.naturalHeight));
-      const canvas = document.createElement('canvas');
-      canvas.width = Math.round(img.naturalWidth * scale);
-      canvas.height = Math.round(img.naturalHeight * scale);
-      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
-      return { dataUrl, mimeType: 'image/jpeg', data: dataUrl.split(',')[1] };
-    } finally {
-      URL.revokeObjectURL(url);
-    }
-  }
-  function clearPhoto() {
-    pendingPhoto = null;
-    $('preview').classList.remove('show');
-    $('previewImg').removeAttribute('src');
-    $('photoInput').value = '';
-    refreshSend();
-  }
-  $('photo').addEventListener('click', () => { unlockSpeech(); $('photoInput').click(); });
-  $('previewClear').addEventListener('click', clearPhoto);
-  $('photoInput').addEventListener('change', async (e) => {
-    const file = e.target.files && e.target.files[0];
-    if (!file) return;
-    try {
-      pendingPhoto = await preparePhoto(file);
-      $('previewImg').src = pendingPhoto.dataUrl;
-      $('preview').classList.add('show');
-      input.focus();
-    } catch (err) {
-      clearPhoto();
-      notice(err.message, true);
-    }
-    refreshSend();
-  });
-
-  // Buddy writes first when you come back after a while.
-  function maybeGreet() {
-    if (!settings.workerUrl) return;
-    const now = Date.now();
-    const gap = now - (state.lastSeen || 0);
-    if (state.messages.length && gap < GREET_AFTER_MS) return;
-    const hours = state.lastSeen ? Math.round(gap / 3600000) : null;
-    const local = new Date().toLocaleString('en-GB', { weekday: 'long', hour: '2-digit', minute: '2-digit' });
-    const why = hours == null
-      ? 'This is the very first time you meet the user. Introduce yourself briefly and ask something easy to get to know them.'
-      : `The user just opened the chat again after about ${hours} hour(s). Message them first like a friend would — refer to something you remember or something from your last chat if it fits.`;
-    run(null, `[App note, not from the user: it is ${local} for the user. ${why} Set "correction" to null.]`);
-  }
-
-  // ---------- speech out ----------
-  let voices = [];
-  const loadVoices = () => { voices = window.speechSynthesis ? speechSynthesis.getVoices() : []; };
-  if (window.speechSynthesis) {
-    loadVoices();
-    speechSynthesis.addEventListener?.('voiceschanged', loadVoices);
-  }
-  function pickVoice(code) {
-    const base = code.split('-')[0];
-    const cands = voices.filter((v) => v.lang.replace('_', '-').startsWith(base));
-    // The right accent (en-GB vs en-US) matters more than a nicer voice.
-    const pref = (v) => (/(premium|enhanced|natural|siri)/i.test(v.name) ? 0 : 1) + (v.lang.replace('_', '-') === code ? 0 : 2);
-    return cands.sort((a, b) => pref(a) - pref(b))[0] || null;
-  }
-  let speechUnlocked = false;
-  function unlockSpeech() {
-    // iOS only allows speech that started from a tap; speak a silent utterance once.
-    if (speechUnlocked || !window.speechSynthesis) return;
-    speechUnlocked = true;
-    const u = new SpeechSynthesisUtterance(' ');
-    u.volume = 0;
-    speechSynthesis.speak(u);
-  }
-  function speak(text) {
-    if (!window.speechSynthesis || !text) return;
-    speechSynthesis.cancel();
-    const code = speechCode();
-    const u = new SpeechSynthesisUtterance(text.replace(/[*_#`]/g, ''));
-    u.lang = code;
-    const v = pickVoice(code);
-    if (v) u.voice = v;
-    u.rate = Number(settings.rate) || 1;
-    speechSynthesis.speak(u);
-  }
-
-  // ---------- speech in ----------
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  let rec = null, listening = false, finalText = '';
-  function startListening() {
-    if (!SR) {
-      notice('เครื่องนี้ไม่รองรับการฟังเสียงในเบราว์เซอร์ ใช้ปุ่มไมค์บนคีย์บอร์ด iPhone (Dictation) แทนได้', true);
-      input.focus();
-      return;
-    }
-    unlockSpeech();
-    window.speechSynthesis?.cancel();
-    rec = new SR();
-    rec.lang = speechCode();
-    rec.interimResults = true;
-    rec.continuous = false;
-    finalText = '';
-    rec.onresult = (e) => {
-      let interim = '';
-      for (let i = e.resultIndex; i < e.results.length; i++) {
-        const r = e.results[i];
-        if (r.isFinal) finalText += r[0].transcript;
-        else interim += r[0].transcript;
-      }
-      input.value = (finalText + interim).trim();
-      autoGrow();
-      refreshSend();
-    };
-    rec.onerror = (e) => {
-      if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
-        notice('ไม่ได้รับอนุญาตให้ใช้ไมค์ — ไปที่ การตั้งค่า > Safari > ไมโครโฟน แล้วเลือก "อนุญาต"', true);
-      }
-    };
-    rec.onend = () => {
-      listening = false;
-      micBtn.classList.remove('on');
-      if (settings.autoSend && input.value.trim()) send();
-    };
-    try {
-      rec.start();
-      listening = true;
-      micBtn.classList.add('on');
-    } catch {
-      listening = false;
-    }
-  }
-  function stopListening() { try { rec?.stop(); } catch {} }
-
-  // ---------- input ----------
-  function autoGrow() {
-    input.style.height = 'auto';
-    input.style.height = Math.min(input.scrollHeight, 120) + 'px';
-  }
-  function refreshSend() { sendBtn.disabled = busy || (!input.value.trim() && !pendingPhoto); }
-  input.addEventListener('input', () => { autoGrow(); refreshSend(); });
-  input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(); }
-  });
-  sendBtn.addEventListener('click', send);
-  micBtn.addEventListener('click', () => (listening ? stopListening() : startListening()));
-
-  // ---------- settings ----------
-  const sLang = $('sLang');
-  for (const [key, v] of Object.entries(LANGS)) {
-    const o = el('option', '', v.label);
-    o.value = key;
-    sLang.append(o);
-  }
-  // English offers IELTS bands as well as CEFR; other languages use CEFR only.
-  function fillLevels(lang, current) {
-    const sel = $('sLevel');
-    sel.textContent = '';
-    if (lang === 'English') {
-      const g = el('optgroup');
-      g.label = 'IELTS';
-      for (const [band, cefr] of IELTS) { const o = el('option', '', `IELTS ${band} (${cefr})`); o.value = 'IELTS ' + band; g.append(o); }
-      sel.append(g);
-    }
-    const g = el('optgroup');
-    g.label = 'CEFR';
-    for (const [lv, th] of Object.entries(CEFR)) { const o = el('option', '', `${lv} ${th}`); o.value = lv; g.append(o); }
-    sel.append(g);
-    sel.value = lang === 'English' || !/^IELTS /.test(current) ? current : cefrOf(current);
-    if (!sel.value) sel.value = cefrOf(current) || 'B1';
-    $('variantBox').hidden = lang !== 'English';
-  }
-  sLang.addEventListener('change', () => fillLevels(sLang.value, $('sLevel').value));
-  function openSettings() {
-    $('sWorker').value = settings.workerUrl;
-    sLang.value = settings.lang;
-    fillLevels(settings.lang, settings.level);
-    $('sVariant').value = settings.variant || 'American';
-    $('sName').value = settings.name;
-    $('sPersona').value = settings.persona;
-    $('sRate').value = settings.rate;
-    $('sLimit').value = settings.dailyLimit || '';
-    showSchedule();
-    $('sAi').value = settings.ai || 'auto';
-    renderPush();
-    $('sVoice').checked = settings.voice;
-    $('sAutoSend').checked = settings.autoSend;
-    $('settings').showModal();
-  }
-  $('settingsBtn').addEventListener('click', openSettings);
-  // Save on submit (fires right away in every browser), not on the dialog's close event.
-  $('settingsForm').addEventListener('submit', (e) => {
-    if (e.submitter && e.submitter.value !== 'save') return;
-    const hadWorker = !!settings.workerUrl;
-    settings = {
-      ...settings,
-      workerUrl: $('sWorker').value.trim(),
-      lang: sLang.value,
-      level: $('sLevel').value,
-      variant: $('sVariant').value,
-      name: $('sName').value.trim() || DEFAULT_SETTINGS.name,
-      persona: $('sPersona').value.trim() || DEFAULT_SETTINGS.persona,
-      rate: Number($('sRate').value),
-      dailyLimit: Math.max(0, Math.floor(Number($('sLimit').value) || 0)),
-      ai: $('sAi').value,
-      voice: $('sVoice').checked,
-      autoSend: $('sAutoSend').checked,
-    };
-    save('lb_settings', settings);
-    updateHeader();
-    renderQuota();
-    syncPush(true);
-    renderAll();
-    if (!hadWorker && settings.workerUrl) { unlockSpeech(); maybeGreet(); }
-  });
-  $('resetBtn').addEventListener('click', () => {
-    if (!confirm('ลบแชต คำที่พลาด และความจำทั้งหมด?')) return;
-    state = { messages: [], facts: [], mistakes: [], lastSeen: 0 };
-    persist();
-    $('settings').close();
-    updateHeader();
-    renderAll();
-    maybeGreet();
-  });
-
-  // ---------- mistakes ----------
-  $('mistakesBtn').addEventListener('click', () => {
-    const list = $('mList');
-    list.textContent = '';
-    if (!state.mistakes.length) list.append(el('li', 'empty', 'ยังไม่มี — คุยไปเรื่อยๆ แล้วคำที่พลาดจะมาอยู่ที่นี่'));
-    [...state.mistakes].reverse().forEach((m) => { const li = el('li'); li.append(fixCard(m)); list.append(li); });
-    const facts = $('fList');
-    facts.textContent = '';
-    if (!state.facts.length) facts.append(el('li', 'empty', 'ยังไม่มี'));
-    state.facts.forEach((f) => facts.append(el('li', '', f)));
-    $('mistakes').showModal();
-  });
-  $('closeMistakes').addEventListener('click', () => $('mistakes').close());
-  $('quizBtn').addEventListener('click', () => {
-    $('mistakes').close();
-    unlockSpeech();
-    run(null, '[App note, not from the user: the user tapped "quiz me". Give ONE short, friendly quiz question that practises one of their recent mistakes (fill-in-the-blank or "how would you say…"). Wait for their answer before giving the next one. Set "correction" to null.]');
-  });
-
-  // ---------- role-play ----------
-  function renderScene() {
-    $('scene').hidden = !state.scene;
-    if (state.scene) $('sceneText').textContent = `${state.scene.icon} กำลังฝึก: ${state.scene.th}`;
-  }
-  function startScene(scene) {
-    $('roles').close();
-    if (busy) return;
-    state.scene = scene;
-    persist();
-    renderScene();
-    unlockSpeech();
-    notice(`เริ่มฝึก: ${scene.icon} ${scene.th}`);
-    run(null, `[App note, not from the user: the user chose a role-play. ${scene.en} Start the scene now with your first line in character. Set "correction" to null.]`);
-  }
-  function renderSceneList() {
-    const list = $('sceneList');
-    list.textContent = '';
-    for (const s of SCENES.filter((x) => !x.englishOnly || isEnglish())) {
-      const b = el('button');
-      b.type = 'button';
-      b.append(el('b', '', s.icon), s.th);
-      b.addEventListener('click', () => startScene(s));
-      list.append(b);
-    }
-  }
-  $('roleBtn').addEventListener('click', () => { renderSceneList(); $('customScene').value = ''; $('roles').showModal(); });
-  $('closeRoles').addEventListener('click', () => $('roles').close());
-  $('customStart').addEventListener('click', () => {
-    const t = $('customScene').value.trim();
-    if (!t) { $('customScene').focus(); return; }
-    startScene({ icon: '🎭', th: t, en: `Situation chosen by the user (written in Thai or ${settings.lang}): "${t}". Play the other person in this situation.` });
-  });
-  $('sceneEnd').addEventListener('click', () => {
-    if (busy || !state.scene) return;
-    const scene = state.scene;
-    state.scene = null;
-    persist();
-    renderScene();
-    const what = scene.feedback || `Give friendly feedback: what they did well, 2–3 useful ${settings.lang} phrases for this situation (with Thai meaning), and one thing to practise. Keep it short.`;
-    run(null, `[App note, not from the user: the role-play "${scene.th}" has ended. Step out of the role and, as ${settings.name}, ${what} For THIS message only, write "reply" in Thai (keep ${settings.lang} words and example sentences in ${settings.lang}). Set "correction" to null.]`);
-  });
-
-  // ---------- backup ----------
-  async function exportData() {
-    const data = {
-      app: 'language-buddy', version: 1, exported: new Date().toISOString(),
-      settings, state: { ...state, messages: state.messages.map(({ photoData, ...m }) => m) },
-    };
-    const name = `language-buddy-${new Date().toISOString().slice(0, 10)}.json`;
-    const file = new File([JSON.stringify(data, null, 1)], name, { type: 'application/json' });
-    try {
-      if (navigator.canShare?.({ files: [file] })) { await navigator.share({ files: [file], title: name }); return; }
-    } catch (e) { if (e.name === 'AbortError') return; }
-    const a = el('a');
-    a.href = URL.createObjectURL(file);
-    a.download = name;
-    document.body.append(a);
-    a.click();
-    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
-  }
-  async function importData(file) {
-    let data;
-    try { data = JSON.parse(await file.text()); } catch { alert('ไฟล์นี้อ่านไม่ได้'); return; }
-    if (data?.app !== 'language-buddy' || !data.state || !Array.isArray(data.state.messages)) { alert('ไฟล์นี้ไม่ใช่ข้อมูลสำรองของ Language Buddy'); return; }
-    const n = data.state.messages.length;
-    if (!confirm(`นำเข้าข้อมูลจาก ${String(data.exported || '').slice(0, 10)} (${n} ข้อความ)?\nข้อมูลในเครื่องตอนนี้จะถูกแทนที่`)) return;
-    state = { messages: [], facts: [], mistakes: [], lastSeen: 0, scene: null, ...data.state };
-    settings = { ...DEFAULT_SETTINGS, ...data.settings, workerUrl: data.settings?.workerUrl || settings.workerUrl };
-    save('lb_settings', settings);
-    persist();
-    $('settings').close();
-    updateHeader(); renderQuota(); renderScene(); renderAll();
-    notice(`นำเข้าแล้ว ${n} ข้อความ`);
-    syncPush(true);
-  }
-  $('exportBtn').addEventListener('click', exportData);
-  $('importBtn').addEventListener('click', () => $('importInput').click());
-  $('importInput').addEventListener('change', (e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) importData(f); });
-
-  // ---------- push: the buddy messages first ----------
-  const pushSupported = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
-  const standalone = navigator.standalone === true || matchMedia('(display-mode: standalone)').matches;
-  const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-  const workerBase = () => settings.workerUrl.replace(/\/+$/, '');
-  const savePush = () => save('lb_push', push);
-  function pushProfile() {
-    return {
-      name: settings.name, persona: settings.persona, lang: settings.lang, level: levelText(), variant: isEnglish() ? settings.variant : '',
-      tz: Intl.DateTimeFormat().resolvedOptions().timeZone, perDay: Number(settings.perDay) || 0,
-      mode: settings.pushMode, from: settings.pushFrom, to: settings.pushTo, times: settings.pushTimes,
-      facts: state.facts.slice(-20),
-      recent: state.messages.slice(-6).map((m) => ({ role: m.role, text: (m.photo ? '[sent a photo] ' : '') + (m.text || '') })),
-    };
-  }
-  async function pushApi(path, payload, method = 'POST') {
-    const url = `${workerBase()}/push/${path}` + (method === 'GET' ? `?id=${encodeURIComponent(push.id)}` : '');
-    const res = await fetch(url, method === 'GET' ? {} : { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: push.id, ...payload }) });
-    let data = {};
-    try { data = await res.json(); } catch {}
-    if (!res.ok) { const err = new Error(data.error || `HTTP ${res.status}`); err.status = res.status; throw err; }
-    return data;
-  }
-  // Keep the worker's copy of the profile fresh (at most every 10 minutes) and mark the user active.
-  async function syncPush(force) {
-    if (!push.enabled || !settings.workerUrl) return;
-    if (!force && Date.now() - push.lastSync < 10 * 60 * 1000) return;
-    try {
-      await pushApi('sync', { profile: pushProfile() });
-      push.lastSync = Date.now();
-      savePush();
-    } catch (e) {
-      if (e.status === 404) { push.enabled = false; savePush(); renderPush(); }
-    }
-  }
-  // Messages the buddy sent while the app was closed go into the chat when it opens.
-  async function fetchInbox() {
-    if (!push.enabled || !settings.workerUrl) return;
-    try {
-      const { messages = [] } = await pushApi('inbox', null, 'GET');
-      if (!messages.length) return;
-      for (const m of messages) state.messages.push({ role: 'model', text: String(m.text), t: Number(m.t) || Date.now() });
-      state.messages.sort((a, b) => a.t - b.t);
-      state.lastSeen = Date.now();
-      persist();
-      renderAll();
-      if (settings.voice && document.visibilityState === 'visible') speak(messages[messages.length - 1].text);
-    } catch {}
-  }
-  function renderPush() {
-    const status = $('pushStatus');
-    let text, canOn = false;
-    if (!settings.workerUrl) text = 'ใส่ลิงก์ Worker ก่อน';
-    else if (isIOS && !standalone) text = 'บน iPhone ต้อง "เพิ่มไปยังหน้าจอโฮม" แล้วเปิดแอปจากไอคอนก่อน ถึงจะเปิดการแจ้งเตือนได้ (iOS 16.4 ขึ้นไป)';
-    else if (!pushSupported) text = 'เครื่อง/เบราว์เซอร์นี้ไม่รองรับการแจ้งเตือนของเว็บแอป';
-    else if (Notification.permission === 'denied') text = 'การแจ้งเตือนถูกปิดไว้ ไปที่ การตั้งค่า > การแจ้งเตือน > Buddy แล้วเปิด "อนุญาตการแจ้งเตือน"';
-    else if (push.enabled) text = `✅ เปิดอยู่ — ${scheduleText()}`;
-    else { text = 'ยังไม่ได้เปิด'; canOn = true; }
-    status.textContent = text;
-    $('pushOn').hidden = push.enabled || !canOn;
-    $('pushTest').hidden = $('pushOff').hidden = !push.enabled;
-  }
-  const b64ToBytes = (s) => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((s.length + 3) % 4)), (c) => c.charCodeAt(0));
-  $('pushOn').addEventListener('click', async () => {
-    const btn = $('pushOn');
-    btn.disabled = true;
-    try {
-      const perm = await Notification.requestPermission();   // must run right after the tap on iOS
-      if (perm !== 'granted') { renderPush(); return; }
-      const { key } = await (await fetch(`${workerBase()}/push/key`)).json();
-      if (!key) throw new Error('Worker ยังไม่ได้ตั้งค่าระบบแจ้งเตือน');
-      const reg = await navigator.serviceWorker.ready;
-      const old = await reg.pushManager.getSubscription();
-      if (old) await old.unsubscribe();
-      const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(key) });
-      push.id = push.id || crypto.randomUUID();
-      readSchedule();
-      await pushApi('subscribe', { sub: sub.toJSON(), profile: pushProfile() });
-      push.enabled = true;
-      push.lastSync = Date.now();
-      savePush();
-    } catch (e) {
-      alert('เปิดการแจ้งเตือนไม่สำเร็จ: ' + e.message);
-    } finally {
-      btn.disabled = false;
-      renderPush();
-    }
-  });
-  $('pushTest').addEventListener('click', async () => {
-    const btn = $('pushTest');
-    btn.disabled = true;
-    btn.textContent = 'กำลังส่ง…';
-    try {
-      await pushApi('test', { profile: pushProfile() });
-      btn.textContent = 'ส่งแล้ว ✓ ดูแจ้งเตือน';
-    } catch (e) {
-      alert('ส่งทดสอบไม่สำเร็จ: ' + e.message);
-      btn.textContent = 'ส่งทดสอบตอนนี้';
-    } finally {
-      setTimeout(() => { btn.disabled = false; btn.textContent = 'ส่งทดสอบตอนนี้'; }, 4000);
-    }
-  });
-  $('pushOff').addEventListener('click', async () => {
-    try { await pushApi('unsubscribe', {}); } catch {}
-    try { const reg = await navigator.serviceWorker.ready; await (await reg.pushManager.getSubscription())?.unsubscribe(); } catch {}
-    push.enabled = false;
-    savePush();
-    renderPush();
-  });
-  // ---------- push schedule ----------
-  const hh = (h) => String(h).padStart(2, '0') + ':00';
-  for (let h = 0; h <= 24; h++) {
-    if (h < 24) { const o = el('option', '', hh(h)); o.value = h; $('sFrom').append(o); }
-    if (h > 0) { const o = el('option', '', h === 24 ? '24:00 (เที่ยงคืน)' : hh(h)); o.value = h; $('sTo').append(o); }
-  }
-  function scheduleText() {
-    if (settings.pushMode === 'fixed') {
-      const t = settings.pushTimes || [];
-      return t.length ? `${settings.name} จะทักมาตอน ${t.join(', ')} น. ทุกวัน` : 'ยังไม่ได้ใส่เวลา — ใส่อย่างน้อย 1 เวลา';
-    }
-    return `${settings.name} จะทักมาวันละไม่เกิน ${settings.perDay} ครั้ง สุ่มเวลาระหว่าง ${hh(settings.pushFrom)}–${hh(settings.pushTo)} (ไม่ทักซ้ำถ้ายังไม่ได้อ่าน และไม่ทักถ้าเพิ่งคุยกันไป)`;
-  }
-  function showSchedule() {
-    $('sPushMode').value = settings.pushMode;
-    $('sFrom').value = settings.pushFrom;
-    $('sTo').value = settings.pushTo;
-    $('sPerDay').value = String(settings.perDay || 2);
-    ['sTime1', 'sTime2', 'sTime3'].forEach((id, i) => { $(id).value = (settings.pushTimes || [])[i] || ''; });
-    $('pushRandom').hidden = settings.pushMode === 'fixed';
-    $('pushFixed').hidden = settings.pushMode !== 'fixed';
-  }
-  function readSchedule() {
-    let from = Number($('sFrom').value), to = Number($('sTo').value);
-    if (to <= from) to = Math.min(24, from + 1);
-    settings.pushMode = $('sPushMode').value === 'fixed' ? 'fixed' : 'random';
-    settings.pushFrom = from;
-    settings.pushTo = to;
-    settings.perDay = Number($('sPerDay').value) || 2;
-    settings.pushTimes = [...new Set(['sTime1', 'sTime2', 'sTime3'].map((id) => $(id).value).filter(Boolean))].sort();
-    save('lb_settings', settings);
-  }
-  for (const id of ['sPushMode', 'sFrom', 'sTo', 'sPerDay', 'sTime1', 'sTime2', 'sTime3']) {
-    $(id).addEventListener('change', () => {
-      readSchedule();
-      showSchedule();
-      renderPush();
-      syncPush(true);
-    });
-  }
-
-  // ---------- start ----------
-  $('quota').addEventListener('click', openSettings);
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') { renderQuota(); fetchInbox().then(maybeGreet); syncPush(false); }
-    else { state.lastSeen = state.messages.length ? Date.now() : state.lastSeen; persist(); }
-  });
-  if ('serviceWorker' in navigator && location.protocol !== 'file:') {
-    navigator.serviceWorker.register('sw.js').catch(() => {});
-  }
-  updateHeader();
-  renderQuota();
-  renderScene();
-  renderAll();
-  fetchInbox().then(maybeGreet);
-  syncPush(false);
-})();
-</script>
 </body>
 </html>

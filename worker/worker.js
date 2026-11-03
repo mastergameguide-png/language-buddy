@@ -11,13 +11,26 @@
 //   GEMINI_MODEL      (Text, optional)    defaults to gemini-3.5-flash-lite
 //   GROQ_API_KEY      (Secret, optional)  key from console.groq.com; used as the second AI
 //   GROQ_MODEL        (Text, optional)    defaults to openai/gpt-oss-120b
+//   ACCESS_CODE       (Secret, optional)  if set, the app must send it as X-Buddy-Key
 //   BUDDY             (KV binding, for push)
+//   LIMITER           (rate-limit binding) requests per IP per minute, see wrangler.toml
 
-const WORKER_VERSION = 8;         // shown when you open the worker link; bump on every change
+const WORKER_VERSION = 9;         // shown when you open the worker link; bump on every change
 const MAX_TURNS = 60;
 const MAX_BODY_CHARS = 1500000;   // room for one resized photo
 const MAX_IMAGE_CHARS = 1400000;  // base64 length of a single photo
 const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const MAX_SYSTEM_CHARS = 16000;
+
+// Constant-time comparison, so the access code cannot be guessed from response timing.
+async function sameSecret(a, b) {
+  const enc = new TextEncoder();
+  const [x, y] = await Promise.all([crypto.subtle.digest('SHA-256', enc.encode(a)), crypto.subtle.digest('SHA-256', enc.encode(b))]);
+  const ux = new Uint8Array(x), uy = new Uint8Array(y);
+  let diff = 0;
+  for (let i = 0; i < ux.length; i++) diff |= ux[i] ^ uy[i];
+  return diff === 0;
+}
 
 // Push schedule. "random": between the user's from/to hours, never within QUIET_AFTER_ACTIVE of
 // the user chatting, spaced out, and not while an earlier message is still unread.
@@ -42,9 +55,21 @@ function cleanParts(parts) {
   return out.length ? out : [{ text: '' }];
 }
 
+// Upstream calls give up after these, so a stuck AI falls back to the other one in time
+// (the app itself waits up to 45 s).
+const GEMINI_TIMEOUT = 22000;
+const GROQ_TIMEOUT = 18000;
+async function timed(url, init, ms) {
+  try {
+    return await fetch(url, { ...init, signal: AbortSignal.timeout(ms) });
+  } catch (e) {
+    return new Response(JSON.stringify({ error: { message: e.name === 'TimeoutError' || e.name === 'AbortError' ? 'The AI took too long to answer' : 'Could not reach the AI' } }), { status: 504 });
+  }
+}
+
 async function callGemini(env, system, contents) {
   const model = env.GEMINI_MODEL || 'gemini-3.5-flash-lite';
-  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+  const res = await timed(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY },
     body: JSON.stringify({
@@ -52,7 +77,7 @@ async function callGemini(env, system, contents) {
       contents,
       generationConfig: { responseMimeType: 'application/json', temperature: 0.9, maxOutputTokens: 2048 },
     }),
-  });
+  }, GEMINI_TIMEOUT);
   let data = {};
   try { data = await res.json(); } catch {}
   if (!res.ok) return { ok: false, status: res.status, error: data.error?.message || `Gemini error ${res.status}` };
@@ -72,11 +97,11 @@ async function callGroq(env, system, contents) {
   }))];
   const request = { model, messages, temperature: 0.9, max_completion_tokens: 2048, response_format: { type: 'json_object' } };
   if (/gpt-oss|qwen3/.test(model)) request.reasoning_effort = 'low';
-  const send = (req) => fetch('https://api.groq.com/openai/v1/chat/completions', {
+  const send = (req) => timed('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${env.GROQ_API_KEY}` },
     body: JSON.stringify(req),
-  });
+  }, GROQ_TIMEOUT);
   let res = await send(request);
   let data = {};
   try { data = await res.json(); } catch {}
@@ -369,9 +394,10 @@ export default {
     const cors = {
       'Access-Control-Allow-Origin': originOk ? origin || '*' : 'null',
       'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
+      'Access-Control-Allow-Headers': 'Content-Type, X-Buddy-Key',
       'Access-Control-Max-Age': '86400',
       Vary: 'Origin',
+      'X-Content-Type-Options': 'nosniff',
     };
     const json = (obj, status = 200) =>
       new Response(JSON.stringify(obj), { status, headers: { ...cors, 'Content-Type': 'application/json' } });
@@ -387,6 +413,16 @@ export default {
       return json({ ok: true, version: WORKER_VERSION, push: !!(env.BUDDY && env.VAPID_PRIVATE_JWK), ai: ['gemini', 'groq'].filter((n) => hasProvider(env, n)), message: 'Language Buddy worker is running' });
     }
     if (!originOk) return json({ error: 'This website is not allowed to use the worker (check ALLOWED_ORIGIN)' }, 403);
+    // The Origin header can be faked outside a browser, so add a per-IP limit and an optional
+    // shared code (ACCESS_CODE) that only the user's app knows.
+    if (env.ACCESS_CODE && !(await sameSecret(request.headers.get('X-Buddy-Key') || '', env.ACCESS_CODE))) {
+      return json({ error: 'Wrong or missing access code' }, 401);
+    }
+    if (env.LIMITER) {
+      const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+      const { success } = await env.LIMITER.limit({ key: ip });
+      if (!success) return json({ error: 'Too many requests, slow down a little' }, 429);
+    }
     if (path.startsWith('/push/')) return handlePush(path, request, env, json);
     if (request.method !== 'POST') return json({ error: 'POST only' }, 405);
     if (!env.GEMINI_API_KEY && !env.GROQ_API_KEY) return json({ error: 'No AI key is set on the worker' }, 500);
@@ -397,7 +433,7 @@ export default {
     try { body = JSON.parse(raw); } catch { return json({ error: 'Bad JSON' }, 400); }
 
     const { system, contents } = body;
-    if (typeof system !== 'string' || !Array.isArray(contents) || !contents.length || contents.length > MAX_TURNS) {
+    if (typeof system !== 'string' || system.length > MAX_SYSTEM_CHARS || !Array.isArray(contents) || !contents.length || contents.length > MAX_TURNS) {
       return json({ error: 'Expected { system: string, contents: [...] }' }, 400);
     }
     const clean = contents.map((c) => ({ role: c.role === 'model' ? 'model' : 'user', parts: cleanParts(c.parts) }));

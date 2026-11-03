@@ -1,6 +1,11 @@
 // Bump this when you change any app file so phones pick up the new version.
-const CACHE = 'buddy-v8';
-const SHELL = ['./', 'index.html', 'manifest.json', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'];
+const CACHE = 'buddy-v9';
+const SHELL = [
+  './', 'index.html', 'manifest.json', 'css/app.css',
+  'js/main.js', 'js/util.js', 'js/store.js', 'js/srs.js', 'js/stats.js', 'js/ai.js', 'js/speech.js', 'js/push.js',
+  'js/views/chat.js', 'js/views/home.js', 'js/views/review.js', 'js/views/roleplay.js', 'js/views/me.js', 'js/views/settings.js',
+  'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png',
+];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
