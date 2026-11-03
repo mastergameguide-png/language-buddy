@@ -7,7 +7,7 @@ compatibility_date = "2025-01-01"
 [vars]
 # Change to your GitHub Pages address, e.g. "https://yourname.github.io"
 ALLOWED_ORIGIN = "*"
-# GEMINI_MODEL = "gemini-2.5-flash"
+# GEMINI_MODEL = "gemini-3.8-flash"
 
 # Set the key as a secret (never put it in this file):
 #   npx wrangler secret put GEMINI_API_KEY
