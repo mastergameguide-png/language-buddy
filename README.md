@@ -85,7 +85,7 @@ AI language practice buddy
 | "โควตาฟรีหมด" | free tier จำกัดจำนวนครั้งต่อนาที/ต่อวัน รอสักครู่แล้วลองใหม่ |
 | ตัวเลขโควตาไม่ตรงกับ AI Studio | แอปนับเฉพาะในเครื่องนั้น ถ้าใช้หลายเครื่อง ตัวเลขจริงดูที่ aistudio.google.com/rate-limit (รีเซ็ตเที่ยงคืนเวลาแปซิฟิก = 14:00–15:00 เวลาไทย) |
 | ส่งรูปแล้ว AI ไม่พูดถึงรูป หรือขึ้น "Request too large" | โค้ด Worker ใน Cloudflare ยังเป็นเวอร์ชันเก่า เปิดลิงก์ Worker ต้องเห็น `"version":4` ถ้าไม่เห็น ให้วางโค้ดจาก `worker/worker.js` ใหม่แล้วกด Deploy |
-| "User location is not supported" หรือ "Google ปฏิเสธการเชื่อมต่อชั่วคราว" | Google บล็อก IP ของ Cloudflare บางตัวเป็นครั้งคราว แอปลองส่งใหม่ให้อัตโนมัติ 4 ครั้งแล้ว ถ้ายังเจอให้กด "ลองอีกครั้ง" |
+| "User location is not supported" หรือ "Google ปฏิเสธการเชื่อมต่อชั่วคราว" | Google บล็อก IP ของ Cloudflare ในเอเชีย `wrangler.toml` จึงตั้งให้ Worker ทำงานที่สหรัฐฯ (`[placement]`) ต้อง deploy ด้วย `npx wrangler deploy` ค่านี้จึงจะมีผล เช็กได้จาก header `cf-placement: remote-IAD` |
 | error ว่า model not found | ชื่อโมเดลของ Google อาจเปลี่ยน ดูชื่อล่าสุดใน AI Studio แล้วเพิ่มตัวแปร `GEMINI_MODEL` (Text) ใน Worker |
 | "not allowed (check ALLOWED_ORIGIN)" | ค่า `ALLOWED_ORIGIN` ต้องตรงกับ `https://ชื่อคุณ.github.io` เป๊ะ |
 | แก้โค้ดแล้วมือถือยังเห็นแบบเก่า | ปิดแอปแล้วเปิดใหม่ 1–2 ครั้ง หรือเปลี่ยน `CACHE` ใน `sw.js` เป็นเลขใหม่ |

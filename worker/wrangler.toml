@@ -8,6 +8,11 @@ compatibility_date = "2025-01-01"
 keep_vars = true
 preview_urls = false
 
+# Run in the US. When the Worker ran in Asia, Gemini often rejected Cloudflare's
+# outgoing IP with "User location is not supported".
+[placement]
+region = "aws:us-east-1"
+
 [observability]
 enabled = true
 
