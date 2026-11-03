@@ -9,9 +9,11 @@
 //   INTERNAL_KEY      (Secret, for push)  random string; lets the cron call /push/run
 //   ALLOWED_ORIGIN    (Text, recommended) your GitHub Pages address, e.g. https://yourname.github.io
 //   GEMINI_MODEL      (Text, optional)    defaults to gemini-3.5-flash-lite
+//   GROQ_API_KEY      (Secret, optional)  key from console.groq.com; used as the second AI
+//   GROQ_MODEL        (Text, optional)    defaults to openai/gpt-oss-120b
 //   BUDDY             (KV binding, for push)
 
-const WORKER_VERSION = 5;         // shown when you open the worker link; bump on every change
+const WORKER_VERSION = 6;         // shown when you open the worker link; bump on every change
 const MAX_TURNS = 60;
 const MAX_BODY_CHARS = 1500000;   // room for one resized photo
 const MAX_IMAGE_CHARS = 1400000;  // base64 length of a single photo
@@ -56,6 +58,63 @@ async function callGemini(env, system, contents) {
   if (!text) return { ok: false, status: 502, error: 'Gemini returned an empty answer (maybe blocked by safety filters)' };
   const u = data.usageMetadata || {};
   return { ok: true, text, usage: { prompt: u.promptTokenCount || 0, output: u.candidatesTokenCount || 0, total: u.totalTokenCount || 0 } };
+}
+
+// Groq speaks the OpenAI chat format. Its models here cannot see photos, so photos become a note.
+async function callGroq(env, system, contents) {
+  const model = env.GROQ_MODEL || 'openai/gpt-oss-120b';
+  const messages = [{ role: 'system', content: system }, ...contents.map((c) => ({
+    role: c.role === 'model' ? 'assistant' : 'user',
+    content: c.parts.filter((p) => typeof p.text === 'string').map((p) => p.text).join('\n') +
+      (c.parts.some((p) => p.inlineData) ? ' [sent a photo]' : ''),
+  }))];
+  const request = { model, messages, temperature: 0.9, max_completion_tokens: 1024, response_format: { type: 'json_object' } };
+  if (/gpt-oss|qwen3/.test(model)) request.reasoning_effort = 'low';
+  const send = (req) => fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${env.GROQ_API_KEY}` },
+    body: JSON.stringify(req),
+  });
+  let res = await send(request);
+  let data = {};
+  try { data = await res.json(); } catch {}
+  // Some models reject JSON mode or fail to produce valid JSON; the app copes with plain text.
+  if (res.status === 400 && /response_format|json_validate_failed|json/i.test(data.error?.message || data.error?.code || '')) {
+    delete request.response_format;
+    res = await send(request);
+    data = {};
+    try { data = await res.json(); } catch {}
+  }
+  if (!res.ok) return { ok: false, status: res.status, error: data.error?.message || `Groq error ${res.status}` };
+  const text = data.choices?.[0]?.message?.content || '';
+  if (!text) return { ok: false, status: 502, error: 'Groq returned an empty answer' };
+  const u = data.usage || {};
+  return { ok: true, text, usage: { prompt: u.prompt_tokens || 0, output: u.completion_tokens || 0, total: u.total_tokens || 0 } };
+}
+
+const PROVIDERS = { gemini: callGemini, groq: callGroq };
+const hasProvider = (env, name) => (name === 'gemini' ? !!env.GEMINI_API_KEY : !!env.GROQ_API_KEY);
+
+// Try each AI in order and move on when one is out of quota, overloaded or blocked.
+// Photos only go to Gemini, since Groq cannot see them.
+async function callAI(env, system, contents, order) {
+  const tried = [];
+  let last = { ok: false, status: 500, error: 'No AI is configured on the worker' };
+  for (const name of order.filter((n) => hasProvider(env, n))) {
+    const r = await PROVIDERS[name](env, system, contents);
+    if (r.ok) return { ...r, provider: name, fellBack: tried };
+    tried.push({ provider: name, status: r.status, error: r.error });
+    last = { ...r, provider: name, fellBack: tried };
+    if (r.status === 413 || (r.status === 400 && !/location is not supported/i.test(r.error))) break;
+  }
+  return last;
+}
+
+function routeFor(contents, mode) {
+  if (contents.some((c) => c.parts.some((p) => p.inlineData))) return ['gemini'];
+  if (mode === 'groq') return ['groq', 'gemini'];
+  if (mode === 'gemini') return ['gemini'];
+  return ['gemini', 'groq'];
 }
 
 // ---------- base64url ----------
@@ -150,7 +209,8 @@ async function writeNudge(env, rec) {
   const contents = (p.recent || []).slice(-6).map((m) => ({ role: m.role === 'user' ? 'user' : 'model', parts: [{ text: String(m.text || '').slice(0, 600) || '(photo)' }] }));
   contents.push({ role: 'user', parts: [{ text: `[App note, not from the user: it is ${t.weekday} ${String(t.hour).padStart(2, '0')}:${String(t.minute).padStart(2, '0')} for the user and they have not opened the chat for a while. Send ONE short message first, like a friend texting out of the blue (1–2 sentences): ask about their day, follow up on something you remember, or share a small thing about "your" day with a question. Do not say you are an AI and do not mention this note.]` }] });
   if (contents[0].role !== 'user') contents.unshift({ role: 'user', parts: [{ text: '(opened the chat)' }] });
-  const r = await callGemini(env, nudgePrompt(p), contents);
+  // Short texts go to Groq first so the chat keeps more of the Gemini quota.
+  const r = await callAI(env, nudgePrompt(p), contents, ['groq', 'gemini']);
   if (!r.ok) return r;
   let reply = r.text.trim();
   try { reply = JSON.parse(reply.replace(/^```(?:json)?\s*/i, '').replace(/```$/, '')).reply || reply; } catch {}
@@ -285,11 +345,13 @@ export default {
       if (!env.INTERNAL_KEY || request.headers.get('x-internal') !== env.INTERNAL_KEY) return json({ error: 'Forbidden' }, 403);
       return json({ results: await runDue(env) });
     }
-    if (path === '/' && request.method === 'GET') return json({ ok: true, version: WORKER_VERSION, push: !!(env.BUDDY && env.VAPID_PRIVATE_JWK), message: 'Language Buddy worker is running' });
+    if (path === '/' && request.method === 'GET') {
+      return json({ ok: true, version: WORKER_VERSION, push: !!(env.BUDDY && env.VAPID_PRIVATE_JWK), ai: ['gemini', 'groq'].filter((n) => hasProvider(env, n)), message: 'Language Buddy worker is running' });
+    }
     if (!originOk) return json({ error: 'This website is not allowed to use the worker (check ALLOWED_ORIGIN)' }, 403);
     if (path.startsWith('/push/')) return handlePush(path, request, env, json);
     if (request.method !== 'POST') return json({ error: 'POST only' }, 405);
-    if (!env.GEMINI_API_KEY) return json({ error: 'GEMINI_API_KEY is not set on the worker' }, 500);
+    if (!env.GEMINI_API_KEY && !env.GROQ_API_KEY) return json({ error: 'No AI key is set on the worker' }, 500);
 
     const raw = await request.text();
     if (raw.length > MAX_BODY_CHARS) return json({ error: 'Request too large' }, 413);
@@ -301,9 +363,9 @@ export default {
       return json({ error: 'Expected { system: string, contents: [...] }' }, 400);
     }
     const clean = contents.map((c) => ({ role: c.role === 'model' ? 'model' : 'user', parts: cleanParts(c.parts) }));
-    const r = await callGemini(env, system, clean);
-    if (!r.ok) return json({ error: r.error }, r.status);
-    return json({ text: r.text, usage: r.usage });
+    const r = await callAI(env, system, clean, routeFor(clean, body.ai));
+    if (!r.ok) return json({ error: r.error, provider: r.provider, fellBack: r.fellBack }, r.status);
+    return json({ text: r.text, usage: r.usage, provider: r.provider, fellBack: r.fellBack });
   },
 
   async scheduled(event, env, ctx) {

@@ -299,7 +299,14 @@
     <textarea id="sPersona"></textarea>
     <label for="sRate">ความเร็วเสียงพูด</label>
     <input id="sRate" type="range" min="0.6" max="1.2" step="0.05">
-    <label for="sLimit">โควตาฟรีต่อวัน (จำนวนครั้ง)</label>
+    <label for="sAi">AI ที่ใช้คุย</label>
+    <select id="sAi">
+      <option value="auto">อัตโนมัติ (แนะนำ) — Gemini ก่อน ถ้าไม่ได้สลับไป Groq</option>
+      <option value="groq">Groq ก่อน (เร็วกว่า) — ถ้าไม่ได้สลับไป Gemini</option>
+      <option value="gemini">Gemini อย่างเดียว</option>
+    </select>
+    <div class="hint">รูปใช้ Gemini เสมอ (Groq ดูรูปไม่ได้) · ข้อความทักผ่านการแจ้งเตือนใช้ Groq ก่อน เพื่อประหยัดโควตา Gemini</div>
+    <label for="sLimit">โควตาฟรีของ Gemini ต่อวัน (จำนวนครั้ง)</label>
     <input id="sLimit" type="number" min="0" step="1" inputmode="numeric" placeholder="เช่น 1000">
     <div class="hint">ดูตัวเลข RPD ของโมเดลที่ใช้ได้ที่ aistudio.google.com/rate-limit (ใส่ 0 ถ้าไม่รู้) · แอปนับเฉพาะในเครื่องนี้ · รีเซ็ตเที่ยงคืนเวลาสหรัฐฯ ฝั่งตะวันตก</div>
     <label class="check"><input id="sVoice" type="checkbox"> อ่านคำตอบออกเสียงอัตโนมัติ</label>
@@ -382,6 +389,7 @@
     rate: 0.95,
     dailyLimit: 0,                // free requests per day from AI Studio; 0 = unknown
     perDay: 2,                    // how many times a day the buddy may message first (push)
+    ai: 'auto',                   // which AI the worker tries first: auto (Gemini → Groq), groq, gemini
   };
   const SCENES = [
     { icon: '🍜', th: 'สั่งอาหารที่ร้าน', en: 'The user is a customer at a restaurant. You are the waiter: greet them, take the order, answer questions about the menu, and bring the bill at the end.' },
@@ -420,7 +428,8 @@
   let usage = load('lb_usage', {});
   function todayUsage() {
     const day = pacificDay();
-    if (usage.day !== day) usage = { day, requests: 0, photos: 0, tokens: 0, out: false };
+    if (usage.day !== day) usage = { day, requests: 0, photos: 0, tokens: 0, out: false, groq: 0 };
+    usage.groq = usage.groq || 0;
     return usage;
   }
   function nextReset() {
@@ -429,9 +438,11 @@
     for (let i = 0; i < 1500 && pacificDay(t) === today; i++) t.setMinutes(t.getMinutes() + 1);
     return t;
   }
-  function recordUsage(tokens, hadPhoto) {
+  // `requests` counts Gemini calls (the limit in settings is Gemini's); Groq calls are counted apart.
+  function recordUsage(tokens, hadPhoto, provider) {
     const u = todayUsage();
-    u.requests += 1;
+    if (provider === 'groq') u.groq += 1;
+    else u.requests += 1;
     u.tokens += tokens || 0;
     if (hadPhoto) u.photos += 1;
     save('lb_usage', u);
@@ -448,16 +459,17 @@
     const box = $('quota'), n = u.requests.toLocaleString('th-TH');
     let text, pct;
     if (u.out) {
-      text = `โควตาฟรีวันนี้หมดแล้ว (ใช้ไป ${n} ครั้ง) · ใช้ได้อีกครั้งหลัง ${reset} น.`;
+      text = `Gemini วันนี้หมดแล้ว (ใช้ไป ${n} ครั้ง) · ใช้ได้อีกครั้งหลัง ${reset} น.` + (settings.ai !== 'gemini' ? ' · ตอนนี้คุยผ่าน Groq' : '');
       pct = 100;
     } else if (limit) {
       const left = Math.max(limit - u.requests, 0);
-      text = `วันนี้ใช้ไป ${n} / ${limit.toLocaleString('th-TH')} ครั้ง · เหลือ ${left.toLocaleString('th-TH')} · รีเซ็ต ${reset} น.`;
+      text = `Gemini วันนี้ ${n} / ${limit.toLocaleString('th-TH')} ครั้ง · เหลือ ${left.toLocaleString('th-TH')} · รีเซ็ต ${reset} น.`;
       pct = Math.min(100, (u.requests / limit) * 100);
     } else {
-      text = `วันนี้ใช้ไป ${n} ครั้ง · แตะเพื่อใส่โควตาต่อวัน`;
+      text = `Gemini วันนี้ ${n} ครั้ง · แตะเพื่อใส่โควตาต่อวัน`;
       pct = 0;
     }
+    if (u.groq) text += ` · Groq ${u.groq.toLocaleString('th-TH')}`;
     if (u.photos) text += ` · รูป ${u.photos}`;
     $('quotaText').textContent = text;
     $('quotaBar').style.width = pct + '%';
@@ -511,7 +523,7 @@
     }
     row.append(bubble);
     if (m.correction) row.append(fixCard(m.correction));
-    row.append(el('div', 'meta', fmtTime(m.t)));
+    row.append(el('div', 'meta', fmtTime(m.t) + (m.ai === 'groq' ? ' · Groq' : '')));
     chat.append(row);
     return row;
   }
@@ -622,7 +634,7 @@ Only correct real errors in the user's last message (grammar, wrong word, unnatu
     if (!settings.workerUrl) { showSetupNotice(); return null; }
     const contents = buildContents(extraUserTurn);
     const hadPhoto = contents.some((c) => c.parts.some((p) => p.inlineData));
-    const body = JSON.stringify({ system: systemPrompt(), contents });
+    const body = JSON.stringify({ system: systemPrompt(), contents, ai: settings.ai });
     let res, data;
     // Google sometimes rejects the Cloudflare server that relays the request ("location is not
     // supported"); a fresh request usually goes out through another one, so try again quietly.
@@ -633,6 +645,8 @@ Only correct real errors in the user's last message (grammar, wrong word, unnatu
       try { data = await res.json(); } catch {}
       if (res.ok || !/location is not supported/i.test(data.error || '')) break;
     }
+    // Gemini said its daily quota is gone, even if Groq answered instead.
+    if ((data.fellBack || []).some((f) => f.provider === 'gemini' && f.status === 429 && /per\s*day|perday|daily/i.test(f.error || ''))) markQuotaOut();
     if (!res.ok) {
       const msg = data.error || `HTTP ${res.status}`;
       if (res.status === 429) {
@@ -646,8 +660,8 @@ Only correct real errors in the user's last message (grammar, wrong word, unnatu
       if (/location is not supported/i.test(msg)) throw new Error('Google ปฏิเสธการเชื่อมต่อชั่วคราว ลองส่งใหม่อีกครั้ง');
       throw new Error(msg);
     }
-    recordUsage(data.usage?.total, hadPhoto);
-    return parseReply(data.text || '');
+    recordUsage(data.usage?.total, hadPhoto, data.provider);
+    return { ...parseReply(data.text || ''), provider: data.provider };
   }
 
   function applyAI(ai, userMsg) {
@@ -669,6 +683,7 @@ Only correct real errors in the user's last message (grammar, wrong word, unnatu
       state.facts = state.facts.slice(-40);
     }
     const botMsg = { role: 'model', text: ai.reply, t: Date.now() };
+    if (ai.provider === 'groq') botMsg.ai = 'groq';
     state.messages.push(botMsg);
     state.lastSeen = Date.now();
     persist();
@@ -890,6 +905,7 @@ Only correct real errors in the user's last message (grammar, wrong word, unnatu
     $('sRate').value = settings.rate;
     $('sLimit').value = settings.dailyLimit || '';
     $('sPerDay').value = String(settings.perDay || 2);
+    $('sAi').value = settings.ai || 'auto';
     renderPush();
     $('sVoice').checked = settings.voice;
     $('sAutoSend').checked = settings.autoSend;
@@ -908,6 +924,7 @@ Only correct real errors in the user's last message (grammar, wrong word, unnatu
       persona: $('sPersona').value.trim() || DEFAULT_SETTINGS.persona,
       rate: Number($('sRate').value),
       dailyLimit: Math.max(0, Math.floor(Number($('sLimit').value) || 0)),
+      ai: $('sAi').value,
       voice: $('sVoice').checked,
       autoSend: $('sAutoSend').checked,
     };
