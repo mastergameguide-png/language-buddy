@@ -290,10 +290,15 @@
       </div>
       <div>
         <label for="sLevel">ระดับ</label>
-        <select id="sLevel">
-          <option>A1</option><option>A2</option><option>B1</option><option>B2</option><option>C1</option>
-        </select>
+        <select id="sLevel"></select>
       </div>
+    </div>
+    <div id="variantBox">
+      <label for="sVariant">สำเนียงและคำศัพท์</label>
+      <select id="sVariant">
+        <option value="American">🇺🇸 อเมริกัน (color, apartment, vacation)</option>
+        <option value="British">🇬🇧 บริติช (colour, flat, holiday)</option>
+      </select>
     </div>
     <label for="sName">ชื่อเพื่อน AI</label>
     <input id="sName" type="text" maxlength="20">
@@ -409,7 +414,8 @@
   const DEFAULT_SETTINGS = {
     workerUrl: '',
     lang: 'English',
-    level: 'B1',
+    level: 'B1',                  // CEFR (A1–C2) or, for English, an IELTS band such as 'IELTS 6.5'
+    variant: 'American',          // English only: American or British
     name: 'Sam',
     persona: 'A kind, playful friend from abroad. Casual, warm, a little teasing. Loves hearing about the user\'s day, food and hobbies.',
     voice: true,
@@ -424,6 +430,9 @@
     ai: 'auto',                   // which AI the worker tries first: auto (Gemini → Groq), groq, gemini
   };
   const SCENES = [
+    { icon: '🎓', th: 'สอบพูด IELTS (Speaking)', englishOnly: true,
+      en: 'You are an IELTS Speaking examiner running a full mock test. Part 1: ask 4–5 short questions about familiar topics (home, work or study, hobbies), one at a time. Part 2: give a cue card (a topic plus 3–4 bullet points), tell the user to prepare and speak for 1–2 minutes, then ask one short follow-up. Part 3: ask 3–4 deeper discussion questions linked to the Part 2 topic. Say which part you are starting. Behave like a real examiner: neutral and polite, no teaching during the test, one question per turn.',
+      feedback: 'As an IELTS examiner, estimate the user\'s band for each criterion — Fluency and Coherence, Lexical Resource, Grammatical Range and Accuracy (pronunciation cannot be judged from text, say so) — and an overall band, based only on what they wrote. Then give 3 specific ways to reach the next half band, each with a better version of one of their own sentences.' },
     { icon: '🍜', th: 'สั่งอาหารที่ร้าน', en: 'The user is a customer at a restaurant. You are the waiter: greet them, take the order, answer questions about the menu, and bring the bill at the end.' },
     { icon: '🏨', th: 'เช็กอินโรงแรม', en: 'You are the hotel receptionist. The user is checking in: ask for the booking name, explain breakfast time, Wi-Fi, and handle a small problem with the room.' },
     { icon: '✈️', th: 'ตม. และสนามบิน', en: 'You are an immigration officer at the airport. Ask the user the usual questions: purpose of visit, how long, where they will stay, return ticket.' },
@@ -435,6 +444,32 @@
     { icon: '📞', th: 'โทรจองโต๊ะ', en: 'You are a restaurant staff member answering the phone. The user is calling to book a table: date, time, number of people, name, special requests.' },
     { icon: '🎉', th: 'เจอเพื่อนใหม่ในปาร์ตี้', en: 'You are someone the user just met at a party. Make small talk: names, where you are from, work or study, hobbies, and suggest meeting again.' },
   ];
+  const CEFR = {
+    A1: 'เริ่มต้น', A2: 'พื้นฐาน', B1: 'กลาง', B2: 'กลาง-สูง', C1: 'สูง', C2: 'เชี่ยวชาญ',
+  };
+  // IELTS band → CEFR, following the official IELTS/CEFR alignment (B1 4.0–5.0, B2 5.5–6.5, C1 7.0–8.0, C2 8.5+).
+  const IELTS = [['3.5', 'A2'], ['4.0', 'B1'], ['4.5', 'B1'], ['5.0', 'B1'], ['5.5', 'B2'], ['6.0', 'B2'], ['6.5', 'B2'],
+    ['7.0', 'C1'], ['7.5', 'C1'], ['8.0', 'C1'], ['8.5', 'C2'], ['9.0', 'C2']];
+  const isEnglish = () => settings.lang === 'English';
+  const ieltsBand = (level = settings.level) => (/^IELTS /.test(level) ? level.slice(6) : null);
+  const cefrOf = (level = settings.level) => (ieltsBand(level) ? (IELTS.find(([b]) => b === ieltsBand(level)) || [0, 'B1'])[1] : level);
+  // Speech uses the accent the user chose for English.
+  const speechCode = () => (isEnglish() ? (settings.variant === 'British' ? 'en-GB' : 'en-US') : LANGS[settings.lang]?.code || 'en-US');
+  function levelText() {
+    const band = isEnglish() && ieltsBand();
+    return band ? `IELTS band ${band} (about CEFR ${cefrOf()})` : `CEFR ${cefrOf()}`;
+  }
+  function variantText() {
+    if (!isEnglish()) return '';
+    return settings.variant === 'British'
+      ? 'Use British English: British spelling (colour, organise, travelling), vocabulary (flat, holiday, lorry, queue, mobile) and natural British expressions. When correcting, treat American spelling or words as fine but mention the British form in "why" if it helps.'
+      : 'Use American English: American spelling (color, organize, traveling), vocabulary (apartment, vacation, truck, line, cell phone) and natural American expressions. When correcting, treat British spelling or words as fine but mention the American form in "why" if it helps.';
+  }
+  function ieltsText() {
+    const band = isEnglish() && ieltsBand();
+    if (!band) return '';
+    return `The user is preparing for IELTS and is around band ${band}. Use vocabulary and grammar a band ${band} speaker can follow, and now and then naturally use (and briefly invite them to try) a word, collocation or structure typical of the next half band up. In "why", when useful, say which IELTS criterion the mistake affects (Grammatical Range and Accuracy, Lexical Resource, Fluency and Coherence).`;
+  }
   const PHOTO_MAX_SIDE = 1024;
   const HISTORY_SENT = 24;        // messages sent to the model each turn
   const HISTORY_KEPT = 300;       // messages kept on the phone
@@ -600,7 +635,8 @@
   function updateHeader() {
     $('buddyName').textContent = settings.name || 'Buddy';
     $('avatar').textContent = (settings.name || 'B').trim().charAt(0).toUpperCase();
-    $('status').textContent = `${settings.lang} · ${settings.level}`;
+    const flag = isEnglish() ? (settings.variant === 'British' ? ' 🇬🇧' : ' 🇺🇸') : '';
+    $('status').textContent = `${settings.lang}${flag} · ${ieltsBand() && isEnglish() ? 'IELTS ' + ieltsBand() : cefrOf()}`;
     const n = state.mistakes.length;
     if (n) $('mistakesBtn').dataset.count = n > 99 ? '99+' : n;
     else delete $('mistakesBtn').dataset.count;
@@ -615,7 +651,9 @@
 
 Personality: ${settings.persona}
 
-The user is Thai and their ${settings.lang} level is about CEFR ${settings.level}. Use vocabulary and grammar that fit that level. Keep messages short like real chat (1–3 sentences), natural and warm. Usually end with a question or a hook that keeps the conversation going, but vary it. Share small things about "your" day sometimes so it feels two-way. Never switch to Thai in "reply" unless the user is clearly stuck and asks.
+The user is Thai and their ${settings.lang} level is ${levelText()}. Use vocabulary and grammar that fit that level.
+${variantText()}
+${ieltsText()} Keep messages short like real chat (1–3 sentences), natural and warm. Usually end with a question or a hook that keeps the conversation going, but vary it. Share small things about "your" day sometimes so it feels two-way. Never switch to Thai in "reply" unless the user is clearly stuck and asks.
 
 What you remember about the user:
 ${facts}
@@ -837,7 +875,8 @@ Only correct real errors in the user's last message (grammar, wrong word, unnatu
   function pickVoice(code) {
     const base = code.split('-')[0];
     const cands = voices.filter((v) => v.lang.replace('_', '-').startsWith(base));
-    const pref = (v) => (/(premium|enhanced|natural|siri)/i.test(v.name) ? 0 : 1) + (v.lang.replace('_', '-') === code ? 0 : 0.5);
+    // The right accent (en-GB vs en-US) matters more than a nicer voice.
+    const pref = (v) => (/(premium|enhanced|natural|siri)/i.test(v.name) ? 0 : 1) + (v.lang.replace('_', '-') === code ? 0 : 2);
     return cands.sort((a, b) => pref(a) - pref(b))[0] || null;
   }
   let speechUnlocked = false;
@@ -852,7 +891,7 @@ Only correct real errors in the user's last message (grammar, wrong word, unnatu
   function speak(text) {
     if (!window.speechSynthesis || !text) return;
     speechSynthesis.cancel();
-    const code = LANGS[settings.lang]?.code || 'en-US';
+    const code = speechCode();
     const u = new SpeechSynthesisUtterance(text.replace(/[*_#`]/g, ''));
     u.lang = code;
     const v = pickVoice(code);
@@ -873,7 +912,7 @@ Only correct real errors in the user's last message (grammar, wrong word, unnatu
     unlockSpeech();
     window.speechSynthesis?.cancel();
     rec = new SR();
-    rec.lang = LANGS[settings.lang]?.code || 'en-US';
+    rec.lang = speechCode();
     rec.interimResults = true;
     rec.continuous = false;
     finalText = '';
@@ -928,10 +967,30 @@ Only correct real errors in the user's last message (grammar, wrong word, unnatu
     o.value = key;
     sLang.append(o);
   }
+  // English offers IELTS bands as well as CEFR; other languages use CEFR only.
+  function fillLevels(lang, current) {
+    const sel = $('sLevel');
+    sel.textContent = '';
+    if (lang === 'English') {
+      const g = el('optgroup');
+      g.label = 'IELTS';
+      for (const [band, cefr] of IELTS) { const o = el('option', '', `IELTS ${band} (${cefr})`); o.value = 'IELTS ' + band; g.append(o); }
+      sel.append(g);
+    }
+    const g = el('optgroup');
+    g.label = 'CEFR';
+    for (const [lv, th] of Object.entries(CEFR)) { const o = el('option', '', `${lv} ${th}`); o.value = lv; g.append(o); }
+    sel.append(g);
+    sel.value = lang === 'English' || !/^IELTS /.test(current) ? current : cefrOf(current);
+    if (!sel.value) sel.value = cefrOf(current) || 'B1';
+    $('variantBox').hidden = lang !== 'English';
+  }
+  sLang.addEventListener('change', () => fillLevels(sLang.value, $('sLevel').value));
   function openSettings() {
     $('sWorker').value = settings.workerUrl;
     sLang.value = settings.lang;
-    $('sLevel').value = settings.level;
+    fillLevels(settings.lang, settings.level);
+    $('sVariant').value = settings.variant || 'American';
     $('sName').value = settings.name;
     $('sPersona').value = settings.persona;
     $('sRate').value = settings.rate;
@@ -944,14 +1003,16 @@ Only correct real errors in the user's last message (grammar, wrong word, unnatu
     $('settings').showModal();
   }
   $('settingsBtn').addEventListener('click', openSettings);
-  $('settings').addEventListener('close', () => {
-    if ($('settings').returnValue !== 'save') return;
+  // Save on submit (fires right away in every browser), not on the dialog's close event.
+  $('settingsForm').addEventListener('submit', (e) => {
+    if (e.submitter && e.submitter.value !== 'save') return;
     const hadWorker = !!settings.workerUrl;
     settings = {
       ...settings,
       workerUrl: $('sWorker').value.trim(),
       lang: sLang.value,
       level: $('sLevel').value,
+      variant: $('sVariant').value,
       name: $('sName').value.trim() || DEFAULT_SETTINGS.name,
       persona: $('sPersona').value.trim() || DEFAULT_SETTINGS.persona,
       rate: Number($('sRate').value),
@@ -1011,15 +1072,18 @@ Only correct real errors in the user's last message (grammar, wrong word, unnatu
     notice(`เริ่มฝึก: ${scene.icon} ${scene.th}`);
     run(null, `[App note, not from the user: the user chose a role-play. ${scene.en} Start the scene now with your first line in character. Set "correction" to null.]`);
   }
-  const sceneList = $('sceneList');
-  for (const s of SCENES) {
-    const b = el('button');
-    b.type = 'button';
-    b.append(el('b', '', s.icon), s.th);
-    b.addEventListener('click', () => startScene(s));
-    sceneList.append(b);
+  function renderSceneList() {
+    const list = $('sceneList');
+    list.textContent = '';
+    for (const s of SCENES.filter((x) => !x.englishOnly || isEnglish())) {
+      const b = el('button');
+      b.type = 'button';
+      b.append(el('b', '', s.icon), s.th);
+      b.addEventListener('click', () => startScene(s));
+      list.append(b);
+    }
   }
-  $('roleBtn').addEventListener('click', () => { $('customScene').value = ''; $('roles').showModal(); });
+  $('roleBtn').addEventListener('click', () => { renderSceneList(); $('customScene').value = ''; $('roles').showModal(); });
   $('closeRoles').addEventListener('click', () => $('roles').close());
   $('customStart').addEventListener('click', () => {
     const t = $('customScene').value.trim();
@@ -1032,7 +1096,8 @@ Only correct real errors in the user's last message (grammar, wrong word, unnatu
     state.scene = null;
     persist();
     renderScene();
-    run(null, `[App note, not from the user: the role-play "${scene.th}" has ended. Step out of the role and, as ${settings.name}, give friendly feedback. For THIS message only, write "reply" in Thai: what they did well, 2–3 useful ${settings.lang} phrases for this situation (with Thai meaning), and one thing to practise. Keep it short. Set "correction" to null.]`);
+    const what = scene.feedback || `Give friendly feedback: what they did well, 2–3 useful ${settings.lang} phrases for this situation (with Thai meaning), and one thing to practise. Keep it short.`;
+    run(null, `[App note, not from the user: the role-play "${scene.th}" has ended. Step out of the role and, as ${settings.name}, ${what} For THIS message only, write "reply" in Thai (keep ${settings.lang} words and example sentences in ${settings.lang}). Set "correction" to null.]`);
   });
 
   // ---------- backup ----------
@@ -1080,7 +1145,7 @@ Only correct real errors in the user's last message (grammar, wrong word, unnatu
   const savePush = () => save('lb_push', push);
   function pushProfile() {
     return {
-      name: settings.name, persona: settings.persona, lang: settings.lang, level: settings.level,
+      name: settings.name, persona: settings.persona, lang: settings.lang, level: levelText(), variant: isEnglish() ? settings.variant : '',
       tz: Intl.DateTimeFormat().resolvedOptions().timeZone, perDay: Number(settings.perDay) || 0,
       mode: settings.pushMode, from: settings.pushFrom, to: settings.pushTo, times: settings.pushTimes,
       facts: state.facts.slice(-20),

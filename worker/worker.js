@@ -13,7 +13,7 @@
 //   GROQ_MODEL        (Text, optional)    defaults to openai/gpt-oss-120b
 //   BUDDY             (KV binding, for push)
 
-const WORKER_VERSION = 7;         // shown when you open the worker link; bump on every change
+const WORKER_VERSION = 8;         // shown when you open the worker link; bump on every change
 const MAX_TURNS = 60;
 const MAX_BODY_CHARS = 1500000;   // room for one resized photo
 const MAX_IMAGE_CHARS = 1400000;  // base64 length of a single photo
@@ -50,7 +50,7 @@ async function callGemini(env, system, contents) {
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: system }] },
       contents,
-      generationConfig: { responseMimeType: 'application/json', temperature: 0.9, maxOutputTokens: 1024 },
+      generationConfig: { responseMimeType: 'application/json', temperature: 0.9, maxOutputTokens: 2048 },
     }),
   });
   let data = {};
@@ -70,7 +70,7 @@ async function callGroq(env, system, contents) {
     content: c.parts.filter((p) => typeof p.text === 'string').map((p) => p.text).join('\n') +
       (c.parts.some((p) => p.inlineData) ? ' [sent a photo]' : ''),
   }))];
-  const request = { model, messages, temperature: 0.9, max_completion_tokens: 1024, response_format: { type: 'json_object' } };
+  const request = { model, messages, temperature: 0.9, max_completion_tokens: 2048, response_format: { type: 'json_object' } };
   if (/gpt-oss|qwen3/.test(model)) request.reasoning_effort = 'low';
   const send = (req) => fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
@@ -199,7 +199,7 @@ function nudgePrompt(profile) {
   const facts = (profile.facts || []).map((f) => '- ' + f).join('\n') || '(nothing yet)';
   return `You are ${profile.name}, the user's friend who chats with them in ${profile.lang} so they can practise. You are a person with your own life, not a teacher.
 Personality: ${profile.persona}
-The user is Thai, ${profile.lang} level about CEFR ${profile.level}. Use vocabulary that fits that level.
+The user is Thai, ${profile.lang} level: ${profile.level}. Use vocabulary that fits that level.${profile.variant ? ` Use ${profile.variant} English spelling, words and expressions.` : ''}
 What you remember about the user:
 ${facts}
 Answer with JSON only: {"reply": "your message in ${profile.lang}"}`;
@@ -301,7 +301,8 @@ function cleanProfile(p = {}) {
     name: s(p.name, 20) || 'Buddy',
     persona: s(p.persona, 400),
     lang: s(p.lang, 20) || 'English',
-    level: s(p.level, 3) || 'B1',
+    level: s(p.level, 40) || 'CEFR B1',
+    variant: ['American', 'British'].includes(p.variant) ? p.variant : '',
     tz: s(p.tz, 40) || 'Asia/Bangkok',
     perDay: Math.min(3, Math.max(0, Number(p.perDay) || 0)),
     mode: p.mode === 'fixed' ? 'fixed' : 'random',
