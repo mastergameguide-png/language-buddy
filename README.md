@@ -48,7 +48,7 @@ AI language practice buddy
 
 ### 3. อัปโหลดไฟล์ขึ้น GitHub และเปิด GitHub Pages
 
-ถ้าใช้ Claude Code: บอกมันว่า "commit and push to GitHub"
+ถ้าใช้ Claude Code: บอกมันว่า "commit and push to GitHub" และ deploy Worker ด้วย `npx wrangler deploy` ในโฟลเดอร์ `worker` (ครั้งแรกต้อง `npx wrangler login`)
 
 ถ้าอัปโหลดเองผ่านเว็บ:
 1. เข้า repo `language-buddy` บน GitHub → **Add file** → **Upload files**
@@ -84,8 +84,8 @@ AI language practice buddy
 | เสียงไม่ค่อยเป็นธรรมชาติ | การตั้งค่า → การช่วยการเข้าถึง → เนื้อหาที่ถูกพูด → เสียง → ดาวน์โหลดเสียงแบบ Enhanced/Premium ของภาษานั้น |
 | "โควตาฟรีหมด" | free tier จำกัดจำนวนครั้งต่อนาที/ต่อวัน รอสักครู่แล้วลองใหม่ |
 | ตัวเลขโควตาไม่ตรงกับ AI Studio | แอปนับเฉพาะในเครื่องนั้น ถ้าใช้หลายเครื่อง ตัวเลขจริงดูที่ aistudio.google.com/rate-limit (รีเซ็ตเที่ยงคืนเวลาแปซิฟิก = 14:00–15:00 เวลาไทย) |
-| ส่งรูปแล้ว AI ไม่พูดถึงรูป หรือขึ้น "Request too large" | โค้ด Worker ใน Cloudflare ยังเป็นเวอร์ชันเก่า เปิดลิงก์ Worker ต้องเห็น `"version":3` ถ้าไม่เห็น ให้วางโค้ดจาก `worker/worker.js` ใหม่แล้วกด Deploy |
-| "User location is not supported" หรือ "Google ปฏิเสธการเชื่อมต่อชั่วคราว" | Google บล็อก IP ของ Cloudflare บางตัวเป็นครั้งคราว Worker ลองใหม่ให้อัตโนมัติ 5 ครั้งแล้ว ถ้ายังเจอให้กดส่งใหม่ |
+| ส่งรูปแล้ว AI ไม่พูดถึงรูป หรือขึ้น "Request too large" | โค้ด Worker ใน Cloudflare ยังเป็นเวอร์ชันเก่า เปิดลิงก์ Worker ต้องเห็น `"version":4` ถ้าไม่เห็น ให้วางโค้ดจาก `worker/worker.js` ใหม่แล้วกด Deploy |
+| "User location is not supported" หรือ "Google ปฏิเสธการเชื่อมต่อชั่วคราว" | Google บล็อก IP ของ Cloudflare บางตัวเป็นครั้งคราว แอปลองส่งใหม่ให้อัตโนมัติ 4 ครั้งแล้ว ถ้ายังเจอให้กด "ลองอีกครั้ง" |
 | error ว่า model not found | ชื่อโมเดลของ Google อาจเปลี่ยน ดูชื่อล่าสุดใน AI Studio แล้วเพิ่มตัวแปร `GEMINI_MODEL` (Text) ใน Worker |
 | "not allowed (check ALLOWED_ORIGIN)" | ค่า `ALLOWED_ORIGIN` ต้องตรงกับ `https://ชื่อคุณ.github.io` เป๊ะ |
 | แก้โค้ดแล้วมือถือยังเห็นแบบเก่า | ปิดแอปแล้วเปิดใหม่ 1–2 ครั้ง หรือเปลี่ยน `CACHE` ใน `sw.js` เป็นเลขใหม่ |

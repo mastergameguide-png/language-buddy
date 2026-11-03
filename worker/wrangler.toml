@@ -1,13 +1,15 @@
-# Only needed if you deploy from the command line with `npx wrangler deploy`.
-# Deploying by copy-pasting worker.js in the Cloudflare dashboard does not use this file.
+# Deploy from this folder with:  npx wrangler deploy
 name = "language-buddy"
 main = "worker.js"
 compatibility_date = "2025-01-01"
 
-[vars]
-# Change to your GitHub Pages address, e.g. "https://yourname.github.io"
-ALLOWED_ORIGIN = "*"
-# GEMINI_MODEL = "gemini-3.5-flash-lite"
+# Keep the variables set in the Cloudflare dashboard (ALLOWED_ORIGIN, GEMINI_MODEL)
+# instead of replacing them on every deploy.
+keep_vars = true
+preview_urls = false
 
-# Set the key as a secret (never put it in this file):
+[observability]
+enabled = true
+
+# The API key is a secret and never goes in this file:
 #   npx wrangler secret put GEMINI_API_KEY

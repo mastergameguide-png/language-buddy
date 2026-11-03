@@ -6,12 +6,12 @@
 //   ALLOWED_ORIGIN  (Text, recommended) your GitHub Pages address, e.g. https://yourname.github.io
 //   GEMINI_MODEL    (Text, optional)    defaults to gemini-3.5-flash-lite
 
-const WORKER_VERSION = 3;         // shown when you open the worker link; bump on every change
+const WORKER_VERSION = 4;         // shown when you open the worker link; bump on every change
 const MAX_TURNS = 60;
 const MAX_BODY_CHARS = 1500000;   // room for one resized photo
 const MAX_IMAGE_CHARS = 1400000;  // base64 length of a single photo
 const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
-const LOCATION_RETRIES = 5;
+const LOCATION_RETRIES = 1;   // retries here reuse the same outgoing IP and only burn quota; the app retries instead
 
 // Each turn may have text parts and (from the app) one photo as inlineData.
 function cleanParts(parts) {
@@ -69,7 +69,7 @@ export default {
     });
 
     // Google sometimes rejects Cloudflare's outgoing IP with "User location is not supported";
-    // the next attempt usually leaves from another IP, so retry a few times.
+    // retrying inside one run leaves from the same IP, so the app sends a fresh request instead.
     let res, data;
     for (let attempt = 0; attempt < LOCATION_RETRIES; attempt++) {
       res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {

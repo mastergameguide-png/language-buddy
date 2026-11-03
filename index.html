@@ -547,13 +547,17 @@ Only correct real errors in the user's last message (grammar, wrong word, unnatu
     if (!settings.workerUrl) { showSetupNotice(); return null; }
     const contents = buildContents(extraUserTurn);
     const hadPhoto = contents.some((c) => c.parts.some((p) => p.inlineData));
-    const res = await fetch(settings.workerUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ system: systemPrompt(), contents }),
-    });
-    let data = {};
-    try { data = await res.json(); } catch {}
+    const body = JSON.stringify({ system: systemPrompt(), contents });
+    let res, data;
+    // Google sometimes rejects the Cloudflare server that relays the request ("location is not
+    // supported"); a fresh request usually goes out through another one, so try again quietly.
+    for (let attempt = 0; attempt < 4; attempt++) {
+      if (attempt) await new Promise((r) => setTimeout(r, 400 * attempt));
+      res = await fetch(settings.workerUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
+      data = {};
+      try { data = await res.json(); } catch {}
+      if (res.ok || !/location is not supported/i.test(data.error || '')) break;
+    }
     if (!res.ok) {
       const msg = data.error || `HTTP ${res.status}`;
       if (res.status === 429) {
