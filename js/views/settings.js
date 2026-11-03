@@ -205,10 +205,11 @@ export function initSettings() {
   f('importBtn').addEventListener('click', () => f('importInput').click());
   f('importInput').addEventListener('change', (e) => { const file = e.target.files?.[0]; e.target.value = ''; if (file) importData(file); });
   f('resetBtn').addEventListener('click', () => {
-    if (!confirm('ลบแชต ความจำ สมุดผิด คลังคำ และสถิติทั้งหมด?\n(การตั้งค่ายังอยู่ — แนะนำให้ส่งออกข้อมูลสำรองก่อน · ถ้าเปิดซิงก์ไว้ เครื่องอื่นจะถูกล้างด้วย)')) return;
-    replaceState({});
-    toast('ล้างข้อมูลแล้ว');
-    location.hash = '#home';
+    // Only the conversation goes; mistakes, words, memory and stats stay.
+    if (!confirm('ล้างข้อความแชตทั้งหมด?\n(สมุดผิด คลังคำ สิ่งที่ Sam จำได้ และสถิติยังอยู่ · ถ้าเปิดซิงก์ไว้ แชตในเครื่องอื่นจะถูกล้างด้วย)')) return;
+    replaceState({ ...state, messages: [], scene: null, lastSeen: 0 });
+    toast('ล้างแชตแล้ว');
+    location.hash = '#chat';
   });
 }
 
