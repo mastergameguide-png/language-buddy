@@ -4,7 +4,7 @@
 // Settings (Worker > Settings > Variables and Secrets):
 //   GEMINI_API_KEY  (Secret, required)  key from aistudio.google.com
 //   ALLOWED_ORIGIN  (Text, recommended) your GitHub Pages address, e.g. https://yourname.github.io
-//   GEMINI_MODEL    (Text, optional)    defaults to gemini-3.8-flash
+//   GEMINI_MODEL    (Text, optional)    defaults to gemini-3.5-flash-lite
 
 const MAX_TURNS = 60;
 const MAX_BODY_CHARS = 60000;
@@ -44,7 +44,7 @@ export default {
       parts: [{ text: String(c.parts?.[0]?.text ?? '').slice(0, 4000) }],
     }));
 
-    const model = env.GEMINI_MODEL || 'gemini-3.8-flash';
+    const model = env.GEMINI_MODEL || 'gemini-3.5-flash-lite';
     const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY },
