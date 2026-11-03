@@ -28,7 +28,7 @@ binding = "SELF"
 service = "language-buddy"
 
 [triggers]
-crons = ["*/30 * * * *"]   # keep in sync with CRON_MINUTES in worker.js
+crons = ["*/10 * * * *"]   # keep in sync with CRON_MINUTES in worker.js
 
 # Secrets never go in this file:
 #   npx wrangler secret put GEMINI_API_KEY

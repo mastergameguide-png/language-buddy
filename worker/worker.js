@@ -13,19 +13,21 @@
 //   GROQ_MODEL        (Text, optional)    defaults to openai/gpt-oss-120b
 //   BUDDY             (KV binding, for push)
 
-const WORKER_VERSION = 6;         // shown when you open the worker link; bump on every change
+const WORKER_VERSION = 7;         // shown when you open the worker link; bump on every change
 const MAX_TURNS = 60;
 const MAX_BODY_CHARS = 1500000;   // room for one resized photo
 const MAX_IMAGE_CHARS = 1400000;  // base64 length of a single photo
 const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
-// Push schedule: only between these local hours, never within QUIET_AFTER_ACTIVE of the user
-// chatting, at least MIN_GAP apart, and not while an earlier message is still unread.
-const PUSH_FIRST_HOUR = 9;
+// Push schedule. "random": between the user's from/to hours, never within QUIET_AFTER_ACTIVE of
+// the user chatting, spaced out, and not while an earlier message is still unread.
+// "fixed": at the times the user picked (each at most once a day), skipped if they are chatting.
+const PUSH_FIRST_HOUR = 9;        // defaults for the random window
 const PUSH_LAST_HOUR = 21;
 const QUIET_AFTER_ACTIVE = 3 * 3600 * 1000;
 const MIN_GAP = 3 * 3600 * 1000;
-const CRON_MINUTES = 30;          // must match [triggers] crons in wrangler.toml
+const CHATTING_NOW = 10 * 60 * 1000;
+const CRON_MINUTES = 10;          // must match [triggers] crons in wrangler.toml
 
 // Each turn may have text parts and (from the app) one photo as inlineData.
 function cleanParts(parts) {
@@ -217,34 +219,59 @@ async function writeNudge(env, rec) {
   return { ok: true, reply: String(reply).slice(0, 800) };
 }
 
-async function nudge(env, id, rec, force) {
+async function nudge(env, id, rec, force, slot) {
   const w = await writeNudge(env, rec);
   if (!w.ok) return { sent: false, error: w.error };
   const now = Date.now();
   const day = localParts(rec.profile?.tz).day;
+  const today = rec.sent?.day === day ? rec.sent : { count: 0, slots: [] };
   rec.pending = [...(rec.pending || []), { text: w.reply, t: now }].slice(-5);
-  rec.sent = { day, count: (rec.sent?.day === day ? rec.sent.count : 0) + (force ? 0 : 1), last: now };
+  rec.sent = {
+    day,
+    count: today.count + (force ? 0 : 1),
+    slots: slot ? [...(today.slots || []), slot] : today.slots || [],
+    last: now,
+  };
   const push = await sendPush(env, rec.sub, { title: rec.profile?.name || 'Buddy', body: w.reply, t: now });
   if (push.gone) { await env.BUDDY.delete('u:' + id); return { sent: false, error: 'subscription expired', push }; }
   await env.BUDDY.put('u:' + id, JSON.stringify(rec));
   return { sent: push.status < 300, push, text: w.reply };
 }
 
+// Returns false, or { slot } (the fixed time being sent, or null for a random one).
 function dueNow(rec, now = Date.now()) {
   const p = rec.profile || {};
-  const perDay = Math.min(3, Math.max(0, Number(p.perDay) || 0));
-  if (!perDay || !rec.sub) return false;
+  if (!rec.sub) return false;
   const t = localParts(p.tz, new Date(now));
-  if (t.hour < PUSH_FIRST_HOUR || t.hour >= PUSH_LAST_HOUR) return false;
-  const sentToday = rec.sent?.day === t.day ? rec.sent.count : 0;
-  if (sentToday >= perDay) return false;
+  const nowMin = t.hour * 60 + t.minute;
+  const today = rec.sent?.day === t.day ? rec.sent : { count: 0, slots: [] };
+
+  if (p.mode === 'fixed') {
+    for (const time of p.times || []) {
+      const [h, m] = time.split(':').map(Number);
+      const at = h * 60 + m;
+      // A cron run can start a little late, so accept a slot until the next run would see it.
+      if (nowMin >= at && nowMin < at + CRON_MINUTES + 2 && !(today.slots || []).includes(time)) {
+        if (now - (rec.lastActive || 0) < CHATTING_NOW) return false;
+        return { slot: time };
+      }
+    }
+    return false;
+  }
+
+  const perDay = Math.min(3, Math.max(0, Number(p.perDay) || 0));
+  if (!perDay) return false;
+  const from = p.from ?? PUSH_FIRST_HOUR, to = p.to ?? PUSH_LAST_HOUR;
+  if (nowMin < from * 60 || nowMin >= to * 60) return false;
+  if (today.count >= perDay) return false;
   if ((rec.pending || []).length) return false;
-  if (now - (rec.lastActive || 0) < QUIET_AFTER_ACTIVE) return false;
-  if (now - (rec.sent?.last || 0) < MIN_GAP) return false;
+  // A short window cannot fit 3-hour gaps, so shrink them to fit.
+  const windowMs = (to - from) * 3600 * 1000;
+  if (now - (rec.lastActive || 0) < Math.min(QUIET_AFTER_ACTIVE, windowMs / (perDay + 1))) return false;
+  if (now - (rec.sent?.last || 0) < Math.min(MIN_GAP, windowMs / (perDay + 1))) return false;
   // Spread the remaining messages over the cron runs left today, so times feel random.
-  const minutesLeft = (PUSH_LAST_HOUR - t.hour) * 60 - t.minute;
-  const runsLeft = Math.max(1, Math.ceil(minutesLeft / CRON_MINUTES));
-  return Math.random() < (perDay - sentToday) / runsLeft;
+  const runsLeft = Math.max(1, Math.ceil((to * 60 - nowMin) / CRON_MINUTES));
+  return Math.random() < (perDay - today.count) / runsLeft ? { slot: null } : false;
 }
 
 async function runDue(env) {
@@ -254,11 +281,18 @@ async function runDue(env) {
     const list = await env.BUDDY.list({ prefix: 'u:', cursor });
     for (const k of list.keys) {
       const rec = await env.BUDDY.get(k.name, 'json');
-      if (rec && dueNow(rec)) results.push({ id: k.name.slice(2, 10), ...(await nudge(env, k.name.slice(2), rec, false)) });
+      const due = rec && dueNow(rec);
+      if (due) results.push({ id: k.name.slice(2, 10), ...(await nudge(env, k.name.slice(2), rec, false, due.slot)) });
     }
     cursor = list.list_complete ? null : list.cursor;
   } while (cursor);
   return results;
+}
+
+function hourWindow(from, to) {
+  const f = Math.floor(Number(from)), t = Math.floor(Number(to));
+  if (Number.isFinite(f) && Number.isFinite(t) && f >= 0 && t <= 24 && t - f >= 1) return { from: f, to: t };
+  return { from: PUSH_FIRST_HOUR, to: PUSH_LAST_HOUR };
 }
 
 function cleanProfile(p = {}) {
@@ -270,6 +304,9 @@ function cleanProfile(p = {}) {
     level: s(p.level, 3) || 'B1',
     tz: s(p.tz, 40) || 'Asia/Bangkok',
     perDay: Math.min(3, Math.max(0, Number(p.perDay) || 0)),
+    mode: p.mode === 'fixed' ? 'fixed' : 'random',
+    times: [...new Set((Array.isArray(p.times) ? p.times : []).map(String).filter((x) => /^([01]\d|2[0-3]):[0-5]\d$/.test(x)))].sort().slice(0, 3),
+    ...hourWindow(p.from, p.to),
     facts: (Array.isArray(p.facts) ? p.facts : []).slice(-20).map((f) => s(f, 120)),
     recent: (Array.isArray(p.recent) ? p.recent : []).slice(-6).map((m) => ({ role: m.role === 'user' ? 'user' : 'model', text: s(m.text, 600) })),
   };

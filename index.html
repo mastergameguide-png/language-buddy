@@ -206,6 +206,8 @@
   .empty { color: var(--muted); font-size: 14px; }
   .facts { font-size: 14px; color: var(--muted); padding-left: 18px; }
   .sheet h3.section { margin: 22px 0 2px; font-size: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
+  .times { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .times input { padding: 9px 6px; text-align: center; }
   .scenes { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
   .scenes button {
     border: 1px solid var(--line); border-radius: 12px; padding: 10px; text-align: left;
@@ -314,8 +316,34 @@
 
     <h3 class="section">🔔 ให้เพื่อนทักมาก่อน (แจ้งเตือน)</h3>
     <div class="hint" id="pushStatus">กำลังตรวจสอบ…</div>
-    <label for="sPerDay">ทักวันละกี่ครั้ง (ช่วง 9:00–21:00)</label>
-    <select id="sPerDay"><option value="1">1 ครั้ง</option><option value="2">2 ครั้ง</option><option value="3">3 ครั้ง</option></select>
+    <label for="sPushMode">ให้ทักเมื่อไหร่</label>
+    <select id="sPushMode">
+      <option value="random">🎲 สุ่มเวลา เหมือนเพื่อนทักมาเอง</option>
+      <option value="fixed">🕐 กำหนดเวลาเอง</option>
+    </select>
+    <div id="pushRandom">
+      <div class="grid2">
+        <div>
+          <label for="sFrom">ตั้งแต่</label>
+          <select id="sFrom" class="hour"></select>
+        </div>
+        <div>
+          <label for="sTo">ถึง</label>
+          <select id="sTo" class="hour"></select>
+        </div>
+      </div>
+      <label for="sPerDay">วันละกี่ครั้ง</label>
+      <select id="sPerDay"><option value="1">1 ครั้ง</option><option value="2">2 ครั้ง</option><option value="3">3 ครั้ง</option></select>
+    </div>
+    <div id="pushFixed" hidden>
+      <label>เวลาที่ให้ทัก (สูงสุด 3 เวลา เว้นว่างได้)</label>
+      <div class="times">
+        <input type="time" id="sTime1" step="300">
+        <input type="time" id="sTime2" step="300">
+        <input type="time" id="sTime3" step="300">
+      </div>
+      <div class="hint">ข้อความอาจมาช้ากว่าเวลาที่ตั้งได้ไม่เกิน 10 นาที และจะไม่ทักถ้าคุณกำลังคุยอยู่ในแอปพอดี</div>
+    </div>
     <div class="actions">
       <button class="btn primary" type="button" id="pushOn">เปิดการแจ้งเตือน</button>
       <button class="btn" type="button" id="pushTest" hidden>ส่งทดสอบตอนนี้</button>
@@ -389,6 +417,10 @@
     rate: 0.95,
     dailyLimit: 0,                // free requests per day from AI Studio; 0 = unknown
     perDay: 2,                    // how many times a day the buddy may message first (push)
+    pushMode: 'random',           // random: perDay times between pushFrom..pushTo; fixed: at pushTimes
+    pushFrom: 9,
+    pushTo: 21,
+    pushTimes: ['08:00', '19:00'],
     ai: 'auto',                   // which AI the worker tries first: auto (Gemini → Groq), groq, gemini
   };
   const SCENES = [
@@ -904,7 +936,7 @@ Only correct real errors in the user's last message (grammar, wrong word, unnatu
     $('sPersona').value = settings.persona;
     $('sRate').value = settings.rate;
     $('sLimit').value = settings.dailyLimit || '';
-    $('sPerDay').value = String(settings.perDay || 2);
+    showSchedule();
     $('sAi').value = settings.ai || 'auto';
     renderPush();
     $('sVoice').checked = settings.voice;
@@ -1050,6 +1082,7 @@ Only correct real errors in the user's last message (grammar, wrong word, unnatu
     return {
       name: settings.name, persona: settings.persona, lang: settings.lang, level: settings.level,
       tz: Intl.DateTimeFormat().resolvedOptions().timeZone, perDay: Number(settings.perDay) || 0,
+      mode: settings.pushMode, from: settings.pushFrom, to: settings.pushTo, times: settings.pushTimes,
       facts: state.facts.slice(-20),
       recent: state.messages.slice(-6).map((m) => ({ role: m.role, text: (m.photo ? '[sent a photo] ' : '') + (m.text || '') })),
     };
@@ -1095,7 +1128,7 @@ Only correct real errors in the user's last message (grammar, wrong word, unnatu
     else if (isIOS && !standalone) text = 'บน iPhone ต้อง "เพิ่มไปยังหน้าจอโฮม" แล้วเปิดแอปจากไอคอนก่อน ถึงจะเปิดการแจ้งเตือนได้ (iOS 16.4 ขึ้นไป)';
     else if (!pushSupported) text = 'เครื่อง/เบราว์เซอร์นี้ไม่รองรับการแจ้งเตือนของเว็บแอป';
     else if (Notification.permission === 'denied') text = 'การแจ้งเตือนถูกปิดไว้ ไปที่ การตั้งค่า > การแจ้งเตือน > Buddy แล้วเปิด "อนุญาตการแจ้งเตือน"';
-    else if (push.enabled) text = `✅ เปิดอยู่ — ${settings.name} จะทักมาวันละไม่เกิน ${settings.perDay} ครั้ง ช่วง 9:00–21:00 (ไม่ทักซ้ำถ้ายังไม่ได้อ่าน และไม่ทักถ้าเพิ่งคุยกันไป)`;
+    else if (push.enabled) text = `✅ เปิดอยู่ — ${scheduleText()}`;
     else { text = 'ยังไม่ได้เปิด'; canOn = true; }
     status.textContent = text;
     $('pushOn').hidden = push.enabled || !canOn;
@@ -1115,8 +1148,7 @@ Only correct real errors in the user's last message (grammar, wrong word, unnatu
       if (old) await old.unsubscribe();
       const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(key) });
       push.id = push.id || crypto.randomUUID();
-      settings.perDay = Number($('sPerDay').value) || 2;
-      save('lb_settings', settings);
+      readSchedule();
       await pushApi('subscribe', { sub: sub.toJSON(), profile: pushProfile() });
       push.enabled = true;
       push.lastSync = Date.now();
@@ -1149,12 +1181,46 @@ Only correct real errors in the user's last message (grammar, wrong word, unnatu
     savePush();
     renderPush();
   });
-  $('sPerDay').addEventListener('change', () => {
+  // ---------- push schedule ----------
+  const hh = (h) => String(h).padStart(2, '0') + ':00';
+  for (let h = 0; h <= 24; h++) {
+    if (h < 24) { const o = el('option', '', hh(h)); o.value = h; $('sFrom').append(o); }
+    if (h > 0) { const o = el('option', '', h === 24 ? '24:00 (เที่ยงคืน)' : hh(h)); o.value = h; $('sTo').append(o); }
+  }
+  function scheduleText() {
+    if (settings.pushMode === 'fixed') {
+      const t = settings.pushTimes || [];
+      return t.length ? `${settings.name} จะทักมาตอน ${t.join(', ')} น. ทุกวัน` : 'ยังไม่ได้ใส่เวลา — ใส่อย่างน้อย 1 เวลา';
+    }
+    return `${settings.name} จะทักมาวันละไม่เกิน ${settings.perDay} ครั้ง สุ่มเวลาระหว่าง ${hh(settings.pushFrom)}–${hh(settings.pushTo)} (ไม่ทักซ้ำถ้ายังไม่ได้อ่าน และไม่ทักถ้าเพิ่งคุยกันไป)`;
+  }
+  function showSchedule() {
+    $('sPushMode').value = settings.pushMode;
+    $('sFrom').value = settings.pushFrom;
+    $('sTo').value = settings.pushTo;
+    $('sPerDay').value = String(settings.perDay || 2);
+    ['sTime1', 'sTime2', 'sTime3'].forEach((id, i) => { $(id).value = (settings.pushTimes || [])[i] || ''; });
+    $('pushRandom').hidden = settings.pushMode === 'fixed';
+    $('pushFixed').hidden = settings.pushMode !== 'fixed';
+  }
+  function readSchedule() {
+    let from = Number($('sFrom').value), to = Number($('sTo').value);
+    if (to <= from) to = Math.min(24, from + 1);
+    settings.pushMode = $('sPushMode').value === 'fixed' ? 'fixed' : 'random';
+    settings.pushFrom = from;
+    settings.pushTo = to;
     settings.perDay = Number($('sPerDay').value) || 2;
+    settings.pushTimes = [...new Set(['sTime1', 'sTime2', 'sTime3'].map((id) => $(id).value).filter(Boolean))].sort();
     save('lb_settings', settings);
-    renderPush();
-    syncPush(true);
-  });
+  }
+  for (const id of ['sPushMode', 'sFrom', 'sTo', 'sPerDay', 'sTime1', 'sTime2', 'sTime3']) {
+    $(id).addEventListener('change', () => {
+      readSchedule();
+      showSchedule();
+      renderPush();
+      syncPush(true);
+    });
+  }
 
   // ---------- start ----------
   $('quota').addEventListener('click', openSettings);
