@@ -564,6 +564,7 @@ Only correct real errors in the user's last message (grammar, wrong word, unnatu
         throw new Error('ส่งถี่เกินไป (โควตาต่อนาที) รอประมาณ 1 นาทีแล้วลองใหม่');
       }
       if (res.status === 413) throw new Error('รูปใหญ่เกินไป ลองรูปอื่น');
+      if (/location is not supported/i.test(msg)) throw new Error('Google ปฏิเสธการเชื่อมต่อชั่วคราว ลองส่งใหม่อีกครั้ง');
       throw new Error(msg);
     }
     recordUsage(data.usage?.total, hadPhoto);

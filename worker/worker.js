@@ -6,10 +6,12 @@
 //   ALLOWED_ORIGIN  (Text, recommended) your GitHub Pages address, e.g. https://yourname.github.io
 //   GEMINI_MODEL    (Text, optional)    defaults to gemini-3.5-flash-lite
 
+const WORKER_VERSION = 3;         // shown when you open the worker link; bump on every change
 const MAX_TURNS = 60;
 const MAX_BODY_CHARS = 1500000;   // room for one resized photo
 const MAX_IMAGE_CHARS = 1400000;  // base64 length of a single photo
 const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const LOCATION_RETRIES = 5;
 
 // Each turn may have text parts and (from the app) one photo as inlineData.
 function cleanParts(parts) {
@@ -40,7 +42,7 @@ export default {
       new Response(JSON.stringify(obj), { status, headers: { ...cors, 'Content-Type': 'application/json' } });
 
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
-    if (request.method === 'GET') return json({ ok: true, message: 'Language Buddy worker is running' });
+    if (request.method === 'GET') return json({ ok: true, version: WORKER_VERSION, message: 'Language Buddy worker is running' });
     if (!originOk) return json({ error: 'This website is not allowed to use the worker (check ALLOWED_ORIGIN)' }, 403);
     if (request.method !== 'POST') return json({ error: 'POST only' }, 405);
     if (!env.GEMINI_API_KEY) return json({ error: 'GEMINI_API_KEY is not set on the worker' }, 500);
@@ -60,18 +62,26 @@ export default {
     }));
 
     const model = env.GEMINI_MODEL || 'gemini-3.5-flash-lite';
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: system }] },
-        contents: clean,
-        generationConfig: { responseMimeType: 'application/json', temperature: 0.9, maxOutputTokens: 1024 },
-      }),
+    const geminiBody = JSON.stringify({
+      systemInstruction: { parts: [{ text: system }] },
+      contents: clean,
+      generationConfig: { responseMimeType: 'application/json', temperature: 0.9, maxOutputTokens: 1024 },
     });
 
-    let data = {};
-    try { data = await res.json(); } catch {}
+    // Google sometimes rejects Cloudflare's outgoing IP with "User location is not supported";
+    // the next attempt usually leaves from another IP, so retry a few times.
+    let res, data;
+    for (let attempt = 0; attempt < LOCATION_RETRIES; attempt++) {
+      res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY },
+        body: geminiBody,
+      });
+      data = {};
+      try { data = await res.json(); } catch {}
+      if (res.ok || !/location is not supported/i.test(data.error?.message || '')) break;
+      await new Promise((r) => setTimeout(r, 300 * (attempt + 1)));
+    }
     if (!res.ok) return json({ error: data.error?.message || `Gemini error ${res.status}` }, res.status);
 
     const text = (data.candidates?.[0]?.content?.parts || []).map((p) => p.text || '').join('');
