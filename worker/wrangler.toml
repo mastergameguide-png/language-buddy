@@ -33,6 +33,12 @@ name = "LIMITER"
 namespace_id = "1001"
 simple = { limit = 40, period = 60 }
 
+# Sync / backup across devices: free SQL database (tables in schema.sql).
+[[d1_databases]]
+binding = "DB"
+database_name = "language-buddy-db"
+database_id = "adc345a5-50ca-4292-a1b2-8883a81b4dae"
+
 [triggers]
 crons = ["*/10 * * * *"]   # keep in sync with CRON_MINUTES in worker.js
 

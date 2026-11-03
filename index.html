@@ -167,6 +167,31 @@
           </div>
 
           <div class="card set-group">
+            <h3>🔄 ซิงก์ข้ามเครื่อง (ฐานข้อมูล SQL)</h3>
+            <div class="hint" id="syncStatus">ยังไม่ได้เปิด</div>
+            <div id="syncOff">
+              <div class="hint">เก็บแชต สมุดผิด คลังคำ สถิติ และการตั้งค่าไว้ในฐานข้อมูล SQL ฟรี (Cloudflare D1) ของคุณ เปลี่ยนเครื่องข้อมูลก็ไม่หาย ใช้ "รหัสซิงก์" แทนการสมัครสมาชิก</div>
+              <div class="row wrap-ok" style="margin-top:12px">
+                <button class="btn primary" type="button" id="syncNew">เปิดซิงก์ (สร้างรหัสใหม่)</button>
+              </div>
+              <label class="field"><span>มีรหัสจากเครื่องอื่นแล้ว? ใส่ที่นี่</span><input class="input" id="syncJoinCode" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="XXXX-XXXX-XXXX-XXXX-XXXX"></label>
+              <div class="row wrap-ok" style="margin-top:8px"><button class="btn" type="button" id="syncJoin">เชื่อมกับเครื่องอื่น</button></div>
+            </div>
+            <div id="syncOnBox" hidden>
+              <label class="field"><span>รหัสซิงก์ (ใช้บนเครื่องอื่น · เก็บเป็นความลับเหมือนรหัสผ่าน)</span><input class="input" id="syncCode" type="password" readonly autocomplete="off"></label>
+              <div class="row wrap-ok" style="margin-top:8px">
+                <button class="btn" type="button" id="syncShow">แสดงรหัส</button>
+                <button class="btn" type="button" id="syncCopy">คัดลอก</button>
+                <button class="btn primary" type="button" id="syncNow">ซิงก์ตอนนี้</button>
+              </div>
+              <div class="row wrap-ok" style="margin-top:8px">
+                <button class="btn" type="button" id="syncStop">ปิดซิงก์บนเครื่องนี้</button>
+                <button class="btn danger" type="button" id="syncDelete">ลบข้อมูลบนเซิร์ฟเวอร์</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="card set-group">
             <h3>💾 ข้อมูลของคุณ</h3>
             <div class="hint">ข้อมูลทั้งหมดเก็บในเครื่องนี้ ส่งออกเป็นไฟล์เก็บไว้ใน "ไฟล์" หรือ iCloud แล้วนำกลับมาได้ (ไม่รวมรูป)</div>
             <div class="row wrap-ok" style="margin-top:12px">

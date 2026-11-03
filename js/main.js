@@ -3,6 +3,7 @@ import { $, icon, toast } from './util.js';
 import { settings, state, persist, on, load, STATE_VERSION } from './store.js';
 import { startTimeTracking, dueCards } from './stats.js';
 import { fetchInbox, syncPush } from './push.js';
+import { startAutoSync } from './sync.js';
 import { initChat, renderChat, renderHeader, maybeGreet } from './views/chat.js';
 import { renderHome } from './views/home.js';
 import { renderReview } from './views/review.js';
@@ -77,6 +78,7 @@ function boot() {
   startTimeTracking();
   fetchInbox();
   syncPush(false);
+  startAutoSync();
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') {
       fetchInbox().then(() => { if (current === 'chat') maybeGreet(); });

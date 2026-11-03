@@ -1,10 +1,11 @@
 // Settings & profile form, notification schedule, backup/restore.
-import { $, el, toast } from '../util.js';
+import { $, el, toast, ago } from '../util.js';
 import {
   settings, state, push, setSettings, saveSettings, replaceState, persist, emit, on,
   LANGS, CEFR, IELTS, DEFAULT_SETTINGS, cefrOf, logActivity,
 } from '../store.js';
 import { pushStatus, enablePush, testPush, disablePush, syncPush, hh } from '../push.js';
+import { sync, runSync, startSync, stopSync, deleteServerCopy, newCode, cleanCode, showCode } from '../sync.js';
 
 const f = (id) => $(id);
 
@@ -53,6 +54,24 @@ function renderPush() {
   f('pushTest').hidden = f('pushOff').hidden = !push.enabled;
 }
 
+function renderSync() {
+  const on = !!sync.code;
+  f('syncOff').hidden = on;
+  f('syncOnBox').hidden = !on;
+  if (on) f('syncCode').value = showCode(sync.code);
+  f('syncStatus').textContent = !settings.workerUrl ? 'ใส่ลิงก์ Worker ก่อน'
+    : !on ? 'ยังไม่ได้เปิด — ข้อมูลอยู่ในเครื่องนี้เท่านั้น'
+    : sync.error ? '⚠️ ' + sync.error
+    : sync.last ? `✅ เปิดอยู่ · ซิงก์ล่าสุด ${ago(sync.last)}` : 'กำลังซิงก์ครั้งแรก…';
+}
+
+async function syncAction(btn, job, done) {
+  btn.disabled = true;
+  try { const ok = await job(); if (ok !== false && done) toast(done); else if (ok === false) toast(sync.error || 'ซิงก์ไม่สำเร็จ', true); }
+  catch (e) { toast(e.message || 'ไม่สำเร็จ', true); }
+  finally { btn.disabled = false; renderSync(); }
+}
+
 export function fillSettings() {
   f('sWorker').value = settings.workerUrl;
   f('sAccess').value = settings.accessCode;
@@ -75,6 +94,7 @@ export function fillSettings() {
   f('sAutoSend').checked = settings.autoSend;
   showSchedule();
   renderPush();
+  renderSync();
 }
 
 const int = (id, min, max, dflt) => {
@@ -149,11 +169,43 @@ export function initSettings() {
   f('pushOff').addEventListener('click', async () => { await disablePush(); renderPush(); });
   on('push', renderPush);
 
+  f('syncNew').addEventListener('click', () => {
+    if (!settings.workerUrl) { toast('ใส่ลิงก์ Worker ก่อน', true); return; }
+    syncAction(f('syncNew'), () => startSync(newCode()), 'เปิดซิงก์แล้ว — จดรหัสไว้ใช้บนเครื่องอื่น');
+  });
+  f('syncJoin').addEventListener('click', () => {
+    const code = cleanCode(f('syncJoinCode').value);
+    if (code.length < 16) { toast('รหัสซิงก์สั้นเกินไป', true); return; }
+    if (!settings.workerUrl) { toast('ใส่ลิงก์ Worker ก่อน', true); return; }
+    if (!confirm('รวมข้อมูลในเครื่องนี้กับข้อมูลของรหัสนี้?\n(การตั้งค่าจะใช้ของรหัสนี้)')) return;
+    syncAction(f('syncJoin'), () => startSync(code), 'เชื่อมแล้ว ข้อมูลรวมกันเรียบร้อย');
+    f('syncJoinCode').value = '';
+  });
+  f('syncShow').addEventListener('click', () => {
+    const shown = f('syncCode').type === 'text';
+    f('syncCode').type = shown ? 'password' : 'text';
+    f('syncShow').textContent = shown ? 'แสดงรหัส' : 'ซ่อนรหัส';
+  });
+  f('syncCopy').addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(showCode(sync.code)); toast('คัดลอกรหัสแล้ว'); }
+    catch { f('syncCode').type = 'text'; f('syncCode').select(); toast('กดค้างที่รหัสแล้วเลือกคัดลอก'); }
+  });
+  f('syncNow').addEventListener('click', () => syncAction(f('syncNow'), runSync, 'ซิงก์แล้ว'));
+  f('syncStop').addEventListener('click', () => {
+    if (!confirm('ปิดซิงก์บนเครื่องนี้? ข้อมูลในเครื่องและบนเซิร์ฟเวอร์ยังอยู่ (เปิดใหม่ได้ด้วยรหัสเดิม)')) return;
+    stopSync(); renderSync();
+  });
+  f('syncDelete').addEventListener('click', () => {
+    if (!confirm('ลบข้อมูลทั้งหมดของรหัสนี้บนเซิร์ฟเวอร์? ข้อมูลในเครื่องนี้ยังอยู่ แต่เครื่องอื่นจะซิงก์ไม่ได้อีก')) return;
+    syncAction(f('syncDelete'), deleteServerCopy, 'ลบข้อมูลบนเซิร์ฟเวอร์แล้ว');
+  });
+  on('sync', renderSync);
+
   f('exportBtn').addEventListener('click', exportData);
   f('importBtn').addEventListener('click', () => f('importInput').click());
   f('importInput').addEventListener('change', (e) => { const file = e.target.files?.[0]; e.target.value = ''; if (file) importData(file); });
   f('resetBtn').addEventListener('click', () => {
-    if (!confirm('ลบแชต ความจำ สมุดผิด คลังคำ และสถิติทั้งหมด?\n(การตั้งค่ายังอยู่ — แนะนำให้ส่งออกข้อมูลสำรองก่อน)')) return;
+    if (!confirm('ลบแชต ความจำ สมุดผิด คลังคำ และสถิติทั้งหมด?\n(การตั้งค่ายังอยู่ — แนะนำให้ส่งออกข้อมูลสำรองก่อน · ถ้าเปิดซิงก์ไว้ เครื่องอื่นจะถูกล้างด้วย)')) return;
     replaceState({});
     toast('ล้างข้อมูลแล้ว');
     location.hash = '#home';

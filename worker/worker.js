@@ -1,5 +1,6 @@
 // Cloudflare Worker for Language Buddy.
 // - POST /            chat: the app sends { system, contents }; this Worker adds the Gemini key.
+// - POST /sync        backup + sync across devices into the D1 (SQL) database, keyed by a sync code.
 // - /push/*           "buddy messages first": stores a push subscription + a small profile in KV,
 //                     and a cron trigger writes a message with Gemini and sends a Web Push.
 //
@@ -13,9 +14,10 @@
 //   GROQ_MODEL        (Text, optional)    defaults to openai/gpt-oss-120b
 //   ACCESS_CODE       (Secret, optional)  if set, the app must send it as X-Buddy-Key
 //   BUDDY             (KV binding, for push)
+//   DB                (D1 binding, for sync) free SQL database, tables in schema.sql
 //   LIMITER           (rate-limit binding) requests per IP per minute, see wrangler.toml
 
-const WORKER_VERSION = 9;         // shown when you open the worker link; bump on every change
+const WORKER_VERSION = 10;         // shown when you open the worker link; bump on every change
 const MAX_TURNS = 60;
 const MAX_BODY_CHARS = 1500000;   // room for one resized photo
 const MAX_IMAGE_CHARS = 1400000;  // base64 length of a single photo
@@ -384,6 +386,78 @@ async function handlePush(path, request, env, json) {
   return json({ error: 'Not found' }, 404);
 }
 
+// ---------- sync (D1) ----------
+// The app sends the rows that changed on this device and gets back the rows other devices
+// wrote since its cursor. The sync code itself is never stored, only its SHA-256.
+const SYNC_MAX_ROWS = 300;        // rows the app may upload per request
+const SYNC_PAGE = 500;            // rows returned per request
+const SYNC_MAX_ROW_CHARS = 20000;
+const SYNC_MAX_BODY = 2000000;
+
+async function syncAccount(code) {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('lb-sync:' + code));
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function handleSync(path, request, env, json) {
+  if (!env.DB) return json({ error: 'Sync is not set up on this worker' }, 501);
+  if (request.method !== 'POST') return json({ error: 'POST only' }, 405);
+  const raw = await request.text();
+  if (raw.length > SYNC_MAX_BODY) return json({ error: 'Request too large' }, 413);
+  let body;
+  try { body = JSON.parse(raw); } catch { return json({ error: 'Bad JSON' }, 400); }
+  const code = String(body.code || '');
+  if (!/^[A-Z0-9]{16,64}$/.test(code)) return json({ error: 'Bad sync code' }, 400);
+  const account = await syncAccount(code);
+
+  if (path === '/sync/delete') {
+    await env.DB.batch([
+      env.DB.prepare('DELETE FROM items WHERE account = ?').bind(account),
+      env.DB.prepare('DELETE FROM accounts WHERE id = ?').bind(account),
+    ]);
+    return json({ ok: true });
+  }
+  if (path !== '/sync') return json({ error: 'Not found' }, 404);
+
+  const dev = String(body.device || '');
+  if (!/^[0-9a-f-]{36}$/.test(dev)) return json({ error: 'Bad device id' }, 400);
+  const cursor = Math.max(0, Math.floor(Number(body.cursor) || 0));
+  const rows = Array.isArray(body.rows) ? body.rows : [];
+  if (rows.length > SYNC_MAX_ROWS) return json({ error: 'Too many rows' }, 413);
+  const clean = [];
+  for (const r of rows) {
+    const k = String(r?.k || '');
+    const d = r?.d === null ? null : String(r?.d ?? '');
+    if (!/^[a-z]:[\w:.-]{1,80}$/.test(k) || (d !== null && (!d || d.length > SYNC_MAX_ROW_CHARS))) return json({ error: 'Bad row' }, 400);
+    clean.push({ k, d });
+  }
+
+  const now = Date.now();
+  const n = clean.length;
+  const stmts = [];
+  if (n) {
+    // One transaction: reserve n revision numbers, then give each row its own.
+    stmts.push(env.DB.prepare('INSERT INTO accounts (id, rev, created, updated) VALUES (?, 0, ?, ?) ON CONFLICT(id) DO NOTHING').bind(account, now, now));
+    stmts.push(env.DB.prepare('UPDATE accounts SET rev = rev + ?, updated = ? WHERE id = ?').bind(n, now, account));
+    const put = env.DB.prepare(`INSERT INTO items (account, k, d, dev, rev, updated)
+      VALUES (?1, ?2, ?3, ?4, (SELECT rev FROM accounts WHERE id = ?1) - ?5, ?6)
+      ON CONFLICT(account, k) DO UPDATE SET d = excluded.d, dev = excluded.dev, rev = excluded.rev, updated = excluded.updated`);
+    clean.forEach((r, i) => stmts.push(put.bind(account, r.k, r.d, dev, n - 1 - i, now)));
+  }
+  stmts.push(env.DB.prepare('SELECT k, d, rev FROM items WHERE account = ? AND rev > ? AND dev != ? ORDER BY rev LIMIT ?').bind(account, cursor, dev, SYNC_PAGE));
+  stmts.push(env.DB.prepare('SELECT rev FROM accounts WHERE id = ?').bind(account));
+  const res = await env.DB.batch(stmts);
+  const changes = res[res.length - 2].results || [];
+  const accRev = res[res.length - 1].results?.[0]?.rev || 0;
+  const more = changes.length === SYNC_PAGE;
+  return json({
+    rows: changes.map((r) => ({ k: r.k, d: r.d })),
+    cursor: more ? changes[changes.length - 1].rev : Math.max(cursor, accRev),
+    more,
+    rev: accRev,              // lower than the app's cursor = the data was deleted; start over
+  });
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -410,7 +484,7 @@ export default {
       return json({ results: await runDue(env) });
     }
     if (path === '/' && request.method === 'GET') {
-      return json({ ok: true, version: WORKER_VERSION, push: !!(env.BUDDY && env.VAPID_PRIVATE_JWK), ai: ['gemini', 'groq'].filter((n) => hasProvider(env, n)), message: 'Language Buddy worker is running' });
+      return json({ ok: true, version: WORKER_VERSION, push: !!(env.BUDDY && env.VAPID_PRIVATE_JWK), sync: !!env.DB, ai: ['gemini', 'groq'].filter((n) => hasProvider(env, n)), message: 'Language Buddy worker is running' });
     }
     if (!originOk) return json({ error: 'This website is not allowed to use the worker (check ALLOWED_ORIGIN)' }, 403);
     // The Origin header can be faked outside a browser, so add a per-IP limit and an optional
@@ -424,6 +498,7 @@ export default {
       if (!success) return json({ error: 'Too many requests, slow down a little' }, 429);
     }
     if (path.startsWith('/push/')) return handlePush(path, request, env, json);
+    if (path === '/sync' || path.startsWith('/sync/')) return handleSync(path, request, env, json);
     if (request.method !== 'POST') return json({ error: 'POST only' }, 405);
     if (!env.GEMINI_API_KEY && !env.GROQ_API_KEY) return json({ error: 'No AI key is set on the worker' }, 500);
 
