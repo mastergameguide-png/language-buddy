@@ -151,7 +151,11 @@ function renderScene() {
 }
 
 // ---------- talking to the AI ----------
+const loose = (s) => String(s || '').toLowerCase().replace(/[^\p{L}\p{N}']+/gu, ' ').trim();
+
 function applyAI(ai, userMsg, opts) {
+  // Models sometimes "correct" an earlier message; keep a correction only if it is about this one.
+  if (ai.correction && (!userMsg || !loose(userMsg.text).includes(loose(ai.correction.wrong)))) ai.correction = null;
   if (userMsg) {
     if (ai.correction) { userMsg.correction = ai.correction; addMistake(ai.correction); }
     recordMessage(userMsg.text, !!ai.correction, userMsg.voice);
