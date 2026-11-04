@@ -1,9 +1,11 @@
 // Dashboard: today's goals, key numbers, a short personal plan, the week, recent activity.
 import { el, h, icon, num, fmtMinutes, ago } from '../util.js';
-import { settings, state, levelShort, cefrOf, CEFR, CATEGORIES, weakAreas, flag } from '../store.js';
+import { settings, state, levelShort, cefrOf, CEFR, CATEGORIES, weakAreas, flag, activeChar, activeCharId } from '../store.js';
 import { today, streak, lastDays, totals, accuracy, vocabCounts, dueCards } from '../stats.js';
-import { practice } from './chat.js';
+import { practice, switchCharacter } from './chat.js';
 import { suggestScene } from './roleplay.js';
+import { CHARACTERS, customCharacter } from '../engine/characters.js';
+import { avatarEl } from './avatar.js';
 
 function goal(label, value, target, unit) {
   const pct = target ? Math.min(100, Math.round((value / target) * 100)) : 0;
@@ -60,9 +62,20 @@ export function renderHome(root) {
         h('div', { class: 'streak', 'aria-label': `เรียนต่อเนื่อง ${s} วัน` }, `🔥 ${s}`),
         el('div', 'xs muted', 'วันติดต่อกัน'))),
     h('div', { class: 'row wrap-ok', style: 'margin-top:16px; gap:8px' },
-      h('a', { class: 'btn primary', href: '#chat' }, icon('chat'), `คุยกับ ${settings.name}`),
+      h('a', { class: 'btn primary', href: '#chat' }, icon('chat'), `คุยกับ ${activeChar().name}`),
       due ? h('a', { class: 'btn', href: '#review' }, icon('review'), `ทบทวน ${num(due)} ข้อ`) : null));
   root.append(hero);
+
+  // Characters
+  root.append(h('div', { class: 'sec-row' }, el('h2', 'sec', 'คุยกับใครดีวันนี้'), h('a', { class: 'btn sm ghost', href: '#characters' }, 'ดูทั้งหมด')));
+  const strip = h('div', { class: 'char-strip' });
+  for (const c of [...CHARACTERS, customCharacter(settings)]) {
+    const b = h('button', { type: 'button', class: 'char-pick' + (c.id === activeCharId() ? ' on' : ''), 'aria-label': `คุยกับ ${c.name}` },
+      avatarEl(c, state.sessions[c.id]?.emotion, 'md'), el('b', '', c.name), el('small', '', c.tagline.th));
+    b.addEventListener('click', () => switchCharacter(c.id));
+    strip.append(b);
+  }
+  root.append(strip);
 
   // Goals
   root.append(el('h2', 'sec', 'เป้าหมายวันนี้'));
@@ -91,7 +104,7 @@ export function renderHome(root) {
   if (weak) step(`ฝึกจุดที่พลาดบ่อย: ${CATEGORIES[weak.category]} (${weak.count} ครั้งใน 30 วัน)`, 'ฝึก', () => practice(weak.category, CATEGORIES[weak.category]));
   const sc = suggestScene();
   if (sc) step(`ลองสถานการณ์: ${sc.icon} ${sc.th}`, 'เล่น', null, '#roleplay');
-  if (n === 1) step(`เริ่มคุยกับ ${settings.name} สัก 10 ข้อความ เพื่อให้แอปรู้จุดแข็งจุดอ่อนของคุณ`, 'คุยเลย', null, '#chat');
+  if (n === 1) step(`เริ่มคุยกับ ${activeChar().name} สัก 10 ข้อความ เพื่อให้แอปรู้จุดแข็งจุดอ่อนของคุณ`, 'คุยเลย', null, '#chat');
   root.append(plan);
 
   // Week

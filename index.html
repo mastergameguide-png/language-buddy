@@ -33,8 +33,10 @@
 
     <section id="view-chat" class="view chat-view" hidden aria-label="แชต">
       <header class="chat-head">
-        <div class="avatar" id="avatar" aria-hidden="true">S</div>
-        <div class="who grow"><b id="buddyName">Sam</b><small id="buddyStatus"></small></div>
+        <a class="who-btn grow" href="#characters" aria-label="เลือกหรือดูโปรไฟล์ตัวละคร">
+          <span id="avatarSlot"></span>
+          <span class="who"><b id="buddyName">Sam</b><small id="buddyStatus"></small></span>
+        </a>
         <a class="icon-btn" href="#roleplay" aria-label="ฝึกสถานการณ์" data-icon="mask"></a>
         <a class="icon-btn" href="#settings" aria-label="ตั้งค่า" data-icon="gear"></a>
       </header>
@@ -42,6 +44,11 @@
         <span id="quotaText">Gemini วันนี้ 0 ครั้ง</span>
         <div class="bar" id="quotaBarWrap"><i id="quotaBar"></i></div>
       </button>
+      <div class="char-bar" id="charBar">
+        <label class="role-pick"><span aria-hidden="true">🎭</span><select id="roleSelect" aria-label="บทบาทของตัวละคร"></select></label>
+        <span class="emo" id="emoChip" title="อารมณ์ตอนนี้"></span>
+        <button type="button" class="btn sm ghost" id="roleReset" hidden>กลับเป็นปกติ</button>
+      </div>
       <div class="scene-bar" id="sceneBar" hidden>
         <span id="sceneText"></span>
         <button type="button" class="btn sm" id="sceneEnd">จบและขอคำแนะนำ</button>
@@ -64,6 +71,7 @@
     </section>
 
     <section id="view-review" class="view" hidden><div class="scroll"><div class="wrap" id="reviewBody"></div></div></section>
+    <section id="view-characters" class="view" hidden><div class="scroll"><div class="wrap" id="charsBody"></div></div></section>
     <section id="view-roleplay" class="view" hidden><div class="scroll"><div class="wrap" id="roleBody"></div></div></section>
     <section id="view-me" class="view" hidden><div class="scroll"><div class="wrap" id="meBody"></div></div></section>
 
@@ -102,7 +110,8 @@
 
           <div class="card set-group">
             <h3>🤖 เพื่อน AI</h3>
-            <label class="field"><span>ชื่อเพื่อน AI</span><input class="input" id="sName" type="text" maxlength="20"></label>
+            <div class="hint">มีตัวละคร 6 คน (Emma, James, Mika, David, Sofia, Alex) ให้เลือกที่หน้า <a href="#characters">ตัวละคร</a> · ช่องด้านล่างใช้กับ "เพื่อนที่สร้างเอง"</div>
+            <label class="field"><span>ชื่อเพื่อนที่สร้างเอง</span><input class="input" id="sName" type="text" maxlength="20"></label>
             <label class="field"><span>นิสัย/บุคลิก</span><textarea class="input" id="sPersona" maxlength="400"></textarea></label>
             <label class="field"><span>AI ที่ใช้คุย</span>
               <select class="input" id="sAi">
@@ -114,6 +123,16 @@
             <label class="field"><span>ความเร็วเสียงพูด</span><input class="range" id="sRate" type="range" min="0.6" max="1.2" step="0.05"></label>
             <label class="check"><input id="sVoice" type="checkbox"> อ่านคำตอบออกเสียงอัตโนมัติ</label>
             <label class="check"><input id="sAutoSend" type="checkbox"> พูดจบแล้วส่งทันที</label>
+            <label class="check"><input id="sAdaptVoice" type="checkbox"> ปรับเสียงอัตโนมัติ (ช้าลงสำหรับมือใหม่ · น้ำเสียงตามอารมณ์ตัวละคร · สำเนียงของแต่ละตัวละคร)</label>
+          </div>
+
+          <div class="card set-group">
+            <h3>🧠 ความจำ</h3>
+            <div class="hint">ความจำเก็บเป็นประโยคสั้นๆ ในเครื่องนี้ (และในฐานข้อมูลของคุณถ้าเปิดซิงก์) ไม่เก็บรหัสผ่าน เลขบัตร เบอร์โทร หรืออีเมล</div>
+            <label class="check"><input id="sMemLearner" type="checkbox"> ความจำร่วม: ให้ตัวละครทุกตัวจำข้อมูลเกี่ยวกับคุณ (งานอดิเรก เป้าหมาย หัวข้อที่ชอบ)</label>
+            <label class="check"><input id="sMemChar" type="checkbox"> ความจำของตัวละคร: แต่ละตัวจำเรื่องที่เคยคุยกับคุณ (แยกกัน)</label>
+            <div class="hint">ดูและลบความจำได้ที่หน้า ฉัน (ความจำร่วม) และหน้า ตัวละคร → โปรไฟล์ (ความจำของแต่ละตัว) · การปิดจะหยุดทั้งการจำเพิ่มและการใช้ความจำเดิม</div>
+            <div class="row wrap-ok" style="margin-top:12px"><button class="btn danger" type="button" id="memClear">ลบความจำทั้งหมด</button></div>
           </div>
 
           <div class="card set-group">

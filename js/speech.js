@@ -1,5 +1,9 @@
 // Text-to-speech and speech recognition, using the browser's built-in engines.
-import { settings, speechCode } from './store.js';
+import { settings, speechCode, isEnglish, cefrOf, activeChar } from './store.js';
+import { voiceFor } from './engine/emotion.js';
+
+// Slower speech for beginners, a little faster at advanced levels.
+const LEVEL_RATE = { A1: 0.8, A2: 0.87, B1: 0.95, B2: 1, C1: 1.03, C2: 1.06 };
 
 let voices = [];
 const loadVoices = () => { voices = window.speechSynthesis ? speechSynthesis.getVoices() : []; };
@@ -25,15 +29,25 @@ export function unlockSpeech() {
   speechSynthesis.speak(u);
 }
 
-export function speak(text) {
+// opts.emotion: the character's mood for this line; opts.plain: read with the learner's own
+// accent and speed (used for correction examples).
+export function speak(text, opts = {}) {
   if (!window.speechSynthesis || !text) return;
   speechSynthesis.cancel();
-  const code = speechCode();
+  const char = activeChar();
+  // English characters use their own accent; corrections use the variant the learner chose.
+  const code = !opts.plain && isEnglish() && char.accent ? char.accent : speechCode();
   const u = new SpeechSynthesisUtterance(String(text).replace(/[*_#`]/g, ''));
   u.lang = code;
   const v = pickVoice(code);
   if (v) u.voice = v;
-  u.rate = Number(settings.rate) || 1;
+  let rate = Number(settings.rate) || 1, pitch = 1;
+  if (settings.adaptiveVoice !== false) {
+    rate *= LEVEL_RATE[cefrOf()] || 1;
+    if (opts.emotion) { const t = voiceFor(opts.emotion); rate *= t.rate; pitch = t.pitch; }
+  }
+  u.rate = Math.max(0.5, Math.min(1.6, rate));
+  u.pitch = pitch;
   speechSynthesis.speak(u);
 }
 

@@ -1,6 +1,7 @@
 // Backup + sync across devices through the Worker's D1 (SQL) database.
 // Every learner item becomes one row ("c:" chat message, "m:" mistake, "w:" word, "f:" fact,
-// "r:" role-play result, "a:" activity, "d:" day stats, "s:" settings). This device remembers a
+// "r:" role-play result, "a:" activity, "d:" day stats, "s:" settings, "k:" character memory,
+// "x:" skills/topics). This device remembers a
 // short hash of each row it last sent or received, so a sync only uploads what changed here
 // (a missing row = deleted) and downloads what other devices changed since `cursor`.
 import { settings, state, load, save, persist, emit, setSettings, DEFAULT_SETTINGS, normalizeState } from './store.js';
@@ -49,6 +50,9 @@ function localRows() {
   for (const r of state.results) add(`r:${r.t}`, r);
   for (const a of state.activity) add(`a:${a.t}-${hash(a.text || '')}`, a);
   for (const [day, rec] of Object.entries(state.days)) add('d:' + day, rec);
+  for (const [cid, list] of Object.entries(state.charMemory || {})) for (const m of list) add(`k:${cid}:${safeId(m.id)}`, m);
+  if (Object.keys(state.skills || {}).length) add('x:skills', state.skills);
+  if (Object.keys(state.topics || {}).length) add('x:topics', state.topics);
   const shared = { ...settings };
   for (const k of LOCAL_ONLY) delete shared[k];
   add('s:settings', shared);
@@ -73,7 +77,14 @@ function applyRow(k, d) {
   else if (kind === 'f') upsert(state.facts, (f) => 'f:' + hash(f) === k);
   else if (kind === 'r') upsert(state.results, (r) => `r:${r.t}` === k);
   else if (kind === 'a') upsert(state.activity, (a) => `a:${a.t}-${hash(a.text || '')}` === k);
-  else if (kind === 'd') {
+  else if (kind === 'k') {
+    const cid = k.split(':')[1];
+    const list = (state.charMemory[cid] ||= []);
+    upsert(list, (m) => `k:${cid}:${safeId(m.id)}` === k);
+  } else if (kind === 'x') {
+    const name = k.slice(2);
+    if (name === 'skills' || name === 'topics') state[name] = v || {};
+  } else if (kind === 'd') {
     // Two devices studied on the same day: keep the larger count of each figure.
     const day = k.slice(2);
     if (v === null) delete state.days[day];

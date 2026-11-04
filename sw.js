@@ -1,8 +1,10 @@
 // Bump this when you change any app file so phones pick up the new version.
-const CACHE = 'buddy-v12';
+const CACHE = 'buddy-v13';
 const SHELL = [
   './', 'index.html', 'manifest.json', 'css/app.css',
   'js/main.js', 'js/util.js', 'js/store.js', 'js/srs.js', 'js/stats.js', 'js/ai.js', 'js/speech.js', 'js/push.js', 'js/sync.js',
+  'js/engine/characters.js', 'js/engine/emotion.js', 'js/engine/roles.js', 'js/engine/memory.js', 'js/engine/scenarios.js', 'js/engine/response.js', 'js/engine/prompt.js',
+  'js/views/avatar.js', 'js/views/characters.js',
   'js/views/chat.js', 'js/views/home.js', 'js/views/review.js', 'js/views/roleplay.js', 'js/views/me.js', 'js/views/settings.js',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png',
 ];

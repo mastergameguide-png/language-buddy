@@ -1,8 +1,14 @@
 // AI conversation: messages, inline feedback, new words, photos, voice, role-play bar.
 import { $, el, h, icon, fmtTime, toast } from '../util.js';
 import {
-  settings, state, persist, emit, on, addMistake, addWord, logActivity, CATEGORIES, levelShort, flag,
+  settings, state, persist, emit, on, addMistake, addWord, logActivity, CATEGORIES, levelShort, flag, saveSettings,
+  activeChar, activeCharId, sessionOf, threadOf,
 } from '../store.js';
+import { getCharacter, ROLES, CHARACTER_IDS } from '../engine/characters.js';
+import { nextEmotion, EMOTION_UI } from '../engine/emotion.js';
+import { applyRole, roleForScenario } from '../engine/roles.js';
+import { applyMemoryUpdates } from '../engine/memory.js';
+import { avatarEl } from './avatar.js';
 import { askAI, todayUsage, nextReset } from '../ai.js';
 import { speak, unlockSpeech, listen, stopListening, listening, canListen } from '../speech.js';
 import { recordMessage, recordWord, today } from '../stats.js';
@@ -42,7 +48,7 @@ function feedbackCard(c) {
   more.append(line, ...p('ทำไม', c.why), ...p('พูดแบบเจ้าของภาษา', c.natural), ...p('ตัวอย่างเพิ่ม', c.example));
   if (c.natural || c.right) {
     const say = h('button', { type: 'button', class: 'btn sm ghost', style: 'margin-top:8px' }, icon('speaker'), 'ฟังประโยคที่ถูก');
-    say.addEventListener('click', () => speak(c.natural || c.right));
+    say.addEventListener('click', () => speak(c.natural || c.right, { plain: true }));
     more.append(say);
   }
   wrap.append(toggle, more);
@@ -59,12 +65,14 @@ function renderMessage(m) {
   if (m.text) bubble.append(m.text);
   if (m.role === 'model') {
     bubble.title = 'แตะเพื่อฟังอีกครั้ง';
-    bubble.addEventListener('click', () => speak(m.text));
+    bubble.addEventListener('click', () => speak(m.text, { emotion: m.emotion }));
   }
   row.append(bubble);
   if (m.correction) row.append(feedbackCard(m.correction));
   if (m.newWord) row.append(el('div', 'newword', `📘 คำใหม่: ${m.newWord.word}${m.newWord.meaning ? ' — ' + m.newWord.meaning : ''} · เก็บในคลังคำแล้ว`));
-  const meta = el('div', 'meta', fmtTime(m.t) + (m.ai === 'groq' ? ' · Groq' : '') + (m.voice ? ' · 🎤' : ''));
+  const role = m.as && m.as !== activeChar().defaultRole && ROLES[m.as] ? ' · 🎭 ' + ROLES[m.as].th : '';
+  const emo = m.emotion && EMOTION_UI[m.emotion.state] ? ' · ' + EMOTION_UI[m.emotion.state].emoji : '';
+  const meta = el('div', 'meta', fmtTime(m.t) + role + emo + (m.ai === 'groq' ? ' · Groq' : '') + (m.voice ? ' · 🎤' : ''));
   row.append(meta);
   if (m.failed) {
     const retry = h('button', { type: 'button', class: 'btn sm danger' }, 'ส่งไม่สำเร็จ · ลองอีกครั้ง');
@@ -78,7 +86,8 @@ export function renderChat() {
   const b = box();
   if (!b) return;
   b.textContent = '';
-  const msgs = state.messages;
+  const msgs = threadOf();
+  if (!msgs.length && !waiting) b.append(introCard(activeChar()));
   const start = showAll ? 0 : Math.max(0, msgs.length - SHOW_LAST);
   if (start > 0) {
     const more = h('button', { type: 'button', class: 'btn sm ghost' }, `แสดงข้อความก่อนหน้า (${start})`);
@@ -86,6 +95,12 @@ export function renderChat() {
     b.append(more);
   }
   for (const m of msgs.slice(start)) b.append(renderMessage(m));
+  const last = msgs[msgs.length - 1];
+  if (last && last.role === 'model' && last.suggestion && !busy) {
+    const sug = h('button', { type: 'button', class: 'suggest' }, el('span', 'muted', '💡 ลองตอบ: '), el('span', '', last.suggestion));
+    sug.addEventListener('click', () => { input().value = last.suggestion; autoGrow(); refreshSend(); input().focus(); });
+    b.append(sug);
+  }
   if (!settings.workerUrl) notice('ยังไม่ได้ใส่ลิงก์ Cloudflare Worker — ใส่ในหน้าตั้งค่าก่อนเริ่มคุย', false, 'เปิดตั้งค่า', () => { location.hash = '#settings'; });
   if (waiting) typing(true);
   scrollDown();
@@ -116,13 +131,64 @@ function typing(on) {
   } else if (!on && t) t.remove();
 }
 
+function introCard(char) {
+  const c = h('div', { class: 'intro' }, avatarEl(char, null, 'lg'), el('b', '', char.name),
+    el('div', 'small muted', char.custom ? 'เพื่อนที่คุณกำหนดเอง' : `${char.tagline.th} · ${char.age} ปี · ${char.nationality} · ${char.occupation}`));
+  if (!char.custom) c.append(el('p', 'xs muted', `${char.personality.join(' · ')} — บทบาท: ${char.roles.map((r) => ROLES[r].th).join(', ')}`));
+  c.append(el('p', 'xs muted', 'ตัวละครเป็นตัวละคร AI สมมติ'));
+  return c;
+}
+
 export function renderHeader() {
   if (!$('buddyName')) return;
-  $('buddyName').textContent = settings.name || 'Buddy';
-  $('avatar').textContent = (settings.name || 'B').trim().charAt(0).toUpperCase();
-  $('buddyStatus').textContent = `${settings.lang} ${flag()} · ${levelShort()}`;
+  const char = activeChar();
+  const s = sessionOf(char.id);
+  $('buddyName').textContent = char.name;
+  $('avatarSlot').replaceChildren(avatarEl(char, s.emotion, 'md'));
+  $('buddyStatus').textContent = `${settings.lang} ${flag()} · ${levelShort()}${char.custom ? '' : ' · ' + char.tagline.th}`;
+  renderCharBar();
   renderScene();
   renderQuota();
+}
+
+function renderCharBar() {
+  const char = activeChar();
+  const s = sessionOf(char.id);
+  const sel = $('roleSelect');
+  const roles = [...char.roles];
+  if (!roles.includes(s.role)) roles.push(s.role);
+  sel.replaceChildren(...roles.map((r) => {
+    const o = el('option', '', (ROLES[r] || ROLES.scene).th + (r === char.defaultRole ? ' (ปกติ)' : ''));
+    o.value = r;
+    return o;
+  }));
+  sel.value = s.role;
+  sel.disabled = !!s.scenario || roles.length < 2;
+  const e = s.emotion || { state: char.emotional.baseline, intensity: 0.5 };
+  const ui = EMOTION_UI[e.state] || EMOTION_UI.neutral;
+  $('emoChip').textContent = `${ui.emoji} ${ui.th}`;
+  $('emoChip').title = `อารมณ์ตอนนี้: ${ui.th} (${Math.round(e.intensity * 100)}%)`;
+  $('roleReset').hidden = s.role === char.defaultRole || !!s.scenario;
+}
+
+function setRole(roleId) {
+  const char = activeChar();
+  const before = sessionOf(char.id);
+  const s = roleId === char.defaultRole ? applyRole(before, char, null, 'default') : applyRole(before, char, roleId, 'manual');
+  state.sessions[char.id] = s;
+  persist();
+  renderHeader();
+  toast(s.role === char.defaultRole ? `${char.name} กลับเป็นตัวเองตามปกติ` : `${char.name} จะเล่นเป็น${ROLES[s.role].th}จนกว่าคุณจะเปลี่ยน`);
+}
+
+// Talk to another character (each has its own chat, memory and mood).
+export function switchCharacter(id) {
+  if (!CHARACTER_IDS.includes(id)) return;
+  if (busy) { toast('รอให้ตอบข้อความก่อนหน้าเสร็จก่อนนะ'); return; }
+  settings.character = id;
+  saveSettings();
+  showAll = false;
+  if (location.hash === '#chat') { renderHeader(); renderChat(); maybeGreet(); } else location.hash = '#chat';
 }
 
 export function renderQuota() {
@@ -146,24 +212,50 @@ export function renderQuota() {
 function renderScene() {
   const bar = $('sceneBar');
   if (!bar) return;
-  bar.hidden = !state.scene;
-  if (state.scene) $('sceneText').textContent = `${state.scene.icon} กำลังฝึก: ${state.scene.th}`;
+  const sc = state.scene && state.scene.char === activeCharId() ? state.scene : null;
+  bar.hidden = !sc;
+  if (sc) $('sceneText').textContent = `${sc.icon} กำลังฝึก: ${sc.th}`;
 }
 
 // ---------- talking to the AI ----------
 const loose = (s) => String(s || '').toLowerCase().replace(/[^\p{L}\p{N}']+/gu, ' ').trim();
 
 function applyAI(ai, userMsg, opts) {
+  const char = getCharacter(opts.charId, settings);
+  let session = sessionOf(char.id);
   // Models sometimes "correct" an earlier message; keep a correction only if it is about this one.
   if (ai.correction && (!userMsg || !loose(userMsg.text).includes(loose(ai.correction.wrong)))) ai.correction = null;
   if (userMsg) {
     if (ai.correction) { userMsg.correction = ai.correction; addMistake(ai.correction); }
     recordMessage(userMsg.text, !!ai.correction, userMsg.voice);
-    if (today().msgs === 1) logActivity('chat', `เริ่มคุยกับ ${settings.name} วันนี้`);
+    if (today().msgs === 1) logActivity('chat', `เริ่มคุยกับ ${char.name} วันนี้`);
   }
-  for (const f of ai.remember) if (!state.facts.some((x) => x.toLowerCase() === f.toLowerCase())) state.facts.push(f);
-  state.facts = state.facts.slice(-40);
-  const botMsg = { role: 'model', text: ai.reply, t: Date.now() };
+  // Memory changes go through the validated engine, and only if the learner allows them.
+  const mem = applyMemoryUpdates({ facts: state.facts, list: state.charMemory[char.id] || [] }, ai.memoryUpdates,
+    { learner: settings.memoryLearner !== false, character: settings.memoryCharacter !== false });
+  state.facts = mem.facts;
+  if (mem.list.length) state.charMemory[char.id] = mem.list;
+  // Mood and role: the engines decide; the model only suggests.
+  session.emotion = nextEmotion(session.emotion, ai.emotion, char);
+  if (ai.activeRole && ai.activeRole !== session.role) {
+    const next = applyRole(session, char, ai.activeRole, 'auto');
+    if (next.role !== session.role) toast(next.role === char.defaultRole ? `${char.name} กลับเป็นตัวเองตามปกติ` : `${char.name} เปลี่ยนเป็น${ROLES[next.role].th}`);
+    session = { ...session, role: next.role, roleSource: next.roleSource };
+  }
+  if (ai.topic) {
+    const key = ai.topic.toLowerCase();
+    if (key !== (session.topic || '').toLowerCase() && settings.memoryLearner !== false) state.topics[key] = (state.topics[key] || 0) + 1;
+    session.topic = ai.topic;
+  }
+  if (ai.summary) session.summary = ai.summary;
+  session.t = Date.now();
+  session.turns = (session.turns || 0) + 1;
+  state.sessions[char.id] = session;
+  if (ai.assessment && userMsg) for (const [k, v] of Object.entries(ai.assessment)) state.skills[k] = [...(state.skills[k] || []), v].slice(-30);
+
+  const botMsg = { role: 'model', text: ai.reply, t: Date.now(), emotion: session.emotion, as: session.role };
+  if (char.id !== 'buddy') botMsg.char = char.id;
+  if (ai.suggestion) botMsg.suggestion = ai.suggestion;
   if (ai.provider === 'groq') botMsg.ai = 'groq';
   if (ai.newWord && addWord(ai.newWord)) {
     botMsg.newWord = { word: ai.newWord.word, meaning: ai.newWord.meaning };
@@ -171,16 +263,16 @@ function applyAI(ai, userMsg, opts) {
     logActivity('word', `คำใหม่: ${ai.newWord.word}`);
   }
   if (opts.feedbackFor) {
-    state.results.push({ t: Date.now(), icon: opts.feedbackFor.icon, scene: opts.feedbackFor.th, score: ai.score, summary: ai.reply.slice(0, 400) });
+    state.results.push({ t: Date.now(), icon: opts.feedbackFor.icon, scene: opts.feedbackFor.th, char: char.id, score: ai.score, summary: ai.reply.slice(0, 400) });
     state.results = state.results.slice(-50);
-    logActivity('roleplay', `จบสถานการณ์ ${opts.feedbackFor.th}${ai.score != null ? ` · ${ai.score}/10` : ''}`);
+    logActivity('roleplay', `จบสถานการณ์ ${opts.feedbackFor.th} กับ ${char.name}${ai.score != null ? ` · ${ai.score}/10` : ''}`);
   }
   state.messages.push(botMsg);
   state.lastSeen = Date.now();
   persist();
-  renderChat();
+  if (activeCharId() === char.id) { renderHeader(); renderChat(); }
   emit('state');
-  if (settings.voice) speak(ai.reply);
+  if (settings.voice && activeCharId() === char.id) speak(ai.reply, { emotion: session.emotion });
   syncPush(false);
 }
 
@@ -190,10 +282,12 @@ export async function run(userText, hiddenTurn, photo, opts = {}) {
   if (busy) { toast('รอให้ตอบข้อความก่อนหน้าเสร็จก่อนนะ'); return; }
   busy = true;
   refreshSend();
+  opts = { ...opts, charId: activeCharId() };
   let userMsg = opts.retryMsg || null;
   if (userMsg) { delete userMsg.failed; renderChat(); }
   else if (userText || photo) {
     userMsg = { role: 'user', text: userText || '', t: Date.now() };
+    if (opts.charId !== 'buddy') userMsg.char = opts.charId;
     if (opts.voice) userMsg.voice = true;
     if (photo) {
       userMsg.photo = true;
@@ -246,51 +340,65 @@ function send() {
   run(text, null, photo, { voice });
 }
 
-// Buddy writes first when the chat is opened after a while.
+// The character writes first when its chat is opened after a while (or for the first time).
 export function maybeGreet() {
   if (!settings.workerUrl || busy) return;
-  const gap = Date.now() - (state.lastSeen || 0);
-  if (state.messages.length && gap < GREET_AFTER_MS) return;
-  const hours = state.lastSeen ? Math.round(gap / 3600000) : null;
+  const char = activeChar();
+  const thread = threadOf(char.id);
+  const lastT = thread.length ? thread[thread.length - 1].t : 0;
+  const gap = Date.now() - lastT;
+  if (thread.length && gap < GREET_AFTER_MS) return;
+  const hours = lastT ? Math.round(gap / 3600000) : null;
   const local = new Date().toLocaleString('en-GB', { weekday: 'long', hour: '2-digit', minute: '2-digit' });
   const why = hours == null
-    ? 'This is the very first time you meet the user. Introduce yourself briefly and ask something easy to get to know them.'
-    : `The user just opened the chat again after about ${hours} hour(s). Message them first like a friend would — refer to something you remember or something from your last chat if it fits.`;
-  run(null, `[App note, not from the user: it is ${local} for the user. ${why} Set "correction" to null.]`);
+    ? `This is the first time you (${char.name}) talk with the learner. Introduce yourself briefly with one or two details from your background, mention lightly that you are an AI character, and ask one easy question.`
+    : `The learner just opened your chat again after about ${hours} hour(s). Message them first in your own way, and refer to something you remember if it fits. Do not repeat the greeting you used last time.`;
+  run(null, `[App note, not from the user: it is ${local} for the learner. ${why} Set "language_feedback" to null.]`);
 }
 
 // ---------- role-play & focused practice (started from other pages) ----------
-export function startScene(scene) {
+// scenario: an entry from engine/scenarios.js, or { custom: true, icon, th } for the learner's own idea.
+export function startScene(scenario, charId) {
   if (busy) { toast('รอให้ตอบข้อความก่อนหน้าเสร็จก่อนนะ'); return; }
-  state.scene = { icon: scene.icon, th: scene.th, en: scene.en, feedback: scene.feedback || '' };
-  logActivity('roleplay', `เริ่มสถานการณ์ ${scene.th}`);
+  if (charId && CHARACTER_IDS.includes(charId)) { settings.character = charId; saveSettings(); }
+  const char = activeChar();
+  let s = sessionOf(char.id);
+  s = applyRole(s, char, scenario.custom ? 'scene' : roleForScenario(scenario, char), 'scenario');
+  s.scenario = scenario.id || 'custom';
+  s.t = Date.now();
+  state.sessions[char.id] = s;
+  state.scene = { id: scenario.custom ? null : scenario.id, icon: scenario.icon || '🎭', th: scenario.th, char: char.id, feedback: scenario.feedback || '', criteria: scenario.criteria || [] };
+  logActivity('roleplay', `เริ่มสถานการณ์ ${scenario.th} กับ ${char.name}`);
   persist();
-  location.hash = '#chat';
-  renderScene();
+  showAll = false;
+  if (location.hash !== '#chat') location.hash = '#chat'; else { renderHeader(); renderChat(); }
   unlockSpeech();
-  run(null, `[App note, not from the user: the user chose a role-play. ${scene.en} Start the scene now with your first line in character. Set "correction" to null.]`);
+  run(null, `[App note, not from the user: the learner started the role-play "${scenario.th}". You are now in your scenario role. Start the scene with your first line in that role. Set "language_feedback" to null.]`);
 }
 
 function endScene() {
-  if (busy || !state.scene) return;
+  const char = activeChar();
+  if (busy || !state.scene || state.scene.char !== char.id) return;
   const scene = state.scene;
   state.scene = null;
+  state.sessions[char.id] = applyRole(sessionOf(char.id), char, null, 'default');
   persist();
-  renderScene();
-  const what = scene.feedback || `Give friendly feedback: what they did well, 2–3 useful ${settings.lang} phrases for this situation (with Thai meaning), and one thing to practise. Keep it short.`;
-  run(null, `[App note, not from the user: the role-play "${scene.th}" has ended. Step out of the role and, as ${settings.name}, ${what} Also set "score" to how well they handled it, 0–10. For THIS message only, write "reply" in Thai (keep ${settings.lang} words and example sentences in ${settings.lang}). Set "correction" to null.]`, null, { feedbackFor: scene });
+  renderHeader();
+  const crit = scene.criteria?.length ? ` Judge mainly: ${scene.criteria.join(', ')}.` : '';
+  const what = scene.feedback || `Give friendly feedback: what they did well, 2–3 useful ${settings.lang} phrases for this situation (with Thai meaning), and one thing to practise. Keep it short.${crit}`;
+  run(null, `[App note, not from the user: the role-play "${scene.th}" has ended. Step out of the role and, as yourself (${char.name}, back to your usual role), ${what} Also set "score" to how well they handled it, 0–10. For THIS message only, write "message" in Thai (keep ${settings.lang} words and example sentences in ${settings.lang}). Set "language_feedback" to null.]`, null, { feedbackFor: scene });
 }
 
 export function practice(category, label) {
   location.hash = '#chat';
   unlockSpeech();
-  run(null, `[App note, not from the user: the user wants to practise "${category}" (${label}), one of their weak areas. Start a short, friendly mini-practice inside the chat: ask ONE question or give ONE short task that makes them use this. After their answer, correct it and give the next one. Keep it playful. Set "correction" to null.]`);
+  run(null, `[App note, not from the user: the learner wants to practise "${category}" (${label}), one of their weak areas. Start a short, friendly mini-practice inside the chat, in your own style: ask ONE question or give ONE short task that makes them use this. After their answer, give feedback and the next one. Set "language_feedback" to null.]`);
 }
 
 export function quiz() {
   location.hash = '#chat';
   unlockSpeech();
-  run(null, '[App note, not from the user: the user tapped "quiz me". Give ONE short, friendly quiz question that practises one of their recent mistakes (fill-in-the-blank or "how would you say…"). Wait for their answer before giving the next one. Set "correction" to null.]');
+  run(null, '[App note, not from the user: the learner tapped "quiz me". Give ONE short, friendly quiz question that practises one of their recent mistakes (fill-in-the-blank or "how would you say…"). Wait for their answer before giving the next one. Set "language_feedback" to null.]');
 }
 
 // ---------- photos ----------
@@ -356,6 +464,8 @@ export function initChat() {
     refreshSend();
   });
   $('sceneEnd').addEventListener('click', endScene);
+  $('roleSelect').addEventListener('change', (e) => setRole(e.target.value));
+  $('roleReset').addEventListener('click', () => setRole(activeChar().defaultRole));
   $('quota').addEventListener('click', () => { location.hash = '#settings'; });
   on('usage', renderQuota);
   on('settings', renderHeader);

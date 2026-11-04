@@ -17,12 +17,12 @@
 //   DB                (D1 binding, for sync) free SQL database, tables in schema.sql
 //   LIMITER           (rate-limit binding) requests per IP per minute, see wrangler.toml
 
-const WORKER_VERSION = 10;         // shown when you open the worker link; bump on every change
+const WORKER_VERSION = 11;         // shown when you open the worker link; bump on every change
 const MAX_TURNS = 60;
 const MAX_BODY_CHARS = 1500000;   // room for one resized photo
 const MAX_IMAGE_CHARS = 1400000;  // base64 length of a single photo
 const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
-const MAX_SYSTEM_CHARS = 16000;
+const MAX_SYSTEM_CHARS = 24000;  // character + role + memory + scenario guidance
 
 // Constant-time comparison, so the access code cannot be guessed from response timing.
 async function sameSecret(a, b) {

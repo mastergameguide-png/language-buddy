@@ -2,6 +2,10 @@
 // localStorage on this device; `save` reports failures instead of hiding them.
 import { uid, clampStr, toast } from './util.js';
 import { newCard } from './srs.js';
+import { getCharacter, CHARACTER_IDS, EMOTIONS, ROLES } from './engine/characters.js';
+import { freshSession } from './engine/roles.js';
+import { expire } from './engine/memory.js';
+import { SKILLS } from './engine/response.js';
 
 export const LANGS = {
   English: { code: 'en-US', label: 'English (อังกฤษ)' },
@@ -58,14 +62,20 @@ export const DEFAULT_SETTINGS = {
   pushTo: 21,
   pushTimes: ['08:00', '19:00'],
   ai: 'auto',                   // which AI the worker tries first: auto (Gemini → Groq), groq, gemini
+  character: 'buddy',           // who the learner is talking to (see js/engine/characters.js)
+  memoryLearner: true,          // shared learner memory: facts the characters learn about you
+  memoryCharacter: true,        // each character remembers its own past chats with you
+  adaptiveVoice: true,          // speech speed follows the level, tone follows the character's mood
 };
 
 export const STATE_VERSION = 2;
 const EMPTY_STATE = () => ({
   v: STATE_VERSION, messages: [], facts: [], mistakes: [], vocab: [], scene: null, lastSeen: 0,
   days: {}, activity: [], results: [],
+  charMemory: {}, sessions: {}, skills: {}, topics: {},
 });
 export const HISTORY_KEPT = 300;
+export const HISTORY_DAYS = 120;   // chat messages older than this are not kept
 
 // ---------- storage ----------
 export function load(key, fallback) {
@@ -111,6 +121,10 @@ function cleanMessage(m) {
   if (m.voice) out.voice = true;
   if (m.ai === 'groq') out.ai = 'groq';
   if (m.failed) out.failed = true;
+  if (m.char && CHARACTER_IDS.includes(m.char) && m.char !== 'buddy') out.char = m.char;
+  if (m.role === 'model' && m.emotion && EMOTIONS.includes(m.emotion.state)) out.emotion = { state: m.emotion.state, intensity: Math.max(0, Math.min(1, Number(m.emotion.intensity) || 0.5)) };
+  if (m.as && ROLES[m.as]) out.as = m.as;
+  if (m.suggestion) out.suggestion = str(m.suggestion, 200);
   const c = cleanCorrection(m.correction);
   if (c) out.correction = c;
   if (m.newWord && m.newWord.word) out.newWord = { word: str(m.newWord.word, 80), meaning: str(m.newWord.meaning, 200) };
@@ -127,7 +141,13 @@ export function normalizeState(raw) {
   s.days = s.days && typeof s.days === 'object' ? s.days : {};
   s.activity = (Array.isArray(s.activity) ? s.activity : []).slice(-40);
   s.results = (Array.isArray(s.results) ? s.results : []).slice(-50);
-  s.scene = s.scene && typeof s.scene === 'object' && s.scene.en ? s.scene : null;
+  s.scene = s.scene && typeof s.scene === 'object' && (s.scene.en || s.scene.id || s.scene.th) ? { ...s.scene, char: CHARACTER_IDS.includes(s.scene.char) ? s.scene.char : 'buddy' } : null;
+  const obj = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
+  s.charMemory = Object.fromEntries(Object.entries(obj(s.charMemory)).filter(([k, v]) => CHARACTER_IDS.includes(k) && Array.isArray(v))
+    .map(([k, v]) => [k, expire(v.filter((m) => m && m.text).map((m) => ({ id: str(m.id, 40) || uid(), text: str(m.text, 160), t: Number(m.t) || Date.now(), used: Number(m.used) || 0 }))).slice(-25)]));
+  s.sessions = Object.fromEntries(Object.entries(obj(s.sessions)).filter(([k, v]) => CHARACTER_IDS.includes(k) && v && typeof v === 'object'));
+  s.skills = Object.fromEntries(Object.entries(obj(s.skills)).filter(([k, v]) => SKILLS.includes(k) && Array.isArray(v)).map(([k, v]) => [k, v.map(Number).filter((n) => n >= 1 && n <= 5).slice(-30)]));
+  s.topics = Object.fromEntries(Object.entries(obj(s.topics)).filter(([, n]) => Number(n) > 0).sort((a, b) => b[1] - a[1]).slice(0, 30).map(([k, n]) => [str(k, 60), Number(n)]));
   s.lastSeen = Number(s.lastSeen) || 0;
   s.v = STATE_VERSION;
   return s;
@@ -141,7 +161,8 @@ export function setSettings(next) { settings = { ...DEFAULT_SETTINGS, ...next };
 export function saveSettings() { save('lb_settings', settings); emit('settings'); }
 export function replaceState(next) { state = normalizeState(next); persist(); emit('state'); }
 export function persist() {
-  state.messages = state.messages.slice(-HISTORY_KEPT);
+  const oldest = Date.now() - HISTORY_DAYS * 86400000;
+  state.messages = state.messages.filter((m) => m.t >= oldest).slice(-HISTORY_KEPT);
   save('lb_state', { ...state, messages: state.messages.map(({ photoData, ...m }) => m) });
 }
 export function savePush() { save('lb_push', push); }
@@ -156,6 +177,18 @@ window.addEventListener('storage', (e) => {
 const listeners = {};
 export function on(name, fn) { (listeners[name] ||= []).push(fn); }
 export function emit(name, data) { for (const fn of listeners[name] || []) { try { fn(data); } catch (e) { console.error(e); } } }
+
+// ---------- characters ----------
+export const charOf = (m) => m.char || 'buddy';
+export const activeCharId = () => (CHARACTER_IDS.includes(settings.character) ? settings.character : 'buddy');
+export const activeChar = () => getCharacter(activeCharId(), settings);
+// The live session for a character (role, scenario, mood, topic); stale ones start fresh.
+export function sessionOf(id = activeCharId()) {
+  const s = freshSession(state.sessions[id], getCharacter(id, settings));
+  state.sessions[id] = s;
+  return s;
+}
+export const threadOf = (id = activeCharId()) => state.messages.filter((m) => charOf(m) === id);
 
 // ---------- learner helpers ----------
 export const isEnglish = () => settings.lang === 'English';

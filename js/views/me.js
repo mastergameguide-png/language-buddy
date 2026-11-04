@@ -1,6 +1,6 @@
 // "Me": learner profile, detailed progress, weak areas, and what the buddy remembers.
-import { el, h, icon, num, fmtMinutes } from '../util.js';
-import { settings, state, persist, emit, levelShort, cefrOf, CEFR, CATEGORIES, weakAreas, flag } from '../store.js';
+import { el, h, icon, num, fmtMinutes, toast } from '../util.js';
+import { settings, state, persist, emit, levelShort, cefrOf, CEFR, CATEGORIES, weakAreas, flag, setSettings } from '../store.js';
 import { streak, totals, accuracy, lastDays, vocabCounts } from '../stats.js';
 import { practice } from './chat.js';
 
@@ -71,14 +71,35 @@ export function renderMe(root) {
     root.append(c);
   }
 
-  root.append(el('h2', 'sec', 'ทักษะที่วัดได้ตอนนี้'));
-  root.append(h('div', { class: 'card small' },
-    h('div', { class: 'row' }, el('span', 'grow', '✍️ การเขียน / ไวยากรณ์ / คำศัพท์'), el('span', 'chip good', 'วัดจากแชต')),
-    h('div', { class: 'row', style: 'margin-top:8px' }, el('span', 'grow', '🎤 การพูด'), el('span', 'chip', `นับข้อความเสียง ${num(tot.voice)}`)),
-    h('div', { class: 'row', style: 'margin-top:8px' }, el('span', 'grow', '👂 การฟัง · 📖 การอ่าน · 🗣️ การออกเสียง'), el('span', 'chip', 'ยังวัดไม่ได้')),
-    el('p', 'xs muted', 'การออกเสียงต้องใช้ระบบวิเคราะห์เสียงแยก ซึ่งยังไม่มีในเวอร์ชันฟรีนี้ แอปจึงไม่แสดงคะแนนที่วัดไม่ได้จริง')));
+  root.append(el('h2', 'sec', 'ทักษะ (ประเมินจากข้อความที่คุณพิมพ์)'));
+  const sk = h('div', { class: 'card' });
+  const labels = { grammar: 'ไวยากรณ์', vocabulary: 'คำศัพท์', fluency: 'ความลื่นไหล', comprehension: 'ความเข้าใจ', naturalness: 'ความเป็นธรรมชาติ' };
+  let total = 0, count = 0;
+  for (const [k, label] of Object.entries(labels)) {
+    const v = (state.skills || {})[k] || [];
+    const recent = v.slice(-10);
+    const avg = recent.length ? recent.reduce((a, b) => a + b, 0) / recent.length : null;
+    if (avg != null && recent.length >= 3) { total += avg; count++; }
+    sk.append(h('div', { class: 'goal' }, el('span', 'xs muted', label),
+      h('div', { class: 'bar ' + (avg == null ? '' : avg >= 4 ? 'good' : avg >= 3 ? 'warn' : 'bad') }, h('i', { style: `width:${avg == null ? 0 : (avg / 5) * 100}%` })),
+      el('span', 'small', avg == null || recent.length < 3 ? 'ข้อมูลยังไม่พอ' : `${avg.toFixed(1)}/5`)));
+  }
+  sk.append(h('div', { class: 'goal' }, el('span', 'xs muted', 'การออกเสียง'), h('div', { class: 'bar' }, h('i', { style: 'width:0' })), el('span', 'small muted', 'ยังวัดไม่ได้')));
+  sk.append(el('p', 'xs muted', 'ตัวละครให้คะแนน 1–5 จากข้อความที่ยาว 6 คำขึ้นไป (เฉลี่ย 10 ครั้งล่าสุด) · การออกเสียงต้องใช้ระบบวิเคราะห์เสียง ซึ่งยังไม่มี แอปจึงไม่แสดงคะแนนที่วัดไม่ได้จริง · การฟังและการอ่านยังไม่ได้วัด'));
+  // Suggest a level change from the scores, but the learner decides.
+  const order = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
+  const avgAll = count >= 4 ? total / count : null;
+  const cur = order.indexOf(cefrOf());
+  const sugg = avgAll == null || cur < 0 ? null : avgAll >= 4.3 && cur < 5 ? order[cur + 1] : avgAll <= 2.2 && cur > 0 ? order[cur - 1] : null;
+  if (sugg && !/^IELTS /.test(settings.level)) {
+    const b = h('button', { type: 'button', class: 'btn sm primary' }, `เปลี่ยนเป็น ${sugg}`);
+    b.addEventListener('click', () => { setSettings({ ...settings, level: sugg }); toast(`เปลี่ยนระดับเป็น ${sugg} แล้ว`); renderMe(root); });
+    sk.append(h('div', { class: 'row', style: 'margin-top:10px' }, el('span', 'grow small', `คะแนนเฉลี่ย ${avgAll.toFixed(1)}/5 — ลองระดับ ${sugg} ไหม?`), b));
+  }
+  root.append(sk);
 
-  root.append(el('h2', 'sec', `สิ่งที่ ${settings.name} จำเกี่ยวกับคุณ`));
+  root.append(h('div', { class: 'sec-row' }, el('h2', 'sec', 'ความจำร่วม: สิ่งที่ตัวละครรู้เกี่ยวกับคุณ'), h('a', { class: 'btn sm ghost', href: '#characters' }, 'ความจำของแต่ละตัว')));
+  if (settings.memoryLearner === false) root.append(el('p', 'xs muted', 'ปิดความจำร่วมอยู่ (เปิดได้ที่ ตั้งค่า → ความจำ)'));
   const facts = h('div', { class: 'list' });
   if (!state.facts.length) facts.append(h('div', { class: 'card small muted' }, 'ยังไม่มี — เล่าเรื่องตัวเองให้เพื่อน AI ฟังได้เลย'));
   state.facts.forEach((f, i) => {

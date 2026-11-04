@@ -1,19 +1,26 @@
 // "Buddy messages first": Web Push subscription, profile sync and the inbox of messages the
 // Worker wrote while the app was closed.
-import { settings, state, push, savePush, persist, emit, levelText, isEnglish } from './store.js';
+import { settings, state, push, savePush, persist, emit, levelText, isEnglish, activeChar, activeCharId, threadOf } from './store.js';
 import { workerBase, authHeaders } from './ai.js';
 
 export const pushSupported = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
 export const standalone = navigator.standalone === true || matchMedia('(display-mode: standalone)').matches;
 export const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
+// A short description of the active character for the message the Worker writes while the app is closed.
+function personaLine() {
+  const c = activeChar();
+  if (c.custom) return settings.persona;
+  return `${c.age}, ${c.nationality}, ${c.occupation}. ${c.personality.join(', ')}. ${c.style}`.slice(0, 400);
+}
+
 export function pushProfile() {
   return {
-    name: settings.name, persona: settings.persona, lang: settings.lang, level: levelText(), variant: isEnglish() ? settings.variant : '',
+    name: activeChar().name, persona: personaLine(), lang: settings.lang, level: levelText(), variant: isEnglish() ? settings.variant : '',
     tz: Intl.DateTimeFormat().resolvedOptions().timeZone, perDay: Number(settings.perDay) || 0,
     mode: settings.pushMode, from: settings.pushFrom, to: settings.pushTo, times: settings.pushTimes,
     facts: state.facts.slice(-20),
-    recent: state.messages.slice(-6).map((m) => ({ role: m.role, text: (m.photo ? '[sent a photo] ' : '') + (m.text || '') })),
+    recent: threadOf().slice(-6).map((m) => ({ role: m.role, text: (m.photo ? '[sent a photo] ' : '') + (m.text || '') })),
   };
 }
 
@@ -48,7 +55,8 @@ export async function fetchInbox() {
   try {
     const { messages = [] } = await pushApi('inbox', null, 'GET');
     if (!messages.length) return [];
-    for (const m of messages) state.messages.push({ role: 'model', text: String(m.text).slice(0, 4000), t: Number(m.t) || Date.now() });
+    const char = activeCharId();
+    for (const m of messages) state.messages.push({ role: 'model', text: String(m.text).slice(0, 4000), t: Number(m.t) || Date.now(), ...(char !== 'buddy' ? { char } : {}) });
     state.messages.sort((a, b) => a.t - b.t);
     state.lastSeen = Date.now();
     persist();
@@ -70,9 +78,9 @@ export const hh = (h) => String(h).padStart(2, '0') + ':00';
 export function scheduleText() {
   if (settings.pushMode === 'fixed') {
     const t = settings.pushTimes || [];
-    return t.length ? `${settings.name} จะทักมาตอน ${t.join(', ')} น. ทุกวัน` : 'ยังไม่ได้ใส่เวลา — ใส่อย่างน้อย 1 เวลา';
+    return t.length ? `${activeChar().name} จะทักมาตอน ${t.join(', ')} น. ทุกวัน` : 'ยังไม่ได้ใส่เวลา — ใส่อย่างน้อย 1 เวลา';
   }
-  return `${settings.name} จะทักมาวันละไม่เกิน ${settings.perDay} ครั้ง สุ่มเวลาระหว่าง ${hh(settings.pushFrom)}–${hh(settings.pushTo)} (ไม่ทักซ้ำถ้ายังไม่ได้อ่าน และไม่ทักถ้าเพิ่งคุยกันไป)`;
+  return `${activeChar().name} จะทักมาวันละไม่เกิน ${settings.perDay} ครั้ง สุ่มเวลาระหว่าง ${hh(settings.pushFrom)}–${hh(settings.pushTo)} (ไม่ทักซ้ำถ้ายังไม่ได้อ่าน และไม่ทักถ้าเพิ่งคุยกันไป)`;
 }
 
 const b64ToBytes = (s) => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((s.length + 3) % 4)), (c) => c.charCodeAt(0));

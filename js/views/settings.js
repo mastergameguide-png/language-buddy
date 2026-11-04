@@ -92,6 +92,9 @@ export function fillSettings() {
   f('sAi').value = settings.ai || 'auto';
   f('sVoice').checked = settings.voice;
   f('sAutoSend').checked = settings.autoSend;
+  f('sAdaptVoice').checked = settings.adaptiveVoice !== false;
+  f('sMemLearner').checked = settings.memoryLearner !== false;
+  f('sMemChar').checked = settings.memoryCharacter !== false;
   showSchedule();
   renderPush();
   renderSync();
@@ -138,6 +141,9 @@ export function initSettings() {
       ai: f('sAi').value,
       voice: f('sVoice').checked,
       autoSend: f('sAutoSend').checked,
+      adaptiveVoice: f('sAdaptVoice').checked,
+      memoryLearner: f('sMemLearner').checked,
+      memoryCharacter: f('sMemChar').checked,
     });
     syncPush(true);
     toast('บันทึกแล้ว');
@@ -201,12 +207,17 @@ export function initSettings() {
   });
   on('sync', renderSync);
 
+  f('memClear').addEventListener('click', () => {
+    if (!confirm('ลบความจำทั้งหมด? (สิ่งที่ตัวละครรู้เกี่ยวกับคุณ ความจำของทุกตัวละคร และหัวข้อที่ชอบ)\nแชต สมุดผิด คลังคำ และสถิติยังอยู่')) return;
+    replaceState({ ...state, facts: [], charMemory: {}, topics: {}, sessions: Object.fromEntries(Object.entries(state.sessions).map(([k, v]) => [k, { ...v, summary: '', topic: '' }])) });
+    toast('ลบความจำทั้งหมดแล้ว');
+  });
   f('exportBtn').addEventListener('click', exportData);
   f('importBtn').addEventListener('click', () => f('importInput').click());
   f('importInput').addEventListener('change', (e) => { const file = e.target.files?.[0]; e.target.value = ''; if (file) importData(file); });
   f('resetBtn').addEventListener('click', () => {
     // Only the conversation goes; mistakes, words, memory and stats stay.
-    if (!confirm('ล้างข้อความแชตทั้งหมด?\n(สมุดผิด คลังคำ สิ่งที่ Sam จำได้ และสถิติยังอยู่ · ถ้าเปิดซิงก์ไว้ แชตในเครื่องอื่นจะถูกล้างด้วย)')) return;
+    if (!confirm('ล้างข้อความแชตทั้งหมด?\n(สมุดผิด คลังคำ ความจำของตัวละคร และสถิติยังอยู่ · ถ้าเปิดซิงก์ไว้ แชตในเครื่องอื่นจะถูกล้างด้วย)')) return;
     replaceState({ ...state, messages: [], scene: null, lastSeen: 0 });
     toast('ล้างแชตแล้ว');
     location.hash = '#chat';

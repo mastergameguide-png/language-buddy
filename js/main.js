@@ -9,6 +9,7 @@ import { renderHome } from './views/home.js';
 import { renderReview } from './views/review.js';
 import { renderRoleplay } from './views/roleplay.js';
 import { renderMe } from './views/me.js';
+import { renderCharacters } from './views/characters.js';
 import { initSettings, fillSettings, applyTheme } from './views/settings.js';
 
 // A bug in one view should not take the whole app down; tell the user and keep going.
@@ -28,6 +29,7 @@ const VIEWS = {
   review: { el: 'view-review', render: () => renderReview($('reviewBody')), nav: 'review' },
   roleplay: { el: 'view-roleplay', render: () => renderRoleplay($('roleBody')), nav: 'roleplay' },
   me: { el: 'view-me', render: () => renderMe($('meBody')), nav: 'me' },
+  characters: { el: 'view-characters', render: () => renderCharacters($('charsBody')), nav: 'chat' },
   settings: { el: 'view-settings', render: () => fillSettings(), nav: 'me' },
 };
 let current = null;
