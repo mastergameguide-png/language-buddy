@@ -50,7 +50,7 @@ function roleBlock(ch, s, c) {
     ? `The learner chose this role, so keep it until they end it; "active_role" must stay "${s.role}".`
     : `If the learner clearly asks to practise something that one of your roles fits (${can}), switch to it and set "active_role"; when they want to stop, set it back to "${ch.defaultRole}". Otherwise keep "${s.role}".`;
   const sc = c.scenario
-    ? `\nROLE-PLAY IS ON.\n${c.scenario.custom ? `Situation chosen by the learner: "${c.scenario.th}". Play the other person in it.` : scenarioBrief(c.scenario, role.label)}\nReact to unexpected answers like a real person would, then steer back gently. Keep each turn short and realistic.`
+    ? `\nROLE-PLAY IS ON.\n${c.scenario.custom ? `Situation chosen by the learner: "${c.scenario.th}". Play the other person in it.` : scenarioBrief(c.scenario, role.label, c.sceneState || {})}\nReact to unexpected answers like a real person would, then steer back gently. Keep each turn short and realistic.`
     : '';
   return `${switching}\n${auto}${sc}`;
 }
@@ -68,6 +68,7 @@ export function buildSystemPrompt(c) {
   const cats = CATEGORY_IDS.join(' | ');
   const detailed = c.feedback === 'detailed' || (!c.scenario && c.mode === 'correction');
   const learnerMem = c.memoryOn.learner ? list(c.facts) : '(memory is turned off by the learner)';
+  const steps = c.scenario && !c.scenario.custom && c.scenario.steps?.length ? c.scenario.steps : null;
   const charMem = !c.memoryOn.character ? '(memory is turned off by the learner)'
     : c.charMemories.length ? list(c.charMemories) : '(none — this is new to you. Words like "again" or "as usual" do not mean you know it: admit in your own words that you do not know yet and ask)';
 
@@ -141,7 +142,9 @@ Answer with one JSON object only (every key in double quotes), shaped like this 
     "example": "one complete natural answer",
     "example_th": "its Thai meaning"
   },
-  "memory_updates": [{"scope": "learner", "text": "has a cat named Mochi"}],
+  "memory_updates": [{"scope": "learner", "text": "has a cat named Mochi"}],${steps ? `
+  "scenario_step": "${steps[0].id}",
+  "scenario_done": false,` : ''}
   "topic": "weekend plans",
   "summary": null,
   "assessment": {"grammar": 3, "vocabulary": 4, "fluency": 4, "comprehension": 5, "naturalness": 3},
@@ -158,7 +161,10 @@ Field rules:
 - memory_updates: usually []. scope "learner" = a durable fact about the learner; scope "character" = something you (${ch.name}) and the learner did or talked about that you should remember. Never passwords, numbers, addresses or private data.
 - summary: null, except every ~8 turns or when the topic changes: 1–2 sentences summarising this conversation.
 - assessment: null unless the learner's last message has 6+ words; then 1–5 per skill from that message only (text only, never pronunciation).
-- score: null unless an [App note] asks for a score (0–10).
+- score: null unless an [App note] asks for a score (0–10).${steps ? `
+- scenario_step: the id of the stage the scene is in after your message (${steps.map((x) => x.id).join(', ')}).
+- scenario_done: true only once the completion condition is met; otherwise false.` : ''}
+- criteria_scores: only when an [App note] asks for them: {"criterion": 1–5} for each criterion it names.
 
 LAST CHECK before you answer: "message" must match the ${c.cefr} level guide (${CEFR_GUIDE[c.cefr] || CEFR_GUIDE.B1}). Rewrite it simpler if it does not.
 `;
@@ -180,9 +186,9 @@ export const appNotes = {
     return note(`the learner started the role-play "${title}". You are now in your scenario role. Start the scene with your first line in that role.`);
   },
   sceneEnd({ title, name, lang, feedback, criteria = [] }) {
-    const crit = criteria.length ? ` Judge mainly: ${criteria.join(', ')}.` : '';
+    const crit = criteria.length ? ` Judge mainly: ${criteria.join(', ')}. Also set "criteria_scores" to an object scoring each of these, 1–5, using exactly these names: ${criteria.map((x) => `"${x}"`).join(', ')}.` : '';
     const what = feedback || `Give friendly feedback: what they did well, 2–3 useful ${lang} phrases for this situation (with Thai meaning), and one thing to practise. Keep it short.${crit}`;
-    return note(`the role-play "${title}" has ended. Step out of the role and, as yourself (${name}, back to your usual role), ${what} Also set "score" to how well they handled it, 0–10. For THIS message only, write "message" in Thai (keep ${lang} words and example sentences in ${lang}).`);
+    return note(`the role-play "${title}" has ended. Step out of the role and, as yourself (${name}, back to your usual role), ${what}${feedback ? crit : ''} Also set "score" to how well they handled it, 0–10. For THIS message only, write "message" in Thai (keep ${lang} words and example sentences in ${lang}).`);
   },
   practice(category, label) {
     return note(`the learner wants to practise "${category}" (${label}), one of their weak areas. Start a short, friendly mini-practice inside the chat, in your own style: ask ONE question or give ONE short task that makes them use this. After their answer, give feedback and the next one.`);

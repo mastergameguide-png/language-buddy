@@ -167,6 +167,16 @@ function cleanMessage(m) {
   return out;
 }
 
+// The running role-play. step/total/done/variant were added in Phase 2.
+function cleanScene(sc) {
+  const total = Math.max(0, Math.min(20, Math.floor(Number(sc.total) || 0)));
+  return {
+    ...sc, char: CHARACTER_IDS.includes(sc.char) ? sc.char : 'buddy',
+    variant: ['easy', 'normal', 'hard'].includes(sc.variant) ? sc.variant : 'normal',
+    total, step: Math.max(0, Math.min(total, Math.floor(Number(sc.step) || 0))), done: sc.done === true,
+  };
+}
+
 // Accepts any older or imported shape and returns a valid current state.
 export function normalizeState(raw) {
   const s = { ...EMPTY_STATE(), ...(raw && typeof raw === 'object' ? raw : {}) };
@@ -179,7 +189,7 @@ export function normalizeState(raw) {
   s.days = s.days && typeof s.days === 'object' ? s.days : {};
   s.activity = (Array.isArray(s.activity) ? s.activity : []).slice(-LIMITS.activity);
   s.results = capList(s, 'results', Array.isArray(s.results) ? s.results : [], LIMITS.results);
-  s.scene = s.scene && typeof s.scene === 'object' && (s.scene.en || s.scene.id || s.scene.th) ? { ...s.scene, char: CHARACTER_IDS.includes(s.scene.char) ? s.scene.char : 'buddy' } : null;
+  s.scene = s.scene && typeof s.scene === 'object' && (s.scene.en || s.scene.id || s.scene.th) ? cleanScene(s.scene) : null;
   const obj = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
   s.charMemory = Object.fromEntries(Object.entries(obj(s.charMemory)).filter(([k, v]) => CHARACTER_IDS.includes(k) && Array.isArray(v))
     .map(([k, v]) => [k, expire(v.filter((m) => m && m.text).map((m) => ({ id: str(m.id, 40) || uid(), text: str(m.text, 160), t: Number(m.t) || Date.now(), used: Number(m.used) || 0 }))).slice(-25)]));

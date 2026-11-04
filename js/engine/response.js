@@ -76,6 +76,13 @@ export function hintsOf(h) {
   return out.clue || vocab.length || out.structure || out.example ? out : null;
 }
 
+// End-of-scene scores per criterion: [{ name, score 1–5 }]. Names are matched to the scene later.
+export function criteriaOf(c) {
+  if (!c || typeof c !== 'object' || Array.isArray(c)) return [];
+  return Object.entries(c).slice(0, 8).map(([name, v]) => ({ name: clean(name, 80), score: Number(v) }))
+    .filter((x) => x.name && Number.isFinite(x.score) && x.score >= 1 && x.score <= 5).map((x) => ({ ...x, score: Math.round(x.score * 2) / 2 }));
+}
+
 // The "say it in English" helper's answer: up to 3 { label, text, note }.
 export function parseHelper(text) {
   const { json } = extractJSON(text);
@@ -135,7 +142,7 @@ export function parseStructured(text, { charId = null, roles = [] } = {}) {
   const { json: j, raw } = extractJSON(text);
   const message = j && typeof j === 'object' ? (typeof j.message === 'string' ? j.message : typeof j.reply === 'string' ? j.reply : null) : null;
   if (message == null) {
-    return { reply: clean(raw, 4000) || '…', malformed: true, characterId: charId, emotion: null, activeRole: null, correction: null, newWord: null, memoryUpdates: [], suggestions: [], hints: null, score: null, topic: '', summary: '', assessment: null };
+    return { reply: clean(raw, 4000) || '…', malformed: true, characterId: charId, emotion: null, activeRole: null, correction: null, newWord: null, memoryUpdates: [], suggestions: [], hints: null, score: null, topic: '', summary: '', assessment: null, scenarioStep: null, scenarioDone: false, criteriaScores: [] };
   }
   const w = j.new_word;
   const role = typeof j.active_role === 'string' ? j.active_role.trim().toLowerCase().replace(/[\s-]+/g, '_') : null;
@@ -152,6 +159,9 @@ export function parseStructured(text, { charId = null, roles = [] } = {}) {
     memoryUpdates: memoryOf(j),
     suggestions: suggestionsOf(j),
     hints: hintsOf(j.hints),
+    scenarioStep: typeof j.scenario_step === 'string' && /^s\d{1,2}$/.test(j.scenario_step.trim()) ? j.scenario_step.trim() : null,
+    scenarioDone: j.scenario_done === true,
+    criteriaScores: criteriaOf(j.criteria_scores),
     score: Number.isFinite(score) ? Math.max(0, Math.min(10, score)) : null,
     topic: clean(j.topic, 60),
     summary: clean(j.summary, 400),

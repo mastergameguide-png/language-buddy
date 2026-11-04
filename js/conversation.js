@@ -11,7 +11,7 @@ import { getCharacter, ROLES, CHARACTER_IDS } from './engine/characters.js';
 import { nextEmotion } from './engine/emotion.js';
 import { applyRole, roleForScenario } from './engine/roles.js';
 import { applyMemoryUpdates } from './engine/memory.js';
-import { scoreLabel } from './engine/scenarios.js';
+import { scoreLabel, scenarioById, progressOf, matchCriteria, VARIANTS } from './engine/scenarios.js';
 import { appNotes } from './engine/prompt.js';
 import { checkReply, addQuality } from './engine/checks.js';
 import { askAI } from './ai.js';
@@ -72,6 +72,13 @@ export function applyAI(ai, userMsg, opts) {
   session.t = Date.now();
   session.turns = (session.turns || 0) + 1;
   state.sessions[char.id] = session;
+  // Scenario progress: the model reports the stage; the app only moves forward and checks the id.
+  const scene = state.scene && state.scene.char === char.id ? state.scene : null;
+  if (scene && scene.total) {
+    const idx = ai.scenarioStep ? Number(ai.scenarioStep.slice(1)) : 0;
+    if (idx >= 1 && idx <= scene.total) scene.step = Math.max(scene.step || 0, idx);
+    if (ai.scenarioDone && !scene.done) { scene.done = true; scene.step = scene.total; }
+  }
   if (ai.assessment && userMsg) for (const [k, v] of Object.entries(ai.assessment)) state.skills[k] = [...(state.skills[k] || []), v].slice(-30);
   // Quality counters only; the reply itself is never rewritten.
   state.quality = addQuality(state.quality, checkReply(ai.reply, { cefr: ai.ctx?.cefr, charMemories: ai.ctx?.charMemories, thread: before }), ai.malformed);
@@ -87,10 +94,17 @@ export function applyAI(ai, userMsg, opts) {
     logActivity('word', `คำใหม่: ${ai.newWord.word}`);
   }
   if (opts.feedbackFor) {
-    const result = { t: Date.now(), id: opts.feedbackFor.id || null, icon: opts.feedbackFor.icon, scene: opts.feedbackFor.th, char: char.id, score: ai.score, summary: ai.reply.slice(0, 400) };
+    const sc = opts.feedbackFor;
+    const result = {
+      t: Date.now(), id: sc.id || null, icon: sc.icon, scene: sc.th, char: char.id, score: ai.score, summary: ai.reply.slice(0, 400),
+      variant: sc.variant || 'normal', step: sc.step || 0, total: sc.total || 0, done: !!sc.done,
+      criteria: matchCriteria(ai.criteriaScores, sc.criteria),
+    };
+    const before = sc.id ? progressOf(state.results, sc.id) : null;
     addResult(result);
     const label = scoreLabel(result);
-    logActivity('roleplay', `จบสถานการณ์ ${opts.feedbackFor.th} กับ ${char.name}${label ? ` · ${label}` : ''}`);
+    const prev = before?.last && result.score != null && Number.isFinite(Number(result.score)) ? Number(result.score) - Number(before.last.score) : null;
+    logActivity('roleplay', `จบสถานการณ์ ${sc.th} กับ ${char.name}${label ? ` · ${label}` : ''}${prev ? ` (${prev > 0 ? '+' : ''}${prev} จากครั้งก่อน)` : ''}`);
   }
   state.messages.push(botMsg);
   state.lastSeen = Date.now();
@@ -179,7 +193,7 @@ export function setCharacter(id) {
 
 // ---------- role-play & focused practice ----------
 // scenario: an entry from engine/scenarios.js, or { custom: true, icon, th } for the learner's own idea.
-export function startScene(scenario, charId) {
+export function startScene(scenario, charId, variant = 'normal') {
   if (busy) { toast('รอให้ตอบข้อความก่อนหน้าเสร็จก่อนนะ'); return; }
   if (charId && CHARACTER_IDS.includes(charId)) { settings.character = charId; saveSettings(); }
   const char = activeChar();
@@ -188,8 +202,12 @@ export function startScene(scenario, charId) {
   s.scenario = scenario.id || 'custom';
   s.t = Date.now();
   state.sessions[char.id] = s;
-  state.scene = { id: scenario.custom ? null : scenario.id, icon: scenario.icon || '🎭', th: scenario.th, char: char.id, feedback: scenario.feedback || '', criteria: scenario.criteria || [] };
-  logActivity('roleplay', `เริ่มสถานการณ์ ${scenario.th} กับ ${char.name}`);
+  const v = VARIANTS[variant] ? variant : 'normal';
+  state.scene = {
+    id: scenario.custom ? null : scenario.id, icon: scenario.icon || '🎭', th: scenario.th, char: char.id, feedback: scenario.feedback || '', criteria: scenario.criteria || [],
+    variant: v, total: scenario.custom ? 0 : (scenarioById(scenario.id)?.steps.length || 0), step: 0, done: false,
+  };
+  logActivity('roleplay', `เริ่มสถานการณ์ ${scenario.th} กับ ${char.name}${v !== 'normal' ? ` (${VARIANTS[v].th})` : ''}`);
   persist();
   emit('chat:open');
   unlockSpeech();

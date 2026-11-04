@@ -4,7 +4,7 @@ import { settings, state, levelShort, cefrOf, CEFR, CATEGORIES, weakAreas, flag,
 import { today, streak, lastDays, totals, accuracy, vocabCounts, dueCards } from '../stats.js';
 import { switchCharacter } from './chat.js';
 import { practice } from '../conversation.js';
-import { suggestScene } from './roleplay.js';
+import { suggestScene, openScenario } from './roleplay.js';
 import { CHARACTERS, customCharacter } from '../engine/characters.js';
 import { avatarEl } from './avatar.js';
 
@@ -104,7 +104,7 @@ export function renderHome(root) {
   if (due) step(`ทบทวนคำและประโยคที่ถึงเวลา ${num(due)} ข้อ`, 'เริ่ม', null, '#review');
   if (weak) step(`ฝึกจุดที่พลาดบ่อย: ${CATEGORIES[weak.category]} (${weak.count} ครั้งใน 30 วัน)`, 'ฝึก', () => practice(weak.category, CATEGORIES[weak.category]));
   const sc = suggestScene();
-  if (sc) step(`ลองสถานการณ์: ${sc.icon} ${sc.th}`, 'เล่น', null, '#roleplay');
+  if (sc) step(`ลองสถานการณ์: ${sc.icon} ${sc.th} (${sc.cefr[0]}–${sc.cefr[1]})`, 'ดู', () => openScenario(sc.id));
   if (n === 1) step(`เริ่มคุยกับ ${activeChar().name} สัก 10 ข้อความ เพื่อให้แอปรู้จุดแข็งจุดอ่อนของคุณ`, 'คุยเลย', null, '#chat');
   root.append(plan);
 

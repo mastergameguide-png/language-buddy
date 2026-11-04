@@ -62,6 +62,7 @@ export function promptContext(extraContext = '') {
     ieltsText: ieltsText(), learnerName: clampStr(settings.learnerName, 40), goalText: clampStr(settings.goalText, 200), feedback: settings.feedback,
     mode: modeOf(settings.mode, isEnglish()), length: pick(LENGTHS, settings.length, 'normal'), teaching: pick(TEACHING, settings.teaching, 'medium'),
     char, session, scenario: sc ? (scenarioById(sc.id) || { custom: true, th: sc.th }) : null,
+    sceneState: sc ? { variant: sc.variant, step: sc.step || 0 } : null,
     facts: memOn.learner ? state.facts : [],
     topics: memOn.learner ? Object.keys(state.topics || {}).slice(0, 5) : [],
     mistakes: state.mistakes.slice(-8).map((m) => `"${m.wrong}" → "${m.right}"`),

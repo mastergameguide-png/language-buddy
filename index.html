@@ -52,7 +52,11 @@
         <button type="button" class="btn sm" id="fixBtn" hidden>✏️ คำแก้</button>
       </div>
       <div class="scene-bar" id="sceneBar" hidden>
-        <span id="sceneText"></span>
+        <div class="scene-info">
+          <span id="sceneText"></span>
+          <div class="bar" id="sceneProgWrap" hidden><i id="sceneProg"></i></div>
+          <small id="sceneStep"></small>
+        </div>
         <button type="button" class="btn sm" id="sceneEnd">จบและขอคำแนะนำ</button>
       </div>
       <div class="messages" id="messages" aria-live="polite"></div>

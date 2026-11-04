@@ -1,5 +1,59 @@
 # Changelog
 
+## Phase 2 — Scenario learning (2026-11-04)
+
+### Schema v2 (2.1) — `js/engine/scenarios.js`
+- 13 categories instead of 5 groups.
+- New fields:
+  - `title_en`
+  - `cefr: [min, max]`
+  - `expressions` (whole useful phrases, separate from `vocab`)
+  - `flowTh` (Thai stage names)
+- Derived `steps` (`s1…sN`) and `description`.
+- `upgradeScenario()` keeps v1 entries (with `group`, no range) working, and `validateScenario()` checks the new fields.
+- New helpers: `searchScenarios`, `fitsLevel`, `attemptsOf`, `progressOf`, `matchCriteria`.
+- New generic roles: `support_agent`, `landlord`, `neighbour`, `pharmacist`.
+
+### Content (2.5) — 17 → 25 scenarios
+- New:
+  - โทรหาฝ่ายบริการลูกค้า (support)
+  - แจ้งเจ้าของห้องว่าแอร์เสีย (landlord)
+  - คุยกับเพื่อนบ้านเรื่องเสียงดัง (neighbour)
+  - ขอโทษเพื่อนที่ลืมวันเกิด (apology)
+  - สัมภาษณ์วีซ่า (visa)
+  - ขอเลื่อนส่งงานกับอาจารย์ (teacher)
+  - วันแรกที่ทำงานใหม่ (firstday)
+  - ซื้อยาที่ร้านขายยา (pharmacy)
+- Every one of the 13 categories now has at least one scenario.
+
+### Difficulty variants (2.1)
+- ง่าย / ปกติ / ยาก (`VARIANTS`), chosen before starting. Each one changes how cooperative and fast the other person is, and whether a complication happens.
+
+### Step progress (2.2)
+- During a scenario the prompt lists stage ids and asks for `scenario_step` and `scenario_done`.
+- The app only accepts valid ids and only moves forward.
+- The chat's scenario bar shows the difficulty, a progress bar and "ขั้น 2/5 · stage name".
+- When the scene is done it turns green ("✅ ทำครบตามเป้าหมายแล้ว") and highlights the end button.
+- Saved scenes get `variant`, `total`, `step` and `done`, validated by `cleanScene` in `store.js`. Older saved scenes get safe defaults.
+
+### Results and history (2.4)
+- At the end, the app note asks for `criteria_scores` using the scene's exact criterion names; IELTS asks for them too.
+- Results now store `variant`, steps reached, `done`, and per-criterion scores (1–5).
+- The details panel shows past attempts: date, character, difficulty, steps, score, criteria. It also shows the trend versus the previous attempt and a "เล่นอีกครั้งกับ …" button.
+- The activity log notes the change ("+2 จากครั้งก่อน").
+
+### Library UI (2.3) — `views/roleplay.js`
+- Search covers Thai and English titles, the description, vocabulary and phrases.
+- Category chips scroll sideways on phones; there is also a "🎯 ระดับฉัน" filter.
+- Cards show the CEFR range and "✅ N ครั้ง · ดีสุด x".
+- The details show stages in Thai, phrases, vocabulary, the difficulty picker and recommended characters.
+- The home-page plan opens the suggested scenario directly (`openScenario`). Suggestions now prefer scenarios that fit the learner's level.
+
+### Fixes found by the new tests
+- A result with no score (`null`) was counted as 0 in best score and trends (`Number(null) === 0`). Fixed in `progressOf` and in the conversation's "+N from last time".
+
+Service worker cache `buddy-v18`. The Worker is unchanged (v12).
+
 ## Phase 1 — Core AI experience (2026-11-04)
 
 ### Structure (1.1)

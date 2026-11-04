@@ -80,6 +80,12 @@ await test('new settings have defaults and quality counters are cleaned', async 
   const s = S.normalizeState({ quality: { replies: 5, tooLong: '2', evil: 9, invented: -1 } });
   if (JSON.stringify(s.quality) !== '{"replies":5,"tooLong":2}') throw new Error(JSON.stringify(s.quality));
 });
+await test('running scene: progress fields are cleaned, old scenes get defaults', async () => {
+  let s = S.normalizeState({ scene: { id: 'cafe', th: 'คาเฟ่', char: 'emma', total: 5, step: 9, done: 'yes', variant: 'brutal' } });
+  if (s.scene.step !== 5 || s.scene.done !== false || s.scene.variant !== 'normal' || s.scene.total !== 5) throw new Error(JSON.stringify(s.scene));
+  s = S.normalizeState({ scene: { id: 'hotel', th: 'โรงแรม' } });   // saved before Phase 2
+  if (s.scene.total !== 0 || s.scene.step !== 0 || s.scene.char !== 'buddy') throw new Error(JSON.stringify(s.scene));
+});
 await test('addResult keeps up to the results limit', async () => {
   S.replaceState({});
   for (let i = 0; i < 60; i++) S.addResult({ t: i, scene: 's', score: 5 });

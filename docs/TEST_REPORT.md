@@ -1,5 +1,43 @@
 # Test Report
 
+## Phase 2 — 2026-11-04
+
+### Offline suite: `node tests/run-all.mjs` — 8/8 files, 153 passed, 0 failed
+
+| File | Result |
+|---|---|
+| `scenario.test.mjs` (new) | 13 passed: 25 scenarios valid; roles and cast exist; 13 categories each used; steps and Thai labels; v1 upgrade; search (Thai, English, vocabulary, phrase); category, level and language filters; brief with stage ids, phrases, variant and current stage; `scenario_step` only during a scenario; stage and done validation; criteria parsing and matching; end note asks for criteria (also for IELTS); attempts and progress |
+| `store.test.mjs` | 14 passed (new: scene progress fields cleaned, pre-Phase-2 scenes get defaults) |
+| `engine` / `learning` / `push` / `sync` / `worker-route` / `worker-security` | 31 / 18 / 40 / 8 / 14 / 15 passed |
+
+The new tests found 1 defect, which is fixed: a `null` score was counted as 0.
+
+### Browser (mock Worker, 375 px) — all PASS
+- **Library:** 25 cards in 13 sections.
+- **Filters:**
+  - search "หมอ" → 2 results;
+  - category "สุขภาพ" → doctor and pharmacy;
+  - "ระดับฉัน" at B1 → 25 (every range includes B1).
+- **Details and start:** the café details show the level fit, stages, phrases and difficulty. Choosing "ยาก" and starting with Sofia makes the scenario bar show "· ยาก ขั้น 1/5 · ทักทายและสั่ง" at 20%.
+- **Progress:** it advanced to 2/5 and then to done (green bar, highlighted end button).
+- **End of scene:** the result is saved with `variant: hard`, `5/5`, `done`, 3 criteria scores and score 7.
+- **History:** the café card shows "✅ 2 ครั้ง · ดีสุด 8/10"; the IELTS card shows a band estimate. The details list the attempts with criteria and a "เล่นอีกครั้งกับ Sofia" button.
+- **Home shortcut:** the suggested scenario opens the library scrolled to its details.
+- No JS errors and no horizontal overflow.
+
+### Real AI — `node tests/live-scenarios.mjs` (new, approved by the owner, about 25 requests): 10/10
+- **Openings:** all 8 new scenarios open in role, report a valid stage (s1), and move forward after one learner turn (s2, or s3 for the apology scene) without wrongly saying done. Examples:
+  - the visa officer asks for the passport;
+  - the neighbour says "Yeah? Who is it?"
+  - the pharmacist asks about allergies.
+- **Full café scene:** stages went 1→2→2→4→4, then reported done.
+- **End of scene:** returned criteria scores under the scene's exact names (5, 5, 4), a score and Thai feedback.
+
+### Not tested
+- `tests/live-characters.mjs` was not re-run. The chat prompt only changed for scenes, which the scenario live test covers.
+- Real iPhone.
+- Hard vs easy behaviour with the real AI. This is prompt-only and not measured.
+
 ## Phase 1 — 2026-11-04
 
 ### Offline suite: `node tests/run-all.mjs`

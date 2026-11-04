@@ -34,6 +34,10 @@ export const ROLES = {
   local: { label: 'Local person', th: 'คนท้องถิ่น', style: 'helpful stranger on the street' },
   clerk: { label: 'Ticket clerk', th: 'พนักงานขายตั๋ว', style: 'efficient, checks destination and times' },
   pet_owner: { label: 'Pet owner', th: 'เจ้าของสัตว์เลี้ยง', style: 'worried client describing symptoms' },
+  support_agent: { label: 'Customer service agent', th: 'พนักงานบริการลูกค้า', style: 'polite phone support, follows a process, checks order details' },
+  landlord: { label: 'Landlord', th: 'เจ้าของห้องเช่า', style: 'busy, a little reluctant at first, but reasonable' },
+  neighbour: { label: 'Neighbour', th: 'เพื่อนบ้าน', style: 'surprised at first, can get a bit defensive, then open to a compromise' },
+  pharmacist: { label: 'Pharmacist', th: 'เภสัชกร', style: 'careful, asks about symptoms and allergies, explains dosage clearly' },
   scene: { label: 'Scene role', th: 'บทในสถานการณ์', style: 'the other person in the scene' },
 };
 

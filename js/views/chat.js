@@ -7,6 +7,7 @@ import { ROLES } from '../engine/characters.js';
 import { EMOTION_UI } from '../engine/emotion.js';
 import { applyRole } from '../engine/roles.js';
 import { MODES, MODE_IDS, ROLEPLAY_MODE, modeOf } from '../engine/modes.js';
+import { scenarioById, VARIANTS } from '../engine/scenarios.js';
 import { avatarEl } from './avatar.js';
 import { todayUsage, nextReset, askHelper } from '../ai.js';
 import { speak, unlockSpeech, listen, stopListening, listening, canListen } from '../speech.js';
@@ -325,12 +326,23 @@ export function renderQuota() {
   q.classList.toggle('out', !!u.out);
 }
 
+// The running scene: title, difficulty and how far it has got (stage names from the scenario data).
 function renderScene() {
   const bar = $('sceneBar');
   if (!bar) return;
   const sc = state.scene && state.scene.char === activeCharId() ? state.scene : null;
   bar.hidden = !sc;
-  if (sc) $('sceneText').textContent = `${sc.icon} กำลังฝึก: ${sc.th}`;
+  if (!sc) return;
+  const v = sc.variant && sc.variant !== 'normal' ? ` · ${VARIANTS[sc.variant]?.th || ''}` : '';
+  $('sceneText').textContent = `${sc.icon} กำลังฝึก: ${sc.th}${v}`;
+  const steps = scenarioById(sc.id)?.steps || [];
+  $('sceneProgWrap').hidden = !sc.total;
+  $('sceneProg').style.width = sc.total ? `${Math.round((sc.step / sc.total) * 100)}%` : '0';
+  const cur = steps[Math.min(steps.length - 1, Math.max(0, sc.step - 1))];
+  $('sceneStep').textContent = sc.done ? '✅ ทำครบตามเป้าหมายแล้ว — กดจบเพื่อรับคะแนนและคำแนะนำ'
+    : sc.total ? `ขั้น ${sc.step}/${sc.total}${sc.step && cur ? ` · ${cur.th}` : ' · เริ่มต้น'}` : '';
+  $('sceneEnd').classList.toggle('primary', !!sc.done);
+  bar.classList.toggle('done', !!sc.done);
 }
 
 // ---------- Thai → English helper ----------
