@@ -212,10 +212,12 @@
 
           <div class="card set-group">
             <h3>💾 ข้อมูลของคุณ</h3>
-            <div class="hint">ข้อมูลทั้งหมดเก็บในเครื่องนี้ ส่งออกเป็นไฟล์เก็บไว้ใน "ไฟล์" หรือ iCloud แล้วนำกลับมาได้ (ไม่รวมรูป)</div>
+            <div class="hint">ข้อมูลเก็บในเครื่องนี้ (และบนเซิร์ฟเวอร์ถ้าเปิดซิงก์) ส่งออกเป็นไฟล์เก็บไว้ใน "ไฟล์" หรือ iCloud แล้วนำกลับมาได้ (ไม่รวมรูป)</div>
+            <div class="storage" id="storageInfo" aria-live="polite"></div>
             <div class="row wrap-ok" style="margin-top:12px">
               <button class="btn" type="button" id="exportBtn">ส่งออกข้อมูล</button>
               <button class="btn" type="button" id="importBtn">นำเข้าข้อมูล</button>
+              <button class="btn" type="button" id="undoImport" hidden>ย้อนการนำเข้าล่าสุด</button>
               <button class="btn danger" type="button" id="resetBtn">ล้างแชต</button>
               <input type="file" id="importInput" accept="application/json,.json" hidden>
             </div>

@@ -401,3 +401,5 @@ h3.sub { font-size: var(--fs-sm); margin: 6px 0 0; }
 .cast-btn small { color: var(--muted); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cast-btn.rec b::after { content: ' ⭐'; }
 .cast-btn:hover { border-color: var(--accent); }
+.storage { margin-top: 12px; display: grid; gap: 4px; }
+.warn-text { color: var(--warn); }

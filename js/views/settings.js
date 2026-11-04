@@ -1,8 +1,8 @@
 // Settings & profile form, notification schedule, backup/restore.
-import { $, el, toast, ago } from '../util.js';
+import { $, el, h, toast, ago } from '../util.js';
 import {
   settings, state, push, setSettings, saveSettings, replaceState, persist, emit, on,
-  LANGS, CEFR, IELTS, DEFAULT_SETTINGS, cefrOf, logActivity,
+  LANGS, CEFR, IELTS, DEFAULT_SETTINGS, LIMITS, cefrOf, logActivity, storageReport,
 } from '../store.js';
 import { pushStatus, enablePush, testPush, disablePush, syncPush, hh } from '../push.js';
 import { sync, runSync, startSync, stopSync, deleteServerCopy, newCode, cleanCode, showCode } from '../sync.js';
@@ -72,6 +72,24 @@ async function syncAction(btn, job, done) {
   finally { btn.disabled = false; renderSync(); }
 }
 
+// How much space the data uses, the caps, and anything that was ever trimmed at a cap.
+function renderStorage() {
+  const box = f('storageInfo');
+  if (!box) return;
+  const r = storageReport();
+  const pct = Math.min(100, Math.round((r.kb / r.limitKb) * 100));
+  box.textContent = '';
+  box.append(
+    el('div', 'small', `ใช้พื้นที่ประมาณ ${r.kb.toLocaleString('th-TH')} KB จากราว ${r.limitKb.toLocaleString('th-TH')} KB ที่เบราว์เซอร์ให้ (${pct}%)`),
+    h('div', { class: 'bar' + (pct >= 85 ? ' bad' : pct >= 60 ? ' warn' : ''), style: 'margin:6px 0' }, h('i', { style: `width:${pct}%` })),
+  );
+  box.append(el('div', 'xs muted', `แชต ${r.counts.messages} ข้อความ (เก็บล่าสุด ${LIMITS.messagesPerChar} ข้อความต่อตัวละคร) · คำศัพท์ ${r.counts.vocab} · สมุดผิด ${r.counts.mistakes} · ผลสถานการณ์ ${r.counts.results}`));
+  const labels = { messages: 'ข้อความแชตเก่า', vocab: 'คำศัพท์', mistakes: 'ข้อผิด', results: 'ผลสถานการณ์' };
+  const gone = Object.entries(r.trimmed).filter(([, n]) => n > 0).map(([k, n]) => `${labels[k]} ${n}`);
+  if (gone.length) box.append(el('div', 'xs warn-text', `⚠️ เคยลบของเก่าที่เกินเพดานไปแล้ว: ${gone.join(' · ')} — ส่งออกข้อมูลสำรองไว้เป็นระยะเพื่อเก็บทั้งหมด`));
+  if (pct >= 85) box.append(el('div', 'xs warn-text', 'พื้นที่ใกล้เต็ม — ส่งออกข้อมูลสำรอง แล้วกด "ล้างแชต" เพื่อคืนพื้นที่ (คำศัพท์และสมุดผิดยังอยู่)'));
+}
+
 export function fillSettings() {
   f('sWorker').value = settings.workerUrl;
   f('sAccess').value = settings.accessCode;
@@ -98,6 +116,8 @@ export function fillSettings() {
   showSchedule();
   renderPush();
   renderSync();
+  renderStorage();
+  renderUndo();
 }
 
 const int = (id, min, max, dflt) => {
@@ -213,6 +233,7 @@ export function initSettings() {
     toast('ลบความจำทั้งหมดแล้ว');
   });
   f('exportBtn').addEventListener('click', exportData);
+  f('undoImport').addEventListener('click', undoImport);
   f('importBtn').addEventListener('click', () => f('importInput').click());
   f('importInput').addEventListener('change', (e) => { const file = e.target.files?.[0]; e.target.value = ''; if (file) importData(file); });
   f('resetBtn').addEventListener('click', () => {
@@ -231,6 +252,45 @@ export function applyTheme(theme) {
 }
 
 // ---------- backup ----------
+// The data as it was before the last import, kept for 7 days so an import can be undone.
+const UNDO_KEY = 'lb_undo_import';
+const UNDO_DAYS = 7;
+function saveUndo() {
+  try {
+    localStorage.setItem(UNDO_KEY, JSON.stringify({ t: Date.now(), settings, state: { ...state, messages: state.messages.map(({ photoData, ...m }) => m) } }));
+    return true;
+  } catch { return false; }
+}
+function readUndo() {
+  try {
+    const u = JSON.parse(localStorage.getItem(UNDO_KEY) || 'null');
+    if (u && Date.now() - u.t < UNDO_DAYS * 86400000 && u.state) return u;
+    localStorage.removeItem(UNDO_KEY);
+  } catch {}
+  return null;
+}
+function renderUndo() {
+  const u = readUndo();
+  f('undoImport').hidden = !u;
+  if (u) f('undoImport').textContent = `ย้อนการนำเข้าล่าสุด (ข้อมูลก่อน ${new Date(u.t).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })})`;
+}
+function undoImport() {
+  const u = readUndo();
+  if (!u) { renderUndo(); return; }
+  if (!confirm('กลับไปใช้ข้อมูลก่อนการนำเข้าครั้งล่าสุด?\n(ข้อมูลที่นำเข้าและสิ่งที่ทำหลังจากนั้นจะถูกแทนที่)')) return;
+  // The Worker link and access code stay as they are on this device.
+  const keep = { workerUrl: settings.workerUrl, accessCode: settings.accessCode };
+  setSettings({ ...DEFAULT_SETTINGS, ...(u.settings || {}), ...keep });
+  replaceState(u.state);
+  try { localStorage.removeItem(UNDO_KEY); } catch {}
+  logActivity('import', 'ย้อนการนำเข้าข้อมูล');
+  persist();
+  applyTheme(settings.theme);
+  fillSettings();
+  toast('กลับไปใช้ข้อมูลเดิมแล้ว');
+  syncPush(true);
+}
+
 async function exportData() {
   const { accessCode, ...safeSettings } = settings;   // the access code stays on this device
   const data = {
@@ -256,7 +316,8 @@ async function importData(file) {
   try { data = JSON.parse(await file.text()); } catch { toast('ไฟล์นี้อ่านไม่ได้', true); return; }
   if (data?.app !== 'language-buddy' || !data.state || !Array.isArray(data.state.messages)) { toast('ไฟล์นี้ไม่ใช่ข้อมูลสำรองของ Language Buddy', true); return; }
   const n = data.state.messages.length;
-  if (!confirm(`นำเข้าข้อมูลจาก ${String(data.exported || '').slice(0, 10)} (${n} ข้อความ)?\nข้อมูลในเครื่องตอนนี้จะถูกแทนที่`)) return;
+  if (!confirm(`นำเข้าข้อมูลจาก ${String(data.exported || '').slice(0, 10)} (${n} ข้อความ)?\nข้อมูลในเครื่องตอนนี้จะถูกแทนที่ (แอปเก็บสำเนาไว้ ย้อนกลับได้ใน 7 วัน)`)) return;
+  if (!saveUndo() && !confirm('เก็บสำเนาข้อมูลเดิมไม่ได้ (พื้นที่ในเครื่องไม่พอ)\nกด "ยกเลิก" แล้วส่งออกข้อมูลเก็บไว้ก่อน หรือกด "ตกลง" เพื่อนำเข้าเลย (ข้อมูลเดิมจะหาย)')) return;
   // Only known settings keys of the right type are taken from the file.
   const incoming = data.settings && typeof data.settings === 'object' ? data.settings : {};
   const next = { ...settings };
@@ -271,6 +332,7 @@ async function importData(file) {
   emit('state');
   applyTheme(settings.theme);
   fillSettings();
+  renderUndo();
   toast(`นำเข้าแล้ว ${n} ข้อความ`);
   syncPush(true);
 }

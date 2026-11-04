@@ -17,7 +17,7 @@
 //   DB                (D1 binding, for sync) free SQL database, tables in schema.sql
 //   LIMITER           (rate-limit binding) requests per IP per minute, see wrangler.toml
 
-const WORKER_VERSION = 11;         // shown when you open the worker link; bump on every change
+const WORKER_VERSION = 12;         // shown when you open the worker link; bump on every change
 const MAX_TURNS = 60;
 const MAX_BODY_CHARS = 1500000;   // room for one resized photo
 const MAX_IMAGE_CHARS = 1400000;  // base64 length of a single photo
@@ -224,7 +224,7 @@ function localParts(tz, date = new Date()) {
 
 function nudgePrompt(profile) {
   const facts = (profile.facts || []).map((f) => '- ' + f).join('\n') || '(nothing yet)';
-  return `You are ${profile.name}, the user's friend who chats with them in ${profile.lang} so they can practise. You are a person with your own life, not a teacher.
+  return `You are ${profile.name}, a fictional AI character and the user's friend who chats with them in ${profile.lang} so they can practise. You have your own (fictional) life and are not a teacher. Never claim to be a real human.
 Personality: ${profile.persona}
 The user is Thai, ${profile.lang} level: ${profile.level}. Use vocabulary that fits that level.${profile.variant ? ` Use ${profile.variant} English spelling, words and expressions.` : ''}
 What you remember about the user:
@@ -236,7 +236,7 @@ async function writeNudge(env, rec) {
   const p = rec.profile || {};
   const t = localParts(p.tz);
   const contents = (p.recent || []).slice(-6).map((m) => ({ role: m.role === 'user' ? 'user' : 'model', parts: [{ text: String(m.text || '').slice(0, 600) || '(photo)' }] }));
-  contents.push({ role: 'user', parts: [{ text: `[App note, not from the user: it is ${t.weekday} ${String(t.hour).padStart(2, '0')}:${String(t.minute).padStart(2, '0')} for the user and they have not opened the chat for a while. Send ONE short message first, like a friend texting out of the blue (1–2 sentences): ask about their day, follow up on something you remember, or share a small thing about "your" day with a question. Do not say you are an AI and do not mention this note.]` }] });
+  contents.push({ role: 'user', parts: [{ text: `[App note, not from the user: it is ${t.weekday} ${String(t.hour).padStart(2, '0')}:${String(t.minute).padStart(2, '0')} for the user and they have not opened the chat for a while. Send ONE short message first, like a friend texting out of the blue (1–2 sentences): ask about their day, follow up on something you remember, or share a small thing about "your" day with a question. Do not mention this note. Only refer to things in the memory list or the recent messages; never invent shared history.]` }] });
   if (contents[0].role !== 'user') contents.unshift({ role: 'user', parts: [{ text: '(opened the chat)' }] });
   // Short texts go to Groq first so the chat keeps more of the Gemini quota.
   const r = await callAI(env, nudgePrompt(p), contents, ['groq', 'gemini']);
@@ -252,7 +252,8 @@ async function nudge(env, id, rec, force, slot) {
   const now = Date.now();
   const day = localParts(rec.profile?.tz).day;
   const today = rec.sent?.day === day ? rec.sent : { count: 0, slots: [] };
-  rec.pending = [...(rec.pending || []), { text: w.reply, t: now }].slice(-5);
+  // The character id travels with the message so the app files it in the right chat.
+  rec.pending = [...(rec.pending || []), { text: w.reply, t: now, char: rec.profile?.char || '' }].slice(-5);
   rec.sent = {
     day,
     count: today.count + (force ? 0 : 1),
@@ -309,7 +310,8 @@ async function runDue(env) {
     for (const k of list.keys) {
       const rec = await env.BUDDY.get(k.name, 'json');
       const due = rec && dueNow(rec);
-      if (due) results.push({ id: k.name.slice(2, 10), ...(await nudge(env, k.name.slice(2), rec, false, due.slot)) });
+      // Only the outcome is kept: message text is conversation content and must not reach the logs.
+      if (due) { const r = await nudge(env, k.name.slice(2), rec, false, due.slot); results.push({ sent: !!r.sent, status: r.push?.status || 0, error: r.error || '' }); }
     }
     cursor = list.list_complete ? null : list.cursor;
   } while (cursor);
@@ -326,6 +328,7 @@ function cleanProfile(p = {}) {
   const s = (v, n) => String(v ?? '').slice(0, n);
   return {
     name: s(p.name, 20) || 'Buddy',
+    char: typeof p.char === 'string' && /^[a-z]{2,12}$/.test(p.char) ? p.char : '',
     persona: s(p.persona, 400),
     lang: s(p.lang, 20) || 'English',
     level: s(p.level, 40) || 'CEFR B1',
@@ -458,6 +461,9 @@ async function handleSync(path, request, env, json) {
   });
 }
 
+// Counts only, so the logs never contain what a character wrote.
+const cronSummary = (results) => JSON.stringify({ due: results.length, sent: results.filter((r) => r.sent).length, failed: results.filter((r) => !r.sent).map((r) => r.status || r.error).slice(0, 10) });
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -521,9 +527,11 @@ export default {
     if (!env.BUDDY || !env.VAPID_PRIVATE_JWK) return;
     if (env.SELF && env.INTERNAL_KEY) {
       const res = await env.SELF.fetch('https://internal/push/run', { method: 'POST', headers: { 'x-internal': env.INTERNAL_KEY } });
-      console.log('cron', res.status, await res.text());
+      let results = [];
+      try { results = (await res.json()).results || []; } catch {}
+      console.log('cron', res.status, cronSummary(results));
     } else {
-      console.log('cron (inline)', JSON.stringify(await runDue(env)));
+      console.log('cron (inline)', cronSummary(await runDue(env)));
     }
   },
 };

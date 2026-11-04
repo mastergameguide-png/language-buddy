@@ -4,7 +4,7 @@ import { CHARACTERS, ROLES, getCharacter, validateCharacter, customCharacter } f
 import { nextEmotion, expressionFor, voiceFor, baseEmotion } from '../js/engine/emotion.js';
 import { newSession, freshSession, applyRole, roleForScenario, SESSION_IDLE_MS } from '../js/engine/roles.js';
 import { remember, rememberFact, recall, expire, safeMemoryText, applyMemoryUpdates } from '../js/engine/memory.js';
-import { SCENARIOS, validateScenario, scenarioById } from '../js/engine/scenarios.js';
+import { SCENARIOS, validateScenario, scenarioById, scoreLabel, bandFromScore, resultNote } from '../js/engine/scenarios.js';
 import { parseStructured, mapCategory } from '../js/engine/response.js';
 import { buildSystemPrompt, CEFR_GUIDE } from '../js/engine/prompt.js';
 
@@ -197,6 +197,16 @@ test('prompt: Thai particle follows the character', () => {
   assert.ok(buildSystemPrompt(ctx({ char: char('david'), session: newSession(char('david')) })).includes('ครับ'));
   assert.ok(buildSystemPrompt(ctx()).includes('ค่ะ'));
   assert.ok(buildSystemPrompt(ctx()).includes('Never invent shared history'));
+});
+
+test('IELTS results are labelled as practice estimates, other scenes as x/10', () => {
+  assert.equal(bandFromScore(10), 9); assert.equal(bandFromScore(7.2), 6.5); assert.equal(bandFromScore(-3), 0);
+  assert.equal(scoreLabel({ id: 'ielts', score: 7.2 }), '≈ band 6.5 (ประมาณการ)');
+  assert.equal(scoreLabel({ scene: 'สอบพูด IELTS', score: 8 }), '≈ band 7.0 (ประมาณการ)');   // older results had no id
+  assert.equal(scoreLabel({ id: 'cafe', score: 7 }), '7/10');
+  assert.equal(scoreLabel({ id: 'cafe', score: null }), null);
+  assert.match(resultNote({ id: 'ielts' }), /ไม่ใช่คะแนนสอบ IELTS จริง/);
+  assert.match(scenarioById('ielts').feedback, /practice estimate/);
 });
 
 console.log(`\nall ${passed} engine tests passed`);

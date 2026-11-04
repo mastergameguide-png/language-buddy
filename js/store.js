@@ -73,9 +73,30 @@ const EMPTY_STATE = () => ({
   v: STATE_VERSION, messages: [], facts: [], mistakes: [], vocab: [], scene: null, lastSeen: 0,
   days: {}, activity: [], results: [],
   charMemory: {}, sessions: {}, skills: {}, topics: {},
+  trimmed: {},
 });
-export const HISTORY_KEPT = 300;
-export const HISTORY_DAYS = 120;   // chat messages older than this are not kept
+// How much is kept on this device. Learning records (words, mistakes) are only trimmed at a
+// very high safety cap, and anything trimmed is counted in state.trimmed and shown in Settings,
+// so nothing disappears silently. Chat keeps the latest messages per character.
+export const LIMITS = { messagesPerChar: 500, mistakes: 5000, vocab: 5000, results: 500, activity: 40, days: 730 };
+const TRIM_KINDS = ['messages', 'mistakes', 'vocab', 'results'];
+
+// Keeps the newest `max` items and counts what was removed in s.trimmed[kind].
+function capList(s, kind, list, max) {
+  if (list.length <= max) return list;
+  if (TRIM_KINDS.includes(kind)) s.trimmed[kind] = (s.trimmed[kind] || 0) + list.length - max;
+  return list.slice(-max);
+}
+// Chat: the newest LIMITS.messagesPerChar messages of each character's thread.
+function capMessages(s, list) {
+  const per = {};
+  for (const m of list) per[m.char || 'buddy'] = (per[m.char || 'buddy'] || 0) + 1;
+  if (Object.values(per).every((n) => n <= LIMITS.messagesPerChar)) return list;
+  const drop = Object.fromEntries(Object.entries(per).map(([k, n]) => [k, Math.max(0, n - LIMITS.messagesPerChar)]));
+  const out = list.filter((m) => { const k = m.char || 'buddy'; if (drop[k] > 0) { drop[k]--; return false; } return true; });
+  s.trimmed.messages = (s.trimmed.messages || 0) + list.length - out.length;
+  return out;
+}
 
 // ---------- storage ----------
 export function load(key, fallback) {
@@ -137,13 +158,15 @@ function cleanMessage(m) {
 // Accepts any older or imported shape and returns a valid current state.
 export function normalizeState(raw) {
   const s = { ...EMPTY_STATE(), ...(raw && typeof raw === 'object' ? raw : {}) };
-  s.messages = (Array.isArray(s.messages) ? s.messages : []).map(cleanMessage).filter(Boolean).slice(-HISTORY_KEPT);
+  const t = s.trimmed && typeof s.trimmed === 'object' ? s.trimmed : {};
+  s.trimmed = Object.fromEntries(TRIM_KINDS.filter((k) => Number(t[k]) > 0).map((k) => [k, Math.floor(Number(t[k]))]));
+  s.messages = capMessages(s, (Array.isArray(s.messages) ? s.messages : []).map(cleanMessage).filter(Boolean));
   s.facts = (Array.isArray(s.facts) ? s.facts : []).map((f) => str(f, 160)).filter(Boolean).slice(-40);
-  s.mistakes = (Array.isArray(s.mistakes) ? s.mistakes : []).map(cleanMistake).filter(Boolean).slice(-300);
-  s.vocab = (Array.isArray(s.vocab) ? s.vocab : []).map(cleanWord).filter(Boolean).slice(-500);
+  s.mistakes = capList(s, 'mistakes', (Array.isArray(s.mistakes) ? s.mistakes : []).map(cleanMistake).filter(Boolean), LIMITS.mistakes);
+  s.vocab = capList(s, 'vocab', (Array.isArray(s.vocab) ? s.vocab : []).map(cleanWord).filter(Boolean), LIMITS.vocab);
   s.days = s.days && typeof s.days === 'object' ? s.days : {};
-  s.activity = (Array.isArray(s.activity) ? s.activity : []).slice(-40);
-  s.results = (Array.isArray(s.results) ? s.results : []).slice(-50);
+  s.activity = (Array.isArray(s.activity) ? s.activity : []).slice(-LIMITS.activity);
+  s.results = capList(s, 'results', Array.isArray(s.results) ? s.results : [], LIMITS.results);
   s.scene = s.scene && typeof s.scene === 'object' && (s.scene.en || s.scene.id || s.scene.th) ? { ...s.scene, char: CHARACTER_IDS.includes(s.scene.char) ? s.scene.char : 'buddy' } : null;
   const obj = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
   s.charMemory = Object.fromEntries(Object.entries(obj(s.charMemory)).filter(([k, v]) => CHARACTER_IDS.includes(k) && Array.isArray(v))
@@ -164,8 +187,8 @@ export function setSettings(next) { settings = { ...DEFAULT_SETTINGS, ...next };
 export function saveSettings() { save('lb_settings', settings); emit('settings'); }
 export function replaceState(next) { state = normalizeState(next); persist(); emit('state'); }
 export function persist() {
-  const oldest = Date.now() - HISTORY_DAYS * 86400000;
-  state.messages = state.messages.filter((m) => m.t >= oldest).slice(-HISTORY_KEPT);
+  state.trimmed ||= {};
+  state.messages = capMessages(state, state.messages);
   save('lb_state', { ...state, messages: state.messages.map(({ photoData, ...m }) => m) });
 }
 export function savePush() { save('lb_push', push); }
@@ -180,6 +203,22 @@ window.addEventListener('storage', (e) => {
 const listeners = {};
 export function on(name, fn) { (listeners[name] ||= []).push(fn); }
 export function emit(name, data) { for (const fn of listeners[name] || []) { try { fn(data); } catch (e) { console.error(e); } } }
+
+export function addResult(r) {
+  state.results.push(r);
+  state.results = capList(state, 'results', state.results, LIMITS.results);
+}
+
+// Size of this app's data in localStorage (characters ≈ bytes for the browser's ~5 MB limit).
+export function storageReport() {
+  let chars = 0;
+  try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k.startsWith('lb_')) chars += k.length + (localStorage.getItem(k) || '').length; } } catch {}
+  return {
+    kb: Math.round(chars / 1024), limitKb: 5000,
+    counts: { messages: state.messages.length, mistakes: state.mistakes.length, vocab: state.vocab.length, results: state.results.length },
+    trimmed: { ...state.trimmed },
+  };
+}
 
 // ---------- characters ----------
 export const charOf = (m) => m.char || 'buddy';
@@ -210,7 +249,7 @@ export const flag = () => (isEnglish() ? (settings.variant === 'British' ? '🇬
 
 export function logActivity(type, text) {
   state.activity.push({ t: Date.now(), type, text: clampStr(text, 120) });
-  state.activity = state.activity.slice(-40);
+  state.activity = state.activity.slice(-LIMITS.activity);
 }
 
 export function addMistake(c) {
@@ -224,7 +263,7 @@ export function addMistake(c) {
   }
   const m = { id: uid(), ...c, t: Date.now(), srs: newCard() };
   state.mistakes.push(m);
-  state.mistakes = state.mistakes.slice(-300);
+  state.mistakes = capList(state, 'mistakes', state.mistakes, LIMITS.mistakes);
   return m;
 }
 
@@ -233,7 +272,7 @@ export function addWord(w) {
   if (!word || state.vocab.some((v) => v.word.toLowerCase() === word.toLowerCase())) return null;
   const v = { id: uid(), word, meaning: clampStr(w.meaning, 200), example: clampStr(w.example, 300), t: Date.now(), srs: newCard() };
   state.vocab.push(v);
-  state.vocab = state.vocab.slice(-500);
+  state.vocab = capList(state, 'vocab', state.vocab, LIMITS.vocab);
   return v;
 }
 

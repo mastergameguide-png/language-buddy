@@ -1,6 +1,7 @@
 // "Buddy messages first": Web Push subscription, profile sync and the inbox of messages the
 // Worker wrote while the app was closed.
 import { settings, state, push, savePush, persist, emit, levelText, isEnglish, activeChar, activeCharId, threadOf } from './store.js';
+import { CHARACTER_IDS } from './engine/characters.js';
 import { workerBase, authHeaders } from './ai.js';
 
 export const pushSupported = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
@@ -16,7 +17,7 @@ function personaLine() {
 
 export function pushProfile() {
   return {
-    name: activeChar().name, persona: personaLine(), lang: settings.lang, level: levelText(), variant: isEnglish() ? settings.variant : '',
+    name: activeChar().name, char: activeCharId(), persona: personaLine(), lang: settings.lang, level: levelText(), variant: isEnglish() ? settings.variant : '',
     tz: Intl.DateTimeFormat().resolvedOptions().timeZone, perDay: Number(settings.perDay) || 0,
     mode: settings.pushMode, from: settings.pushFrom, to: settings.pushTo, times: settings.pushTimes,
     facts: state.facts.slice(-20),
@@ -55,8 +56,11 @@ export async function fetchInbox() {
   try {
     const { messages = [] } = await pushApi('inbox', null, 'GET');
     if (!messages.length) return [];
-    const char = activeCharId();
-    for (const m of messages) state.messages.push({ role: 'model', text: String(m.text).slice(0, 4000), t: Number(m.t) || Date.now(), ...(char !== 'buddy' ? { char } : {}) });
+    // Each message names the character that wrote it (older Workers did not: use the active one).
+    for (const m of messages) {
+      const char = CHARACTER_IDS.includes(m.char) ? m.char : activeCharId();
+      state.messages.push({ role: 'model', text: String(m.text).slice(0, 4000), t: Number(m.t) || Date.now(), ...(char !== 'buddy' ? { char } : {}) });
+    }
     state.messages.sort((a, b) => a.t - b.t);
     state.lastSeen = Date.now();
     persist();

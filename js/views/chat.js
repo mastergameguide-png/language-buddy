@@ -1,13 +1,14 @@
 // AI conversation: messages, inline feedback, new words, photos, voice, role-play bar.
 import { $, el, h, icon, fmtTime, toast } from '../util.js';
 import {
-  settings, state, persist, emit, on, addMistake, addWord, logActivity, CATEGORIES, levelShort, flag, saveSettings,
+  settings, state, persist, emit, on, addMistake, addWord, addResult, logActivity, CATEGORIES, levelShort, flag, saveSettings,
   activeChar, activeCharId, sessionOf, threadOf,
 } from '../store.js';
 import { getCharacter, ROLES, CHARACTER_IDS } from '../engine/characters.js';
 import { nextEmotion, EMOTION_UI } from '../engine/emotion.js';
 import { applyRole, roleForScenario } from '../engine/roles.js';
 import { applyMemoryUpdates } from '../engine/memory.js';
+import { scoreLabel } from '../engine/scenarios.js';
 import { avatarEl } from './avatar.js';
 import { askAI, todayUsage, nextReset } from '../ai.js';
 import { speak, unlockSpeech, listen, stopListening, listening, canListen } from '../speech.js';
@@ -95,7 +96,6 @@ export function renderChat() {
     b.append(more);
   }
   for (const m of msgs.slice(start)) b.append(renderMessage(m));
-  const last = msgs[msgs.length - 1];
   showSuggestions();
   if (!settings.workerUrl) notice('ยังไม่ได้ใส่ลิงก์ Cloudflare Worker — ใส่ในหน้าตั้งค่าก่อนเริ่มคุย', false, 'เปิดตั้งค่า', () => { location.hash = '#settings'; });
   if (waiting) typing(true);
@@ -281,9 +281,10 @@ function applyAI(ai, userMsg, opts) {
     logActivity('word', `คำใหม่: ${ai.newWord.word}`);
   }
   if (opts.feedbackFor) {
-    state.results.push({ t: Date.now(), icon: opts.feedbackFor.icon, scene: opts.feedbackFor.th, char: char.id, score: ai.score, summary: ai.reply.slice(0, 400) });
-    state.results = state.results.slice(-50);
-    logActivity('roleplay', `จบสถานการณ์ ${opts.feedbackFor.th} กับ ${char.name}${ai.score != null ? ` · ${ai.score}/10` : ''}`);
+    const result = { t: Date.now(), id: opts.feedbackFor.id || null, icon: opts.feedbackFor.icon, scene: opts.feedbackFor.th, char: char.id, score: ai.score, summary: ai.reply.slice(0, 400) };
+    addResult(result);
+    const label = scoreLabel(result);
+    logActivity('roleplay', `จบสถานการณ์ ${opts.feedbackFor.th} กับ ${char.name}${label ? ` · ${label}` : ''}`);
   }
   state.messages.push(botMsg);
   state.lastSeen = Date.now();

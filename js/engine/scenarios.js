@@ -3,7 +3,7 @@
 // aiRoles: roles the character may take, best match first (see ROLES in characters.js).
 // cast: characters that fit best (shown first when choosing who to practise with).
 
-const IELTS_FEEDBACK = 'As an IELTS examiner, estimate the user\'s band for each criterion — Fluency and Coherence, Lexical Resource, Grammatical Range and Accuracy (pronunciation cannot be judged from text, say so) — and an overall band, based only on what they wrote. Then give 3 specific ways to reach the next half band, each with a better version of one of their own sentences. For "score", use the overall band scaled to 0–10 (band 9 = 10).';
+const IELTS_FEEDBACK = 'Start by saying clearly (in Thai) that this is a practice estimate from typed answers, not an official IELTS score. As an IELTS examiner, estimate the user\'s band for each criterion — Fluency and Coherence, Lexical Resource, Grammatical Range and Accuracy (pronunciation cannot be judged from text, say so) — and an overall band, based only on what they wrote. Then give 3 specific ways to reach the next half band, each with a better version of one of their own sentences. For "score", use the overall band scaled to 0–10 (band 9 = 10).';
 
 export const SCENARIO_GROUPS = [
   { id: 'daily', th: 'ชีวิตประจำวัน' },
@@ -159,7 +159,7 @@ export const SCENARIOS = [
     criteria: ['past narrative', 'describing people and things', 'formal politeness'], cast: ['alex'],
   },
   {
-    id: 'ielts', group: 'exam', icon: '🎓', th: 'สอบพูด IELTS', sub: 'Part 1–3 พร้อมประเมิน band', englishOnly: true, feedback: IELTS_FEEDBACK,
+    id: 'ielts', group: 'exam', icon: '🎓', th: 'สอบพูด IELTS', sub: 'Part 1–3 · ประมาณ band จากการฝึก', englishOnly: true, feedback: IELTS_FEEDBACK,
     environment: 'An IELTS Speaking test room.', aiRoles: ['speaking_examiner'], userRole: 'candidate',
     objectives: ['Answer Part 1 questions with some detail', 'Speak for 1–2 minutes on the Part 2 card', 'Discuss Part 3 questions with reasons and examples'],
     difficulty: 'B2', vocab: ['I\'d say', 'on the other hand', 'it depends on', 'for instance', 'in my experience'],
@@ -170,6 +170,18 @@ export const SCENARIOS = [
 ];
 
 export const scenarioById = (id) => SCENARIOS.find((s) => s.id === id) || null;
+
+// IELTS results are practice estimates from typed text, never official scores.
+export const IELTS_NOTE_TH = 'ประมาณการจากการฝึกด้วยการพิมพ์ ไม่ใช่คะแนนสอบ IELTS จริง (การออกเสียงยังไม่ได้ประเมิน)';
+const isIelts = (r) => r && (r.id === 'ielts' || r.scene === 'สอบพูด IELTS');
+// The model reports IELTS as the overall band scaled to 0–10 (band 9 = 10); turn it back into a band.
+export const bandFromScore = (score) => Math.max(0, Math.min(9, Math.round(((Number(score) * 9) / 10) * 2) / 2));
+// Short label for a role-play result: "7/10" or "≈ band 6.5 (ประมาณการ)".
+export function scoreLabel(r) {
+  if (!r || r.score == null || !Number.isFinite(Number(r.score))) return null;
+  return isIelts(r) ? `≈ band ${bandFromScore(r.score).toFixed(1)} (ประมาณการ)` : `${r.score}/10`;
+}
+export const resultNote = (r) => (isIelts(r) ? IELTS_NOTE_TH : '');
 
 // Text for the model: guidance, not a script.
 export function scenarioBrief(sc, roleLabel) {

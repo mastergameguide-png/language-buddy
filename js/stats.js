@@ -4,7 +4,7 @@ import { state, persist } from './store.js';
 import { dayKey } from './util.js';
 import { status, isDue } from './srs.js';
 
-const KEEP_DAYS = 180;
+const KEEP_DAYS = 730;   // per-day records are tiny; two years of history
 const ACTIVE_WINDOW = 90 * 1000;   // counts as learning time if the user did something in the last 90 s
 const TICK = 15 * 1000;
 

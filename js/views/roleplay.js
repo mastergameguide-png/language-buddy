@@ -1,7 +1,7 @@
 // Role-play: scenarios grouped by theme; choosing one shows its goals and who to practise with.
 import { el, h, fmtDate } from '../util.js';
 import { settings, state, isEnglish, activeCharId } from '../store.js';
-import { SCENARIOS, SCENARIO_GROUPS } from '../engine/scenarios.js';
+import { SCENARIOS, SCENARIO_GROUPS, scoreLabel, resultNote, IELTS_NOTE_TH } from '../engine/scenarios.js';
 import { CHARACTERS, getCharacter, ROLES } from '../engine/characters.js';
 import { roleForScenario } from '../engine/roles.js';
 import { avatarEl } from './avatar.js';
@@ -23,6 +23,7 @@ function details(s, root) {
   box.append(
     h('div', { class: 'row' }, el('span', 'em', s.icon), h('div', { class: 'grow' }, el('b', '', s.th), el('div', 'xs muted', `${s.environment} · ระดับประมาณ ${s.difficulty}`))),
     el('span', 'label', `คุณเป็น: ${s.userRole}`),
+    ...(s.id === 'ielts' ? [el('p', 'xs warn-text', '⚠️ ' + IELTS_NOTE_TH)] : []),
     el('span', 'label', 'เป้าหมาย'), li(s.objectives),
     el('span', 'label', 'คำ/วลีที่จะได้ใช้'), h('div', { class: 'chips' }, ...s.vocab.map((v) => el('span', 'chip', v))),
     el('span', 'label', 'ฝึกกับใคร'),
@@ -85,11 +86,14 @@ export function renderRoleplay(root) {
     root.append(el('h2', 'sec', 'ผลการฝึกล่าสุด'));
     const list = h('div', { class: 'list' });
     for (const r of res) {
-      const score = r.score == null ? null : el('span', 'chip ' + (r.score >= 7 ? 'good' : r.score >= 5 ? 'warn' : 'bad'), `${r.score}/10`);
+      const label = scoreLabel(r);
+      const score = label == null ? null : el('span', 'chip ' + (r.score >= 7 ? 'good' : r.score >= 5 ? 'warn' : 'bad'), label);
       const who = r.char ? ` · ${getCharacter(r.char, settings).name}` : '';
       const item = h('div', { class: 'item', style: 'flex-direction:column; align-items:stretch; cursor:pointer' },
         h('div', { class: 'row' }, el('span', 'ico', r.icon || '🎭'), el('span', 'grow small', r.scene + who), score, el('span', 'xs muted', fmtDate(r.t))));
-      const sum = el('div', 'small muted', r.summary);
+      const sum = el('div', 'small muted', r.summary + (resultNote(r) ? `
+
+⚠️ ${resultNote(r)}` : ''));
       sum.hidden = true;
       sum.style.whiteSpace = 'pre-wrap';
       item.append(sum);

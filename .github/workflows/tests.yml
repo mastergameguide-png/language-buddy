@@ -1,0 +1,16 @@
+# Runs the offline test suite (no network, no AI quota, no secrets) on every push and pull request.
+name: tests
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  offline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: node tests/run-all.mjs
