@@ -39,10 +39,14 @@ Owner decisions recorded:
 - `node tests/run-all.mjs` runs every `*.test.mjs` file.
 - `.github/workflows/tests.yml` runs the offline suite on every push and pull request. It needs no secrets and uses no AI quota.
 
+### Updates arrive consistently
+- The service worker now revalidates every app file with the server (`cache: 'no-cache'`, a quick 304 when unchanged). Its install step bypasses the HTTP cache. It no longer stores error responses.
+- Before this, GitHub Pages' 10-minute browser cache could mix a new `index.html` with old scripts right after a deploy.
+- Cache `buddy-v16`.
+
 ### Other
 - README: the scenario count, the IELTS disclaimer, where data is stored, the caps and how to run tests.
 - `views/chat.js`: removed an unused variable.
-- Service worker cache `buddy-v15`.
 
 ### Not changed
 - Access control (R-H1): owner's decision.

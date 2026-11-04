@@ -35,10 +35,11 @@ The new tests found one real defect, which is fixed: `cleanProfile({})` stored t
 |---|---|
 | Worker deployed; `GET /` reports `version: 12`, push and sync on, both AIs | PASS |
 | `POST /` from another origin → 403 | PASS |
-| GitHub Pages serves `buddy-v15` | see the commit notes for this phase (checked after push) |
+| GitHub Actions `tests` workflow on the push (run 41773535413) | PASS: 6/6 files, same counts as local |
+| GitHub Pages serves the new service worker; the live app registers it and shows the storage meter | PASS (`buddy-v16`), after the fix below |
+| **Defect found during the deploy check:** right after a deploy the live page ran the new `index.html` with old scripts, because the service worker fetched through the browser's 10-minute HTTP cache (GitHub Pages `max-age=600`). This existed before Phase 0.5. | FIXED in `c1fb73f`: `cache: 'no-cache'` on fetch, `cache: 'reload'` on install; checked live |
 
 ### Not tested
 - Real iPhone: PWA update, push delivery with the new character tag, storage meter on Safari.
 - Real AI quality: `tests/live-characters.mjs`. No prompt behaviour changed in the chat path, so it was not run, to save quota.
 - The IELTS examiner prompt change with the real model: the result labels are computed by the app, so they do not depend on the model.
-- The GitHub Actions run itself: it runs on GitHub after the push.
