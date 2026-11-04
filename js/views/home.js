@@ -2,7 +2,8 @@
 import { el, h, icon, num, fmtMinutes, ago } from '../util.js';
 import { settings, state, levelShort, cefrOf, CEFR, CATEGORIES, weakAreas, flag, activeChar, activeCharId } from '../store.js';
 import { today, streak, lastDays, totals, accuracy, vocabCounts, dueCards } from '../stats.js';
-import { practice, switchCharacter } from './chat.js';
+import { switchCharacter } from './chat.js';
+import { practice } from '../conversation.js';
 import { suggestScene } from './roleplay.js';
 import { CHARACTERS, customCharacter } from '../engine/characters.js';
 import { avatarEl } from './avatar.js';

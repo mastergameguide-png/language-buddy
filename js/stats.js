@@ -11,6 +11,8 @@ const TICK = 15 * 1000;
 export function today() {
   const k = dayKey();
   const d = (state.days[k] ||= { msgs: 0, checked: 0, corrected: 0, secs: 0, reviews: 0, words: 0, voice: 0 });
+  // Fields added later start at 0 on older days.
+  for (const f of ['hints', 'hintFull', 'helper']) d[f] ||= 0;
   return d;
 }
 function prune() {
@@ -30,6 +32,9 @@ export function recordMessage(text, corrected, voice) {
   prune();
 }
 export function recordReview() { today().reviews += 1; }
+// level: the highest hint step the learner opened before answering (4 = saw a full example).
+export function recordHint(level) { const d = today(); d.hints += 1; if (level >= 4) d.hintFull += 1; }
+export function recordHelper() { today().helper += 1; }
 export function recordWord() { today().words += 1; }
 
 let lastAction = Date.now();
@@ -72,11 +77,12 @@ export function lastDays(n = 7) {
 }
 
 export function totals() {
-  let secs = 0, msgs = 0, checked = 0, corrected = 0, reviews = 0, voice = 0;
+  let secs = 0, msgs = 0, checked = 0, corrected = 0, reviews = 0, voice = 0, hints = 0, hintFull = 0, helper = 0;
   for (const d of Object.values(state.days)) {
     secs += d.secs || 0; msgs += d.msgs || 0; checked += d.checked || 0; corrected += d.corrected || 0; reviews += d.reviews || 0; voice += d.voice || 0;
+    hints += d.hints || 0; hintFull += d.hintFull || 0; helper += d.helper || 0;
   }
-  return { secs, msgs, checked, corrected, reviews, voice };
+  return { secs, msgs, checked, corrected, reviews, voice, hints, hintFull, helper };
 }
 
 // Share of checked messages with no correction; null when there is too little to say.

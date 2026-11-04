@@ -25,7 +25,8 @@ This describes what the code does today, read from the source files (not from RE
 ```
 index.html ── js/main.js (router, badges, boot)
                ├─ js/store.js      settings + state, migration/validation (normalizeState), event bus
-               ├─ js/ai.js         prompt context, request building, Worker call, quota counter
+               ├─ js/ai.js         prompt context, request building, Worker call (chat + Thai→English helper), quota counter
+               ├─ js/conversation.js  (Phase 1) turn orchestration without DOM; emits chat:* events to the chat view
                ├─ js/speech.js     TTS + speech recognition (browser)
                ├─ js/stats.js      per-day counters, streak, accuracy, due cards
                ├─ js/srs.js        simplified SM-2 spaced repetition
@@ -38,7 +39,9 @@ index.html ── js/main.js (router, badges, boot)
                │    memory.js      dedupe, sensitive-text filter, recall, expiry
                │    scenarios.js   17 scenarios as data (5 groups)
                │    response.js    untrusted AI JSON → validated object
-               │    prompt.js      system prompt builder
+               │    prompt.js      system prompt builder, app notes, helper prompt
+               │    modes.js       conversation modes, response length, teaching intensity, correction timing
+               │    checks.js      reply quality flags (counted, never rewritten)
                └─ js/views/        DOM per page: home, chat, characters, review, roleplay, me, settings, avatar
 ```
 

@@ -5,7 +5,8 @@ import { newCard } from './srs.js';
 import { getCharacter, CHARACTER_IDS, EMOTIONS, ROLES } from './engine/characters.js';
 import { freshSession } from './engine/roles.js';
 import { expire } from './engine/memory.js';
-import { SKILLS } from './engine/response.js';
+import { SKILLS, FEEDBACK_TYPES, hintsOf } from './engine/response.js';
+import { QUALITY_KEYS } from './engine/checks.js';
 
 export const LANGS = {
   English: { code: 'en-US', label: 'English (อังกฤษ)' },
@@ -66,6 +67,10 @@ export const DEFAULT_SETTINGS = {
   memoryLearner: true,          // shared learner memory: facts the characters learn about you
   memoryCharacter: true,        // each character remembers its own past chats with you
   adaptiveVoice: true,          // speech speed follows the level, tone follows the character's mood
+  mode: 'natural',              // conversation mode (engine/modes.js); role-play takes over during a scenario
+  length: 'normal',             // how long the character's messages are: short / normal / long
+  teaching: 'medium',           // teaching intensity: low / medium / high
+  correctionTiming: 'after_turn', // immediate (open) / after_turn (folded) / end (collected, shown on request)
 };
 
 export const STATE_VERSION = 2;
@@ -73,7 +78,7 @@ const EMPTY_STATE = () => ({
   v: STATE_VERSION, messages: [], facts: [], mistakes: [], vocab: [], scene: null, lastSeen: 0,
   days: {}, activity: [], results: [],
   charMemory: {}, sessions: {}, skills: {}, topics: {},
-  trimmed: {},
+  trimmed: {}, quality: {},
 });
 // How much is kept on this device. Learning records (words, mistakes) are only trimmed at a
 // very high safety cap, and anything trimmed is counted in state.trimmed and shown in Settings,
@@ -122,6 +127,10 @@ function cleanCorrection(c) {
     wrong: str(c.wrong, 600), right: str(c.right, 600), why: str(c.why, 600),
     category: CATEGORIES[c.category] ? c.category : 'other',
     natural: str(c.natural, 600), example: str(c.example, 400),
+    type: FEEDBACK_TYPES.includes(c.type) ? c.type : c.category === 'naturalness' ? 'unnatural' : 'error',
+    ...(c.th ? { th: str(c.th, 400) } : {}),
+    // Only corrections collected for the end-of-session summary carry seen:false; older ones have no flag.
+    ...(c.seen === false ? { seen: false } : {}),
   };
 }
 function cleanMistake(m) {
@@ -152,6 +161,9 @@ function cleanMessage(m) {
   const c = cleanCorrection(m.correction);
   if (c) out.correction = c;
   if (m.newWord && m.newWord.word) out.newWord = { word: str(m.newWord.word, 80), meaning: str(m.newWord.meaning, 200) };
+  if (m.role === 'model' && m.hints) { const hs = hintsOf(m.hints); if (hs) out.hints = hs; }
+  if (m.role === 'user' && [1, 2, 3, 4].includes(m.hint)) out.hint = m.hint;   // highest hint level used for this answer
+  if (m.role === 'user' && m.helper) out.helper = true;                          // written with the Thai→English helper
   return out;
 }
 
@@ -174,6 +186,7 @@ export function normalizeState(raw) {
   s.sessions = Object.fromEntries(Object.entries(obj(s.sessions)).filter(([k, v]) => CHARACTER_IDS.includes(k) && v && typeof v === 'object'));
   s.skills = Object.fromEntries(Object.entries(obj(s.skills)).filter(([k, v]) => SKILLS.includes(k) && Array.isArray(v)).map(([k, v]) => [k, v.map(Number).filter((n) => n >= 1 && n <= 5).slice(-30)]));
   s.topics = Object.fromEntries(Object.entries(obj(s.topics)).filter(([, n]) => Number(n) > 0).sort((a, b) => b[1] - a[1]).slice(0, 30).map(([k, n]) => [str(k, 60), Number(n)]));
+  s.quality = Object.fromEntries(QUALITY_KEYS.map((k) => [k, Math.max(0, Math.floor(Number(s.quality?.[k]) || 0))]).filter(([, n]) => n));
   s.lastSeen = Number(s.lastSeen) || 0;
   s.v = STATE_VERSION;
   return s;

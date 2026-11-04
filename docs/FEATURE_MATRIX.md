@@ -1,5 +1,18 @@
 # Language Buddy — Feature Matrix
 
+> **Update after Phase 1 (2026-11-04).** These are now **IMPLEMENTED**:
+> - conversation modes;
+> - correction timing;
+> - response length and teaching intensity;
+> - feedback type (error / unnatural / style) and Thai translation;
+> - the graded hint ladder with use/speak and hint tracking;
+> - the Thai→English helper;
+> - push character identity (Phase 0.5);
+> - the IELTS practice-estimate label (Phase 0.5);
+> - Worker/sync/push tests in the repo (Phase 0.5).
+>
+> The tables below are the original Phase 0 audit and are kept for reference.
+
 Audit date: 2026-11-04 · Commit `a8124fe`
 
 Status values:

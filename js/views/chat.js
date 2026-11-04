@@ -1,59 +1,71 @@
-// AI conversation: messages, inline feedback, new words, photos, voice, role-play bar.
+// Chat screen: messages, inline feedback, reply ideas and hints, the Thai→English helper, photos,
+// voice, and the role / mode / mood bar. Talking to the AI lives in ../conversation.js; this file
+// only draws and reacts to its events.
 import { $, el, h, icon, fmtTime, toast } from '../util.js';
-import {
-  settings, state, persist, emit, on, addMistake, addWord, addResult, logActivity, CATEGORIES, levelShort, flag, saveSettings,
-  activeChar, activeCharId, sessionOf, threadOf,
-} from '../store.js';
-import { getCharacter, ROLES, CHARACTER_IDS } from '../engine/characters.js';
-import { nextEmotion, EMOTION_UI } from '../engine/emotion.js';
-import { applyRole, roleForScenario } from '../engine/roles.js';
-import { applyMemoryUpdates } from '../engine/memory.js';
-import { scoreLabel } from '../engine/scenarios.js';
+import { settings, state, persist, on, CATEGORIES, levelShort, flag, saveSettings, isEnglish, activeChar, activeCharId, sessionOf, threadOf } from '../store.js';
+import { ROLES } from '../engine/characters.js';
+import { EMOTION_UI } from '../engine/emotion.js';
+import { applyRole } from '../engine/roles.js';
+import { MODES, MODE_IDS, ROLEPLAY_MODE, modeOf } from '../engine/modes.js';
 import { avatarEl } from './avatar.js';
-import { askAI, todayUsage, nextReset } from '../ai.js';
+import { todayUsage, nextReset, askHelper } from '../ai.js';
 import { speak, unlockSpeech, listen, stopListening, listening, canListen } from '../speech.js';
-import { recordMessage, recordWord, today } from '../stats.js';
-import { syncPush } from '../push.js';
+import { run, isBusy, isWaiting, setCharacter, maybeGreet, endScene, unseenCorrections, markCorrectionsSeen } from '../conversation.js';
+
+export { maybeGreet };
 
 const PHOTO_MAX_SIDE = 1024;
-const GREET_AFTER_MS = 3 * 60 * 60 * 1000;
 const SHOW_LAST = 150;
+const THAI = /[฀-๿]/;
 
-let busy = false;
-let waiting = false;              // true only while a request to the AI is in flight
 let pendingPhoto = null;           // { dataUrl, mimeType, data } waiting to be sent
 let lastInputWasVoice = false;
 let showAll = false;
+let hint = { t: 0, level: 0 };     // how far the learner opened the hint ladder for the latest message
+let helperText = '';               // the sentence the learner took from the Thai→English helper
 const photoCache = {};             // message time -> dataUrl; photos are not saved to storage (too big)
 
 const box = () => $('messages');
 const input = () => $('chatInput');
 const scrollDown = () => requestAnimationFrame(() => { const b = box(); if (b) b.scrollTop = b.scrollHeight; });
+const lastBot = () => { const t = threadOf(); const m = t[t.length - 1]; return m && m.role === 'model' ? m : null; };
+
+function fillInput(text) { input().value = text; autoGrow(); refreshSend(); refreshHelper(); input().focus(); }
 
 // ---------- rendering ----------
+const FIX_KIND = {
+  error: { icon: '✏️', chip: (c) => CATEGORIES[c.category] || 'อื่นๆ' },
+  unnatural: { icon: '🗣️', chip: () => 'ฟังเป็นธรรมชาติกว่า' },
+  style: { icon: '💡', chip: () => 'ทางเลือก (ไม่ผิด)' },
+};
+
 function feedbackCard(c) {
-  const wrap = el('div', 'feedback');
+  const kind = FIX_KIND[c.type] || FIX_KIND.error;
+  const wrap = el('div', 'feedback' + (c.type === 'style' ? ' style-tip' : ''));
   const more = el('div', 'more');
-  more.hidden = true;
-  const toggle = h('button', { type: 'button', 'aria-expanded': 'false' },
-    el('span', '', '✏️'),
-    el('span', 'fix-right grow', c.right),
-    el('span', 'chip', CATEGORIES[c.category] || 'อื่นๆ'));
+  more.hidden = settings.correctionTiming !== 'immediate';
+  const toggle = h('button', { type: 'button', 'aria-expanded': String(!more.hidden) },
+    el('span', '', kind.icon), el('span', 'fix-right grow', c.right), el('span', 'chip', kind.chip(c)));
   toggle.addEventListener('click', () => {
     more.hidden = !more.hidden;
     toggle.setAttribute('aria-expanded', String(!more.hidden));
   });
+  more.append(...fixDetails(c));
+  wrap.append(toggle, more);
+  return wrap;
+}
+
+function fixDetails(c) {
   const p = (label, text) => (text ? [el('span', 'label', label), el('p', '', text)] : []);
   const line = el('p');
   line.append(el('span', 'wrong', c.wrong), ' → ', el('span', 'fix-right', c.right));
-  more.append(line, ...p('ทำไม', c.why), ...p('พูดแบบเจ้าของภาษา', c.natural), ...p('ตัวอย่างเพิ่ม', c.example));
+  const out = [line, ...p('ทำไม', c.why), ...p('พูดแบบเจ้าของภาษา', c.natural), ...p('แปล', c.th), ...p('ตัวอย่างเพิ่ม', c.example)];
   if (c.natural || c.right) {
     const say = h('button', { type: 'button', class: 'btn sm ghost', style: 'margin-top:8px' }, icon('speaker'), 'ฟังประโยคที่ถูก');
     say.addEventListener('click', () => speak(c.natural || c.right, { plain: true }));
-    more.append(say);
+    out.push(say);
   }
-  wrap.append(toggle, more);
-  return wrap;
+  return out;
 }
 
 function renderMessage(m) {
@@ -64,17 +76,21 @@ function renderMessage(m) {
     else bubble.append(el('div', 'xs', '📷 ส่งรูป'));
   }
   if (m.text) bubble.append(m.text);
-  if (m.role === 'model') {
-    bubble.title = 'แตะเพื่อฟังอีกครั้ง';
-    bubble.addEventListener('click', () => speak(m.text, { emotion: m.emotion }));
-  }
   row.append(bubble);
-  if (m.correction) row.append(feedbackCard(m.correction));
+  if (m.role === 'model') {
+    // A real button so replaying works from the keyboard too.
+    const play = h('button', { type: 'button', class: 'replay', 'aria-label': 'ฟังข้อความนี้อีกครั้ง' }, icon('speaker'));
+    play.addEventListener('click', () => speak(m.text, { emotion: m.emotion }));
+    bubble.addEventListener('click', (e) => { if (e.target === bubble) speak(m.text, { emotion: m.emotion }); });
+    row.append(play);
+  }
+  // With "show at the end", a correction stays hidden until the learner opens the summary.
+  if (m.correction && (m.correction.seen !== false || settings.correctionTiming !== 'end')) row.append(feedbackCard(m.correction));
   if (m.newWord) row.append(el('div', 'newword', `📘 คำใหม่: ${m.newWord.word}${m.newWord.meaning ? ' — ' + m.newWord.meaning : ''} · เก็บในคลังคำแล้ว`));
   const role = m.as && m.as !== activeChar().defaultRole && ROLES[m.as] ? ' · 🎭 ' + ROLES[m.as].th : '';
   const emo = m.emotion && EMOTION_UI[m.emotion.state] ? ' · ' + EMOTION_UI[m.emotion.state].emoji : '';
-  const meta = el('div', 'meta', fmtTime(m.t) + role + emo + (m.ai === 'groq' ? ' · Groq' : '') + (m.voice ? ' · 🎤' : ''));
-  row.append(meta);
+  const tags = (m.hint ? ' · 💡' : '') + (m.helper ? ' · 🇹🇭→EN' : '');
+  row.append(el('div', 'meta', fmtTime(m.t) + role + emo + (m.ai === 'groq' ? ' · Groq' : '') + (m.voice ? ' · 🎤' : '') + tags));
   if (m.failed) {
     const retry = h('button', { type: 'button', class: 'btn sm danger' }, 'ส่งไม่สำเร็จ · ลองอีกครั้ง');
     retry.addEventListener('click', () => run(null, null, null, { retryMsg: m }));
@@ -88,7 +104,7 @@ export function renderChat() {
   if (!b) return;
   b.textContent = '';
   const msgs = threadOf();
-  if (!msgs.length && !waiting) b.append(introCard(activeChar()));
+  if (!msgs.length && !isWaiting()) b.append(introCard(activeChar()));
   const start = showAll ? 0 : Math.max(0, msgs.length - SHOW_LAST);
   if (start > 0) {
     const more = h('button', { type: 'button', class: 'btn sm ghost' }, `แสดงข้อความก่อนหน้า (${start})`);
@@ -96,32 +112,101 @@ export function renderChat() {
     b.append(more);
   }
   for (const m of msgs.slice(start)) b.append(renderMessage(m));
-  showSuggestions();
+  showHelp();
   if (!settings.workerUrl) notice('ยังไม่ได้ใส่ลิงก์ Cloudflare Worker — ใส่ในหน้าตั้งค่าก่อนเริ่มคุย', false, 'เปิดตั้งค่า', () => { location.hash = '#settings'; });
-  if (waiting) typing(true);
+  if (isWaiting()) typing(true);
+  renderFixButton();
   scrollDown();
 }
 
-// Shows reply ideas for the latest message (only when nothing is in flight).
-function showSuggestions() {
+// ---------- help under the latest message: reply ideas + hint ladder ----------
+function showHelp() {
   const b = box();
   if (!b) return;
   b.querySelector('.suggest-box')?.remove();
-  const msgs = threadOf();
-  const last = msgs[msgs.length - 1];
-  if (last && last.role === 'model' && last.suggestions?.length && !busy && !waiting) { b.append(suggestBox(last.suggestions)); scrollDown(); }
+  const m = lastBot();
+  if (!m || isBusy() || isWaiting() || (!m.suggestions?.length && !m.hints)) return;
+  if (hint.t !== m.t) hint = { t: m.t, level: 0 };
+  b.append(helpBox(m));
+  scrollDown();
 }
 
-// Reply ideas under the latest message. Tapping one puts it in the box so the learner can edit it first.
-function suggestBox(list) {
-  const box = el('div', 'suggest-box');
-  box.append(el('div', 'suggest-head', '💡 ลองตอบ — แตะเพื่อใส่ในช่องพิมพ์ แก้ได้ก่อนส่ง'));
-  for (const s of list) {
-    const btn = h('button', { type: 'button', class: 'suggest' }, s.label ? el('span', 'suggest-tag', s.label) : '', el('span', '', s.text));
-    btn.addEventListener('click', () => { input().value = s.text; autoGrow(); refreshSend(); input().focus(); });
-    box.append(btn);
+function helpBox(m) {
+  const wrap = el('div', 'suggest-box');
+  if (m.suggestions?.length) {
+    wrap.append(el('div', 'suggest-head', '💡 ลองตอบ — แตะเพื่อใส่ในช่องพิมพ์ แก้ได้ก่อนส่ง'));
+    for (const s of m.suggestions) {
+      const btn = h('button', { type: 'button', class: 'suggest' }, s.label ? el('span', 'suggest-tag', s.label) : '', el('span', '', s.text));
+      // A ready-made answer counts like the last hint step.
+      btn.addEventListener('click', () => { hint.level = Math.max(hint.level, 4); fillInput(s.text); });
+      wrap.append(btn);
+    }
   }
-  return box;
+  if (m.hints) wrap.append(hintLadder(m.hints, wrap));
+  return wrap;
+}
+
+// Step by step: 1 clue → 2 words → 3 sentence pattern → 4 full example.
+function hintLadder(hs, wrap) {
+  const steps = [
+    hs.clue && (() => el('div', 'hint-step', `1 · ${hs.clue}`)),
+    hs.vocab.length && (() => {
+      const row = h('div', { class: 'hint-step chips' }, el('span', 'xs muted', '2 · คำที่ใช้ได้:'));
+      for (const v of hs.vocab) {
+        const c = h('button', { type: 'button', class: 'chip' }, v.th ? `${v.word} — ${v.th}` : v.word);
+        c.addEventListener('click', () => { const cur = input().value.trim(); fillInput(cur ? `${cur} ${v.word}` : v.word); });
+        row.append(c);
+      }
+      return row;
+    }),
+    hs.structure && (() => {
+      const c = h('button', { type: 'button', class: 'suggest' }, el('span', 'suggest-tag', '3 · รูปประโยค'), el('span', '', hs.structure));
+      c.addEventListener('click', () => fillInput(hs.structure.replace(/_{2,}/g, '…')));
+      return c;
+    }),
+    hs.example && (() => {
+      const say = h('button', { type: 'button', class: 'icon-btn', 'aria-label': 'ฟังตัวอย่าง' }, icon('speaker'));
+      say.addEventListener('click', () => speak(hs.example, { plain: true }));
+      const use = h('button', { type: 'button', class: 'btn sm' }, 'ใช้ประโยคนี้');
+      use.addEventListener('click', () => fillInput(hs.example));
+      return h('div', { class: 'hint-step' }, el('div', '', `4 · ${hs.example}`), hs.example_th ? el('div', 'xs muted', hs.example_th) : '', h('div', { class: 'row' }, say, use));
+    }),
+  ].filter(Boolean);
+  const box2 = el('div', 'hint-ladder');
+  const shown = el('div', 'hint-shown');
+  const next = h('button', { type: 'button', class: 'btn sm ghost' });
+  const draw = () => {
+    shown.textContent = '';
+    for (const s of steps.slice(0, hint.level)) shown.append(s());
+    next.hidden = hint.level >= steps.length;
+    next.textContent = hint.level === 0 ? '🆘 ไม่รู้จะตอบยังไง — ขอคำใบ้' : `ใบ้เพิ่ม (${hint.level}/${steps.length})`;
+  };
+  next.addEventListener('click', () => { hint.level = Math.min(steps.length, hint.level + 1); draw(); scrollDown(); });
+  draw();
+  box2.append(shown, next);
+  return box2;
+}
+
+// ---------- "with show at the end": the correction summary ----------
+function renderFixButton() {
+  const btn = $('fixBtn');
+  if (!btn) return;
+  const n = settings.correctionTiming === 'end' ? unseenCorrections().length : 0;
+  btn.hidden = !n;
+  btn.textContent = `✏️ คำแก้ ${n}`;
+}
+function showFixSummary() {
+  const list = unseenCorrections();
+  if (!list.length) return;
+  const card = h('div', { class: 'card fix-summary' }, el('h3', '', `สรุปคำแก้ (${list.length})`));
+  for (const m of list) {
+    const kind = FIX_KIND[m.correction.type] || FIX_KIND.error;
+    card.append(h('div', { class: 'fix-item' }, el('div', 'xs muted', `${kind.icon} ${kind.chip(m.correction)} · ${fmtTime(m.t)}`), ...fixDetails(m.correction)));
+  }
+  markCorrectionsSeen();
+  box()?.append(card);
+  renderFixButton();
+  scrollDown();
 }
 
 function notice(text, isErr, btnLabel, onClick) {
@@ -167,6 +252,7 @@ export function renderHeader() {
   renderCharBar();
   renderScene();
   renderQuota();
+  renderFixButton();
 }
 
 function renderCharBar() {
@@ -182,6 +268,14 @@ function renderCharBar() {
   }));
   sel.value = s.role;
   sel.disabled = !!s.scenario || roles.length < 2;
+  // Mode: role-play takes over while a scenario runs.
+  const ms = $('modeSelect');
+  const inScene = !!(state.scene && state.scene.char === char.id);
+  const ids = MODE_IDS.filter((id) => !MODES[id].englishOnly || isEnglish());
+  ms.replaceChildren(...(inScene ? [Object.assign(el('option', '', `${ROLEPLAY_MODE.icon} ${ROLEPLAY_MODE.th}`), { value: 'roleplay' })]
+    : ids.map((id) => Object.assign(el('option', '', `${MODES[id].icon} ${MODES[id].th}`), { value: id }))));
+  ms.value = inScene ? 'roleplay' : modeOf(settings.mode, isEnglish());
+  ms.disabled = inScene;
   const e = s.emotion || { state: char.emotional.baseline, intensity: 0.5 };
   const ui = EMOTION_UI[e.state] || EMOTION_UI.neutral;
   $('emoChip').textContent = `${ui.emoji} ${ui.th}`;
@@ -199,13 +293,17 @@ function setRole(roleId) {
   toast(s.role === char.defaultRole ? `${char.name} กลับเป็นตัวเองตามปกติ` : `${char.name} จะเล่นเป็น${ROLES[s.role].th}จนกว่าคุณจะเปลี่ยน`);
 }
 
+function setMode(id) {
+  settings.mode = modeOf(id, isEnglish());
+  saveSettings();
+  toast(`โหมด: ${MODES[settings.mode].th} — ${MODES[settings.mode].desc}`);
+}
+
 // Talk to another character (each has its own chat, memory and mood).
 export function switchCharacter(id) {
-  if (!CHARACTER_IDS.includes(id)) return;
-  if (busy) { toast('รอให้ตอบข้อความก่อนหน้าเสร็จก่อนนะ'); return; }
-  settings.character = id;
-  saveSettings();
+  if (!setCharacter(id)) return;
   showAll = false;
+  clearHelper();
   if (location.hash === '#chat') { renderHeader(); renderChat(); maybeGreet(); } else location.hash = '#chat';
 }
 
@@ -235,194 +333,59 @@ function renderScene() {
   if (sc) $('sceneText').textContent = `${sc.icon} กำลังฝึก: ${sc.th}`;
 }
 
-// ---------- talking to the AI ----------
-const loose = (s) => String(s || '').toLowerCase().replace(/[^\p{L}\p{N}']+/gu, ' ').trim();
-
-function applyAI(ai, userMsg, opts) {
-  const char = getCharacter(opts.charId, settings);
-  let session = sessionOf(char.id);
-  // Models sometimes "correct" an earlier message; keep a correction only if it is about this one.
-  if (ai.correction && (!userMsg || !loose(userMsg.text).includes(loose(ai.correction.wrong)))) ai.correction = null;
-  if (userMsg) {
-    if (ai.correction) { userMsg.correction = ai.correction; addMistake(ai.correction); }
-    recordMessage(userMsg.text, !!ai.correction, userMsg.voice);
-    if (today().msgs === 1) logActivity('chat', `เริ่มคุยกับ ${char.name} วันนี้`);
-  }
-  // Memory changes go through the validated engine, and only if the learner allows them.
-  const mem = applyMemoryUpdates({ facts: state.facts, list: state.charMemory[char.id] || [] }, ai.memoryUpdates,
-    { learner: settings.memoryLearner !== false, character: settings.memoryCharacter !== false });
-  state.facts = mem.facts;
-  if (mem.list.length) state.charMemory[char.id] = mem.list;
-  // Mood and role: the engines decide; the model only suggests.
-  session.emotion = nextEmotion(session.emotion, ai.emotion, char);
-  if (ai.activeRole && ai.activeRole !== session.role) {
-    const next = applyRole(session, char, ai.activeRole, 'auto');
-    if (next.role !== session.role) toast(next.role === char.defaultRole ? `${char.name} กลับเป็นตัวเองตามปกติ` : `${char.name} เปลี่ยนเป็น${ROLES[next.role].th}`);
-    session = { ...session, role: next.role, roleSource: next.roleSource };
-  }
-  if (ai.topic) {
-    const key = ai.topic.toLowerCase();
-    if (key !== (session.topic || '').toLowerCase() && settings.memoryLearner !== false) state.topics[key] = (state.topics[key] || 0) + 1;
-    session.topic = ai.topic;
-  }
-  if (ai.summary) session.summary = ai.summary;
-  session.t = Date.now();
-  session.turns = (session.turns || 0) + 1;
-  state.sessions[char.id] = session;
-  if (ai.assessment && userMsg) for (const [k, v] of Object.entries(ai.assessment)) state.skills[k] = [...(state.skills[k] || []), v].slice(-30);
-
-  const botMsg = { role: 'model', text: ai.reply, t: Date.now(), emotion: session.emotion, as: session.role };
-  if (char.id !== 'buddy') botMsg.char = char.id;
-  if (ai.suggestions?.length) botMsg.suggestions = ai.suggestions;
-  if (ai.provider === 'groq') botMsg.ai = 'groq';
-  if (ai.newWord && addWord(ai.newWord)) {
-    botMsg.newWord = { word: ai.newWord.word, meaning: ai.newWord.meaning };
-    recordWord();
-    logActivity('word', `คำใหม่: ${ai.newWord.word}`);
-  }
-  if (opts.feedbackFor) {
-    const result = { t: Date.now(), id: opts.feedbackFor.id || null, icon: opts.feedbackFor.icon, scene: opts.feedbackFor.th, char: char.id, score: ai.score, summary: ai.reply.slice(0, 400) };
-    addResult(result);
-    const label = scoreLabel(result);
-    logActivity('roleplay', `จบสถานการณ์ ${opts.feedbackFor.th} กับ ${char.name}${label ? ` · ${label}` : ''}`);
-  }
-  state.messages.push(botMsg);
-  state.lastSeen = Date.now();
-  persist();
-  if (activeCharId() === char.id) { renderHeader(); renderChat(); }
-  emit('state');
-  if (settings.voice && activeCharId() === char.id) speak(ai.reply, { emotion: session.emotion });
-  syncPush(false);
+// ---------- Thai → English helper ----------
+function refreshHelper() {
+  const b = $('thaiBtn');
+  if (b) b.hidden = !THAI.test(input().value) || isBusy();
 }
-
-// userText/photo: a new user message. hiddenTurn: an [App note] instruction with no visible
-// user message. opts.retryMsg: re-ask for a user message whose reply failed.
-export async function run(userText, hiddenTurn, photo, opts = {}) {
-  if (busy) { toast('รอให้ตอบข้อความก่อนหน้าเสร็จก่อนนะ'); return; }
-  busy = true;
-  refreshSend();
-  box()?.querySelector('.suggest-box')?.remove();
-  opts = { ...opts, charId: activeCharId() };
-  let userMsg = opts.retryMsg || null;
-  if (userMsg) { delete userMsg.failed; renderChat(); }
-  else if (userText || photo) {
-    userMsg = { role: 'user', text: userText || '', t: Date.now() };
-    if (opts.charId !== 'buddy') userMsg.char = opts.charId;
-    if (opts.voice) userMsg.voice = true;
-    if (photo) {
-      userMsg.photo = true;
-      userMsg.photoData = { mimeType: photo.mimeType, data: photo.data };
-      photoCache[userMsg.t] = photo.dataUrl;
-    }
-    state.messages.push(userMsg);
-    persist();
-    box()?.append(renderMessage(userMsg));
-  }
-  waiting = true;
-  typing(true);
-  let ok = false;
+function clearHelper() { box()?.querySelector('.helper-box')?.remove(); }
+async function runHelper() {
+  const text = input().value.trim();
+  if (!text || isBusy()) return;
+  const btn = $('thaiBtn');
+  btn.disabled = true;
+  btn.textContent = '…';
+  clearHelper();
   try {
-    const ai = await askAI(hiddenTurn);
-    waiting = false;
-    typing(false);
-    applyAI(ai, userMsg, opts);
-    ok = true;
-  } catch (e) {
-    waiting = false;
-    typing(false);
-    console.warn(e);
-    if (userMsg) {
-      userMsg.failed = true;
-      persist();
-      renderChat();
-      toast(e.message, true);
-    } else {
-      notice('ส่งไม่สำเร็จ: ' + e.message, true, 'ลองอีกครั้ง', () => run(null, hiddenTurn, null, opts));
+    const options = await askHelper(text);
+    if (!options.length) { toast('ยังแปลไม่ได้ ลองพิมพ์ใหม่อีกครั้ง', true); return; }
+    const wrap = h('div', { class: 'suggest-box helper-box' }, el('div', 'suggest-head', `🇹🇭→${isEnglish() ? '🇬🇧' : settings.lang}: "${text.slice(0, 60)}" พูดได้แบบนี้ — แตะเพื่อใช้`));
+    for (const o of options) {
+      const b = h('button', { type: 'button', class: 'suggest' }, o.label ? el('span', 'suggest-tag', o.label) : '', h('span', {}, o.text, o.note ? el('small', 'muted', ' — ' + o.note) : ''));
+      b.addEventListener('click', () => { helperText = o.text; fillInput(o.text); clearHelper(); });
+      wrap.append(b);
     }
+    box()?.append(wrap);
+    scrollDown();
+  } catch (e) {
+    toast(e.message, true);
   } finally {
-    if (userMsg && ok) delete userMsg.photoData;   // the model only sees each photo once
-    busy = false;
-    refreshSend();
-    if (ok) showSuggestions();
+    btn.disabled = false;
+    btn.textContent = '🇹🇭→EN';
+    refreshHelper();
   }
-  return ok;
 }
 
+// ---------- input ----------
 function send() {
   const text = input().value.trim();
-  if ((!text && !pendingPhoto) || busy) return;
+  if ((!text && !pendingPhoto) || isBusy()) return;
   const photo = pendingPhoto;
   const voice = lastInputWasVoice;
+  const m = lastBot();
+  const hintLevel = m && hint.t === m.t ? hint.level : 0;
+  const helper = !!helperText && text === helperText;
   input().value = '';
   lastInputWasVoice = false;
+  helperText = '';
   clearPhoto();
+  clearHelper();
   autoGrow();
+  refreshHelper();
   unlockSpeech();
-  run(text, null, photo, { voice });
+  run(text, null, photo, { voice, hint: hintLevel || 0, helper });
 }
 
-// The character writes first when its chat is opened after a while (or for the first time).
-export function maybeGreet() {
-  if (!settings.workerUrl || busy) return;
-  const char = activeChar();
-  const thread = threadOf(char.id);
-  const lastT = thread.length ? thread[thread.length - 1].t : 0;
-  const gap = Date.now() - lastT;
-  if (thread.length && gap < GREET_AFTER_MS) return;
-  const hours = lastT ? Math.round(gap / 3600000) : null;
-  const local = new Date().toLocaleString('en-GB', { weekday: 'long', hour: '2-digit', minute: '2-digit' });
-  const why = hours == null
-    ? `This is the first time you (${char.name}) talk with the learner. Introduce yourself briefly with one or two details from your background, mention lightly that you are an AI character, and ask one easy question.`
-    : `The learner just opened your chat again after about ${hours} hour(s). Message them first in your own way, and refer to something you remember if it fits. Do not repeat the greeting you used last time.`;
-  run(null, `[App note, not from the user: it is ${local} for the learner. ${why} Set "language_feedback" to null.]`);
-}
-
-// ---------- role-play & focused practice (started from other pages) ----------
-// scenario: an entry from engine/scenarios.js, or { custom: true, icon, th } for the learner's own idea.
-export function startScene(scenario, charId) {
-  if (busy) { toast('รอให้ตอบข้อความก่อนหน้าเสร็จก่อนนะ'); return; }
-  if (charId && CHARACTER_IDS.includes(charId)) { settings.character = charId; saveSettings(); }
-  const char = activeChar();
-  let s = sessionOf(char.id);
-  s = applyRole(s, char, scenario.custom ? 'scene' : roleForScenario(scenario, char), 'scenario');
-  s.scenario = scenario.id || 'custom';
-  s.t = Date.now();
-  state.sessions[char.id] = s;
-  state.scene = { id: scenario.custom ? null : scenario.id, icon: scenario.icon || '🎭', th: scenario.th, char: char.id, feedback: scenario.feedback || '', criteria: scenario.criteria || [] };
-  logActivity('roleplay', `เริ่มสถานการณ์ ${scenario.th} กับ ${char.name}`);
-  persist();
-  showAll = false;
-  if (location.hash !== '#chat') location.hash = '#chat'; else { renderHeader(); renderChat(); }
-  unlockSpeech();
-  run(null, `[App note, not from the user: the learner started the role-play "${scenario.th}". You are now in your scenario role. Start the scene with your first line in that role. Set "language_feedback" to null.]`);
-}
-
-function endScene() {
-  const char = activeChar();
-  if (busy || !state.scene || state.scene.char !== char.id) return;
-  const scene = state.scene;
-  state.scene = null;
-  state.sessions[char.id] = applyRole(sessionOf(char.id), char, null, 'default');
-  persist();
-  renderHeader();
-  const crit = scene.criteria?.length ? ` Judge mainly: ${scene.criteria.join(', ')}.` : '';
-  const what = scene.feedback || `Give friendly feedback: what they did well, 2–3 useful ${settings.lang} phrases for this situation (with Thai meaning), and one thing to practise. Keep it short.${crit}`;
-  run(null, `[App note, not from the user: the role-play "${scene.th}" has ended. Step out of the role and, as yourself (${char.name}, back to your usual role), ${what} Also set "score" to how well they handled it, 0–10. For THIS message only, write "message" in Thai (keep ${settings.lang} words and example sentences in ${settings.lang}). Set "language_feedback" to null.]`, null, { feedbackFor: scene });
-}
-
-export function practice(category, label) {
-  location.hash = '#chat';
-  unlockSpeech();
-  run(null, `[App note, not from the user: the learner wants to practise "${category}" (${label}), one of their weak areas. Start a short, friendly mini-practice inside the chat, in your own style: ask ONE question or give ONE short task that makes them use this. After their answer, give feedback and the next one. Set "language_feedback" to null.]`);
-}
-
-export function quiz() {
-  location.hash = '#chat';
-  unlockSpeech();
-  run(null, '[App note, not from the user: the learner tapped "quiz me". Give ONE short, friendly quiz question that practises one of their recent mistakes (fill-in-the-blank or "how would you say…"). Wait for their answer before giving the next one. Set "language_feedback" to null.]');
-}
-
-// ---------- photos ----------
 async function preparePhoto(file) {
   const url = URL.createObjectURL(file);
   try {
@@ -449,16 +412,33 @@ function clearPhoto() {
   refreshSend();
 }
 
-// ---------- input ----------
 function autoGrow() { const i = input(); i.style.height = 'auto'; i.style.height = Math.min(i.scrollHeight, 130) + 'px'; }
-function refreshSend() { const b = $('sendBtn'); if (b) b.disabled = busy || (!input().value.trim() && !pendingPhoto); }
+function refreshSend() { const b = $('sendBtn'); if (b) b.disabled = isBusy() || (!input().value.trim() && !pendingPhoto); }
+
+// ---------- conversation events ----------
+const here = (charId) => location.hash === '#chat' && activeCharId() === charId;
+function listenToConversation() {
+  on('chat:busy', () => { refreshSend(); refreshHelper(); });
+  on('chat:sent', ({ msg, photo }) => {
+    if (photo) photoCache[msg.t] = photo.dataUrl;
+    box()?.querySelector('.suggest-box')?.remove();
+    box()?.append(renderMessage(msg));
+    scrollDown();
+  });
+  on('chat:waiting', (w) => { if (w) box()?.querySelector('.suggest-box')?.remove(); typing(w); });
+  on('chat:reply', ({ charId }) => { if (here(charId)) { renderHeader(); renderChat(); } });
+  on('chat:failed', ({ error }) => { renderChat(); toast(error, true); });
+  on('chat:error', ({ error, retry }) => notice('ส่งไม่สำเร็จ: ' + error, true, 'ลองอีกครั้ง', retry));
+  on('chat:open', () => { showAll = false; if (location.hash !== '#chat') location.hash = '#chat'; else { renderHeader(); renderChat(); } });
+}
 
 export function initChat() {
-  $('chatInput').addEventListener('input', () => { lastInputWasVoice = false; autoGrow(); refreshSend(); });
+  $('chatInput').addEventListener('input', () => { lastInputWasVoice = false; autoGrow(); refreshSend(); refreshHelper(); });
   $('chatInput').addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(); }
   });
   $('sendBtn').addEventListener('click', send);
+  $('thaiBtn').addEventListener('click', runHelper);
   $('micBtn').addEventListener('click', () => {
     if (listening) { stopListening(); return; }
     if (!canListen) { toast('เครื่องนี้ไม่รองรับการฟังเสียงในเบราว์เซอร์ ใช้ไมค์บนคีย์บอร์ด iPhone (Dictation) แทนได้', true); input().focus(); return; }
@@ -486,11 +466,12 @@ export function initChat() {
   });
   $('sceneEnd').addEventListener('click', endScene);
   $('roleSelect').addEventListener('change', (e) => setRole(e.target.value));
+  $('modeSelect').addEventListener('change', (e) => setMode(e.target.value));
   $('roleReset').addEventListener('click', () => setRole(activeChar().defaultRole));
+  $('fixBtn').addEventListener('click', showFixSummary);
   $('quota').addEventListener('click', () => { location.hash = '#settings'; });
   on('usage', renderQuota);
   on('settings', renderHeader);
+  listenToConversation();
   renderHeader();
 }
-
-export const isBusy = () => busy;

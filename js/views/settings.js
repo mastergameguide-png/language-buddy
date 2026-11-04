@@ -104,6 +104,9 @@ export function fillSettings() {
   f('sGoalMsg').value = settings.goalMessages;
   f('sGoalRev').value = settings.goalReviews;
   f('sFeedback').value = settings.feedback;
+  f('sTiming').value = settings.correctionTiming || 'after_turn';
+  f('sLength').value = settings.length || 'normal';
+  f('sTeach').value = settings.teaching || 'medium';
   f('sTheme').value = settings.theme;
   f('sRate').value = settings.rate;
   f('sLimit').value = settings.dailyLimit || '';
@@ -155,6 +158,9 @@ export function initSettings() {
       goalMessages: int('sGoalMsg', 1, 200, 10),
       goalReviews: int('sGoalRev', 1, 200, 10),
       feedback: f('sFeedback').value === 'detailed' ? 'detailed' : 'gentle',
+      correctionTiming: ['immediate', 'after_turn', 'end'].includes(f('sTiming').value) ? f('sTiming').value : 'after_turn',
+      length: ['short', 'normal', 'long'].includes(f('sLength').value) ? f('sLength').value : 'normal',
+      teaching: ['low', 'medium', 'high'].includes(f('sTeach').value) ? f('sTeach').value : 'medium',
       theme: f('sTheme').value,
       rate: Number(f('sRate').value),
       dailyLimit: int('sLimit', 0, 100000, 0),

@@ -5,7 +5,8 @@ import { CHARACTERS, customCharacter, ROLES } from '../engine/characters.js';
 import { EMOTION_UI } from '../engine/emotion.js';
 import { SCENARIOS } from '../engine/scenarios.js';
 import { avatarEl } from './avatar.js';
-import { switchCharacter, startScene } from './chat.js';
+import { switchCharacter } from './chat.js';
+import { startScene } from '../conversation.js';
 
 let open = null;   // id of the profile shown expanded
 

@@ -46,8 +46,10 @@
       </button>
       <div class="char-bar" id="charBar">
         <label class="role-pick"><span aria-hidden="true">🎭</span><select id="roleSelect" aria-label="บทบาทของตัวละคร"></select></label>
+        <label class="role-pick"><select id="modeSelect" aria-label="โหมดการคุย"></select></label>
         <span class="emo" id="emoChip" title="อารมณ์ตอนนี้"></span>
         <button type="button" class="btn sm ghost" id="roleReset" hidden>กลับเป็นปกติ</button>
+        <button type="button" class="btn sm" id="fixBtn" hidden>✏️ คำแก้</button>
       </div>
       <div class="scene-bar" id="sceneBar" hidden>
         <span id="sceneText"></span>
@@ -65,6 +67,7 @@
           <button class="round" id="photoBtn" type="button" aria-label="ส่งรูป" data-icon="camera"></button>
           <button class="round" id="micBtn" type="button" aria-label="พูด" data-icon="mic"></button>
           <textarea id="chatInput" rows="1" placeholder="พิมพ์หรือกดไมค์เพื่อพูด…" enterkeyhint="send" aria-label="ข้อความ"></textarea>
+          <button class="round thai" id="thaiBtn" type="button" aria-label="ช่วยพูดข้อความภาษาไทยนี้เป็นภาษาที่เรียน" hidden>🇹🇭→EN</button>
           <button class="round send" id="sendBtn" type="button" aria-label="ส่ง" disabled data-icon="send"></button>
         </div>
       </div>
@@ -106,6 +109,25 @@
                 <option value="gentle">แก้เฉพาะข้อผิดชัดเจน (ไม่ขัดจังหวะ)</option>
                 <option value="detailed">ละเอียด — แก้ทั้งข้อผิดและสำนวนที่ไม่เป็นธรรมชาติ</option>
               </select></label>
+            <label class="field"><span>แสดงคำแก้เมื่อไร</span>
+              <select class="input" id="sTiming">
+                <option value="immediate">ทันที — เปิดคำอธิบายให้เลย</option>
+                <option value="after_turn">ย่อไว้ใต้ข้อความ (แตะดู)</option>
+                <option value="end">เก็บไว้ดูตอนท้าย — ไม่ขัดจังหวะการคุย</option>
+              </select></label>
+            <label class="field"><span>ความยาวคำตอบของตัวละคร</span>
+              <select class="input" id="sLength">
+                <option value="short">สั้น (1–2 ประโยค)</option>
+                <option value="normal">ปกติ</option>
+                <option value="long">ยาวขึ้น (ได้อ่านมากขึ้น)</option>
+              </select></label>
+            <label class="field"><span>ระดับการสอน</span>
+              <select class="input" id="sTeach">
+                <option value="low">น้อย — คุยล้วนๆ</option>
+                <option value="medium">กลาง</option>
+                <option value="high">มาก — สอดแทรกการสอนบ่อย</option>
+              </select></label>
+            <div class="hint">โหมดการคุย (คุยธรรมชาติ / เรียนไปคุยไป / เน้นแก้ภาษา / ฝึก IELTS) เปลี่ยนได้ที่แถบใต้ชื่อตัวละครในหน้าแชต</div>
           </div>
 
           <div class="card set-group">

@@ -2,7 +2,8 @@
 
 Status:
 - **Phase 0.5: DONE (2026-11-04)**, approved without access control (R-H1). Details in [CHANGELOG.md](CHANGELOG.md), test results in [TEST_REPORT.md](TEST_REPORT.md).
-- Phase 1 and later are **waiting for owner approval**. No phase starts before approval.
+- **Phase 1: DONE (2026-11-04).** All of steps 1.1–1.8; see CHANGELOG and TEST_REPORT.
+- Phase 2 and later are **waiting for owner approval**.
 
 Owner decisions (2026-11-04):
 - Keep the Worker open (no access code).

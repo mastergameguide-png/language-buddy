@@ -60,6 +60,26 @@ await test('storage report adds up the app keys', async () => {
   const r = S.storageReport();
   if (!(r.kb >= 0) || r.counts.vocab !== 1 || r.limitKb !== 5000) throw new Error(JSON.stringify(r));
 });
+await test('Phase 1 message fields survive validation; bad ones are dropped', async () => {
+  const s = S.normalizeState({ messages: [
+    { role: 'model', text: 'What did you eat?', t: 1, hints: { clue: 'บอกเมนู', vocab: [{ word: 'pasta', th: 'พาสต้า' }], structure: 'I had ___.', example: 'I had pasta.', example_th: 'กินพาสต้า' } },
+    { role: 'user', text: 'I eat pasta', t: 2, hint: 3, helper: true, correction: { wrong: 'eat', right: 'ate', category: 'tense', type: 'error', th: 'กินแล้ว', seen: false } },
+    { role: 'user', text: 'x', t: 3, hint: 9, correction: { wrong: 'a', right: 'b', category: 'naturalness' } },
+    { role: 'model', text: 'y', t: 4, hints: 'not an object', hint: 2 },
+  ] });
+  const [bot, u1, u2, bot2] = s.messages;
+  if (bot.hints?.vocab[0].word !== 'pasta' || bot.hints.example !== 'I had pasta.') throw new Error('hints lost');
+  if (u1.hint !== 3 || !u1.helper || u1.correction.type !== 'error' || u1.correction.th !== 'กินแล้ว' || u1.correction.seen !== false) throw new Error('user fields lost ' + JSON.stringify(u1));
+  if ('hint' in u2 || u2.correction.type !== 'unnatural' || 'seen' in u2.correction) throw new Error('bad values kept ' + JSON.stringify(u2));
+  if ('hints' in bot2 || 'hint' in bot2) throw new Error('model message kept bad hint fields');
+});
+await test('new settings have defaults and quality counters are cleaned', async () => {
+  for (const [k, v] of Object.entries({ mode: 'natural', length: 'normal', teaching: 'medium', correctionTiming: 'after_turn' })) {
+    if (S.DEFAULT_SETTINGS[k] !== v) throw new Error(k);
+  }
+  const s = S.normalizeState({ quality: { replies: 5, tooLong: '2', evil: 9, invented: -1 } });
+  if (JSON.stringify(s.quality) !== '{"replies":5,"tooLong":2}') throw new Error(JSON.stringify(s.quality));
+});
 await test('addResult keeps up to the results limit', async () => {
   S.replaceState({});
   for (let i = 0; i < 60; i++) S.addResult({ t: i, scene: 's', score: 5 });

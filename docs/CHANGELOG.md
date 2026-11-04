@@ -1,5 +1,68 @@
 # Changelog
 
+## Phase 1 — Core AI experience (2026-11-04)
+
+### Structure (1.1)
+- New `js/conversation.js` (no DOM) holds sending turns, applying replies, greetings, scenes, practice and quiz. It talks to the chat view through events (`chat:busy`, `chat:sent`, `chat:waiting`, `chat:reply`, `chat:failed`, `chat:error`, `chat:open`).
+- `views/chat.js` now only draws and handles input.
+- App-note prompts moved to `engine/prompt.js` (`appNotes`).
+- The double re-render after each reply is gone: the conversation emits `chat:reply` + `badges` instead of `state`.
+- Building the prompt no longer changes memory. The "used" time is stamped after the reply arrives.
+
+### Conversation modes + preferences (1.2, 1.7)
+- `engine/modes.js` defines four modes, picked from the chat bar and synced as `settings.mode`:
+  - คุยธรรมชาติ (natural)
+  - เรียนไปคุยไป (learning)
+  - เน้นแก้ภาษา (correction: turns on detailed feedback)
+  - ฝึก IELTS (IELTS, English only; practice questions, never a band)
+- While a scenario runs, role-play replaces the mode and the picker is locked.
+- New settings: response length (short / normal / long) and teaching intensity (low / medium / high).
+
+### Feedback v2 + correction timing (1.3, 1.4)
+- Each correction has a `type`:
+  - `error`
+  - `unnatural`: not wrong, but not native-like
+  - `style`: optional
+- A Thai translation (`translation_th`) is shown as "แปล".
+- Style tips are labelled "ทางเลือก (ไม่ผิด)". They are not added to the Mistake Book and do not lower grammar accuracy.
+- Older corrections get a type from their category.
+- Setting "แสดงคำแก้เมื่อไร":
+  - **immediate**: the explanation is open.
+  - **after_turn**: folded (the default, same as before).
+  - **end**: corrections are hidden and collected. A "✏️ คำแก้ N" button in the chat bar opens a summary card.
+- Only corrections collected in end mode carry `seen: false`, so older data never shows up as unseen.
+
+### Hint ladder (1.5)
+- Each reply carries `hints`: a Thai clue, 2–4 words with meanings, a sentence pattern, and a full example with its Thai meaning.
+- "🆘 ไม่รู้จะตอบยังไง — ขอคำใบ้" reveals the steps one by one:
+  - tapping a word adds it to the input;
+  - tapping the pattern puts it in the input;
+  - the full example can be heard or used.
+- Usage is tracked from real taps: the highest hint level is saved on the learner's message (`hint` 1–4, and a 💡 tag); per-day `hints` and `hintFull`. Tapping a reply idea counts as level 4.
+- The Me page shows "การใช้ตัวช่วย".
+
+### Thai → English helper (1.6)
+- When the input contains Thai, a "🇹🇭→EN" button appears.
+- It makes one small separate request (`askHelper`, `buildHelperPrompt`) and shows 3 options (simple / casual / polished, each with a Thai note). Tapping one replaces the input. Nothing is added to the chat history.
+- Messages sent this way are tagged (`helper`) and counted.
+- Live testing led to prompt fixes:
+  - keep time words (วันนี้ was turned into "yesterday");
+  - do not guess gender (แฟน → partner);
+  - the parser accepts a bare JSON array.
+
+### Reply quality checks (1.8)
+- `engine/checks.js` flags a reply without changing it:
+  - sentences too long for A1/A2;
+  - "you mentioned / last time / that same…" with nothing to remember;
+  - more than 2 questions;
+  - malformed output.
+- Counters are kept in `state.quality` and shown on the Me page.
+
+### Other
+- Bot messages have a real replay button (keyboard accessible).
+- Service worker cache `buddy-v17`; `conversation.js`, `modes.js` and `checks.js` are added to the offline shell.
+- The Worker is unchanged (still v12).
+
 ## Phase 0.5 — Hardening (2026-11-04)
 
 Approved by the owner: everything in Phase 0.5 except access control (R-H1). The Worker stays open; this is the owner's decision.

@@ -5,7 +5,7 @@ import { SCENARIOS, SCENARIO_GROUPS, scoreLabel, resultNote, IELTS_NOTE_TH } fro
 import { CHARACTERS, getCharacter, ROLES } from '../engine/characters.js';
 import { roleForScenario } from '../engine/roles.js';
 import { avatarEl } from './avatar.js';
-import { startScene } from './chat.js';
+import { startScene } from '../conversation.js';
 
 let picked = null;   // scenario id whose details are open
 

@@ -6,6 +6,8 @@ import { cleanEmotion } from './emotion.js';
 
 export const CATEGORY_IDS = ['tense', 'verb form', 'agreement', 'article', 'preposition', 'plural', 'word choice', 'word order', 'spelling', 'punctuation', 'naturalness', 'other'];
 export const SKILLS = ['grammar', 'vocabulary', 'fluency', 'comprehension', 'naturalness'];
+// error: wrong · unnatural: not wrong but not what a native speaker says · style: optional nicer way.
+export const FEEDBACK_TYPES = ['error', 'unnatural', 'style'];
 
 const str = (v, n) => (v == null ? '' : String(v)).slice(0, n);
 const clean = (v, n) => str(v, n).trim();
@@ -50,7 +52,38 @@ function feedbackOf(j) {
     why: clean(f.explanation ?? f.why, 600),
     natural: clean(f.natural_expression ?? f.natural, 600),
     example: clean(f.example, 400),
+    type: feedbackType(f),
+    th: clean(f.translation_th ?? f.th, 400),
   };
+}
+
+// Older replies had no type: a "naturalness" category counts as unnatural, anything else as an error.
+function feedbackType(f) {
+  const t = String(f.type || '').toLowerCase().trim();
+  if (FEEDBACK_TYPES.includes(t)) return t;
+  if (/style|optional|suggest/.test(t)) return 'style';
+  if (/unnatural|natural|idiom/.test(t)) return 'unnatural';
+  return mapCategory(f.category) === 'naturalness' ? 'unnatural' : 'error';
+}
+
+// Graded help for answering the character's message: clue → vocabulary → structure → example.
+export function hintsOf(h) {
+  if (!h || typeof h !== 'object') return null;
+  const vocab = (Array.isArray(h.vocab) ? h.vocab : []).slice(0, 10)
+    .map((v) => (typeof v === 'string' ? { word: clean(v, 60), th: '' } : v && typeof v === 'object' ? { word: clean(v.word, 60), th: clean(v.th ?? v.meaning, 120) } : null))
+    .filter((v) => v && v.word).slice(0, 5);
+  const out = { clue: clean(h.clue, 300), vocab, structure: clean(h.structure, 200), example: clean(h.example, 300), example_th: clean(h.example_th, 300) };
+  return out.clue || vocab.length || out.structure || out.example ? out : null;
+}
+
+// The "say it in English" helper's answer: up to 3 { label, text, note }.
+export function parseHelper(text) {
+  const { json } = extractJSON(text);
+  // Models sometimes answer with the bare list instead of { options: [...] }.
+  const list = Array.isArray(json) ? json : json && Array.isArray(json.options) ? json.options : [];
+  const seen = new Set();
+  return list.slice(0, 4).map((o) => (o && typeof o === 'object' ? { label: clean(o.label, 24), text: clean(o.text, 300), note: clean(o.note_th ?? o.note, 200) } : null))
+    .filter((o) => o && o.text && !seen.has(o.text.toLowerCase()) && seen.add(o.text.toLowerCase())).slice(0, 3);
 }
 
 function memoryOf(j) {
@@ -102,7 +135,7 @@ export function parseStructured(text, { charId = null, roles = [] } = {}) {
   const { json: j, raw } = extractJSON(text);
   const message = j && typeof j === 'object' ? (typeof j.message === 'string' ? j.message : typeof j.reply === 'string' ? j.reply : null) : null;
   if (message == null) {
-    return { reply: clean(raw, 4000) || '…', malformed: true, characterId: charId, emotion: null, activeRole: null, correction: null, newWord: null, memoryUpdates: [], suggestions: [], score: null, topic: '', summary: '', assessment: null };
+    return { reply: clean(raw, 4000) || '…', malformed: true, characterId: charId, emotion: null, activeRole: null, correction: null, newWord: null, memoryUpdates: [], suggestions: [], hints: null, score: null, topic: '', summary: '', assessment: null };
   }
   const w = j.new_word;
   const role = typeof j.active_role === 'string' ? j.active_role.trim().toLowerCase().replace(/[\s-]+/g, '_') : null;
@@ -118,6 +151,7 @@ export function parseStructured(text, { charId = null, roles = [] } = {}) {
     newWord: w && typeof w === 'object' && clean(w.word, 80) ? { word: clean(w.word, 80), meaning: clean(w.meaning, 200), example: clean(w.example, 300) } : null,
     memoryUpdates: memoryOf(j),
     suggestions: suggestionsOf(j),
+    hints: hintsOf(j.hints),
     score: Number.isFinite(score) ? Math.max(0, Math.min(10, score)) : null,
     topic: clean(j.topic, 60),
     summary: clean(j.summary, 400),

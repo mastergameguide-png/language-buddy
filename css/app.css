@@ -403,3 +403,17 @@ h3.sub { font-size: var(--fs-sm); margin: 6px 0 0; }
 .cast-btn:hover { border-color: var(--accent); }
 .storage { margin-top: 12px; display: grid; gap: 4px; }
 .warn-text { color: var(--warn); }
+.msg.bot .replay { align-self: flex-start; background: none; border: 0; color: var(--text-3, var(--text-2)); padding: 2px 4px; cursor: pointer; }
+.msg.bot .replay svg { width: 16px; height: 16px; }
+.msg.bot .replay:hover { color: var(--accent); }
+.feedback.style-tip { opacity: .9; }
+.hint-ladder { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; width: 100%; }
+.hint-shown { display: flex; flex-direction: column; gap: 6px; width: 100%; }
+.hint-step { font-size: var(--fs-sm); border-left: 3px solid var(--accent); padding: 4px 10px; max-width: min(92%, 560px); }
+.hint-step.chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.composer .round.thai { width: auto; padding: 0 10px; font-size: var(--fs-xs, 12px); white-space: nowrap; }
+.fix-summary { align-self: stretch; }
+.fix-summary .fix-item { border-top: 1px solid var(--line); padding-top: 8px; margin-top: 8px; }
+.fix-summary .label { display: block; font-size: var(--fs-xs, 12px); color: var(--text-2); margin-top: 4px; }
+.fix-summary p { font-size: var(--fs-sm); margin: 2px 0; }
+.fix-summary .wrong { text-decoration: line-through; color: var(--muted); }

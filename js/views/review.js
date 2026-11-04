@@ -4,7 +4,7 @@ import { state, persist, emit, addWord, logActivity, CATEGORIES } from '../store
 import { schedule, preview, status, STATUS_TH, isDue } from '../srs.js';
 import { dueCards, recordReview } from '../stats.js';
 import { speak } from '../speech.js';
-import { quiz } from './chat.js';
+import { quiz } from '../conversation.js';
 
 let tab = 'review';
 let session = null;        // { queue: [{kind,item}], done, again }

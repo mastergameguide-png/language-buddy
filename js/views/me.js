@@ -2,7 +2,7 @@
 import { el, h, icon, num, fmtMinutes, toast } from '../util.js';
 import { settings, state, persist, emit, levelShort, cefrOf, CEFR, CATEGORIES, weakAreas, flag, setSettings } from '../store.js';
 import { streak, totals, accuracy, lastDays, vocabCounts } from '../stats.js';
-import { practice } from './chat.js';
+import { practice } from '../conversation.js';
 
 function stat(label, value, sub) {
   return h('div', { class: 'card stat' }, el('div', 'label', label), el('div', 'value', value), sub ? el('div', 'sub', sub) : null);
@@ -97,6 +97,23 @@ export function renderMe(root) {
     sk.append(h('div', { class: 'row', style: 'margin-top:10px' }, el('span', 'grow small', `คะแนนเฉลี่ย ${avgAll.toFixed(1)}/5 — ลองระดับ ${sugg} ไหม?`), b));
   }
   root.append(sk);
+
+  // How much help the learner used, measured from what they tapped (not from the AI).
+  root.append(el('h2', 'sec', 'การใช้ตัวช่วย'));
+  const help = h('div', { class: 'card' });
+  const pct = tot.msgs ? Math.round((tot.hints / tot.msgs) * 100) : 0;
+  help.append(
+    el('div', 'small', tot.hints ? `ตอบโดยใช้คำใบ้ ${num(tot.hints)} ครั้ง (${pct}% ของข้อความ) · ดูตัวอย่างเต็ม ${num(tot.hintFull)} ครั้ง` : 'ยังไม่ได้ใช้คำใบ้'),
+    el('div', 'small', `ใช้ตัวช่วยแปล 🇹🇭→EN ${num(tot.helper)} ครั้ง`),
+    el('p', 'xs muted', 'นับจากปุ่มที่คุณแตะจริง — ถ้าใช้น้อยลงเรื่อยๆ แปลว่าตอบเองได้มากขึ้น'));
+  root.append(help);
+
+  const q = state.quality || {};
+  if (q.replies) {
+    const rate = (n) => `${Math.round(((n || 0) / q.replies) * 100)}%`;
+    root.append(h('div', { class: 'card xs muted', style: 'margin-top:12px' },
+      `ตรวจคำตอบของ AI อัตโนมัติ ${num(q.replies)} ครั้ง: ประโยคยาวเกินระดับ ${rate(q.tooLong)} · อ้างถึงเรื่องที่ไม่เคยคุย ${rate(q.invented)} · ถามหลายคำถาม ${rate(q.manyQuestions)} · รูปแบบเสีย ${rate(q.malformed)}`));
+  }
 
   root.append(h('div', { class: 'sec-row' }, el('h2', 'sec', 'ความจำร่วม: สิ่งที่ตัวละครรู้เกี่ยวกับคุณ'), h('a', { class: 'btn sm ghost', href: '#characters' }, 'ความจำของแต่ละตัว')));
   if (settings.memoryLearner === false) root.append(el('p', 'xs muted', 'ปิดความจำร่วมอยู่ (เปิดได้ที่ ตั้งค่า → ความจำ)'));

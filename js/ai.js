@@ -3,8 +3,9 @@
 import {
   settings, state, isEnglish, ieltsBand, levelText, cefrOf, weakAreas, load, save, emit, activeChar, sessionOf, threadOf,
 } from './store.js';
-import { buildSystemPrompt } from './engine/prompt.js';
-import { parseStructured } from './engine/response.js';
+import { buildSystemPrompt, buildHelperPrompt } from './engine/prompt.js';
+import { parseStructured, parseHelper } from './engine/response.js';
+import { modeOf, pick, LENGTHS, TEACHING } from './engine/modes.js';
 import { recall } from './engine/memory.js';
 import { scenarioById } from './engine/scenarios.js';
 import { clampStr } from './util.js';
@@ -53,19 +54,20 @@ export function promptContext(extraContext = '') {
   const thread = threadOf(char.id);
   const lastUser = [...thread].reverse().find((m) => m.role === 'user')?.text || '';
   const memOn = { learner: settings.memoryLearner !== false, character: settings.memoryCharacter !== false };
+  // Recall only reads; the "used" time is stamped by the conversation once a reply arrives.
   const mems = memOn.character ? recall(state.charMemory[char.id] || [], `${lastUser} ${session.topic} ${extraContext}`, 6) : [];
-  for (const m of mems) m.used = Date.now();
   const sc = state.scene && state.scene.char === char.id ? state.scene : null;
   return {
     lang: settings.lang, isEnglish: isEnglish(), variant: settings.variant, levelText: levelText(), cefr: cefrOf(),
     ieltsText: ieltsText(), learnerName: clampStr(settings.learnerName, 40), goalText: clampStr(settings.goalText, 200), feedback: settings.feedback,
+    mode: modeOf(settings.mode, isEnglish()), length: pick(LENGTHS, settings.length, 'normal'), teaching: pick(TEACHING, settings.teaching, 'medium'),
     char, session, scenario: sc ? (scenarioById(sc.id) || { custom: true, th: sc.th }) : null,
     facts: memOn.learner ? state.facts : [],
     topics: memOn.learner ? Object.keys(state.topics || {}).slice(0, 5) : [],
     mistakes: state.mistakes.slice(-8).map((m) => `"${m.wrong}" → "${m.right}"`),
     weak: weakAreas().slice(0, 3).map((w) => `${w.category} (${w.count}×)`).join(', '),
     knownWords: state.vocab.slice(-30).map((v) => v.word),
-    charMemories: mems.map((m) => m.text), memoryOn: memOn,
+    charMemories: mems.map((m) => m.text), memoryIds: mems.map((m) => m.id), memoryOn: memOn,
   };
 }
 export const systemPrompt = (extra) => buildSystemPrompt(promptContext(extra));
@@ -112,11 +114,11 @@ async function post(url, body) {
 
 export class AIError extends Error {}
 
-export async function askAI(extraUserTurn) {
+// Sends one request to the Worker and returns its JSON, or throws an AIError with a Thai message.
+async function callWorker(system, contents) {
   if (!settings.workerUrl) throw new AIError('ยังไม่ได้ใส่ลิงก์ Worker — ไปที่ ฉัน → ตั้งค่า');
-  const contents = buildContents(extraUserTurn);
   const hadPhoto = contents.some((c) => c.parts.some((p) => p.inlineData));
-  const body = JSON.stringify({ system: systemPrompt(extraUserTurn || ''), contents, ai: settings.ai });
+  const body = JSON.stringify({ system, contents, ai: settings.ai });
   let res, data = {};
   // One quiet retry for network blips; the Worker already switches between AIs on its side.
   for (let attempt = 0; attempt < 2; attempt++) {
@@ -148,5 +150,20 @@ export async function askAI(extraUserTurn) {
     throw new AIError(clampStr(msg, 200));
   }
   recordUsage(data.usage?.total, hadPhoto, data.provider);
-  return { ...parseReply(data.text), provider: data.provider === 'groq' ? 'groq' : 'gemini' };
+  return data;
+}
+
+export async function askAI(extraUserTurn) {
+  const ctx = promptContext(extraUserTurn || '');
+  const data = await callWorker(buildSystemPrompt(ctx), buildContents(extraUserTurn));
+  return { ...parseReply(data.text), provider: data.provider === 'groq' ? 'groq' : 'gemini', ctx };
+}
+
+// "Say it in English": the learner's Thai text → up to 3 ways to say it. Nothing goes into the chat.
+export async function askHelper(thaiText) {
+  const char = activeChar();
+  const lastBot = [...threadOf(char.id)].reverse().find((m) => m.role === 'model')?.text || '';
+  const system = buildHelperPrompt({ lang: settings.lang, isEnglish: isEnglish(), variant: settings.variant, cefr: cefrOf(), charName: char.name, lastBot });
+  const data = await callWorker(system, [{ role: 'user', parts: [{ text: clampStr(thaiText, 600) }] }]);
+  return parseHelper(data.text);
 }
