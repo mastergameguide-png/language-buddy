@@ -30,12 +30,12 @@ const VIEWS = {
   home: { el: 'view-home', render: () => renderHome($('homeBody')), nav: 'home' },
   chat: { el: 'view-chat', render: () => { renderHeader(); renderChat(); markChatRead(); maybeGreet(); }, nav: 'chat' },
   review: { el: 'view-review', render: () => renderReview($('reviewBody')), nav: 'review' },
-  roleplay: { el: 'view-roleplay', render: () => renderRoleplay($('roleBody')), nav: 'roleplay' },
+  roleplay: { el: 'view-roleplay', render: () => renderRoleplay($('roleBody')), nav: 'practice' },
   me: { el: 'view-me', render: () => renderMe($('meBody')), nav: 'me' },
   characters: { el: 'view-characters', render: () => renderCharacters($('charsBody')), nav: 'chat' },
-  voice: { el: 'view-voice', render: () => renderVoice($('voiceBody')), nav: 'voice' },
+  voice: { el: 'view-voice', render: () => renderVoice($('voiceBody')), nav: 'practice' },
   progress: { el: 'view-progress', render: () => renderProgress($('progressBody')), nav: 'me' },
-  learn: { el: 'view-learn', render: () => renderLearn($('learnBody')), nav: 'roleplay' },
+  learn: { el: 'view-learn', render: () => renderLearn($('learnBody')), nav: 'practice' },
   settings: { el: 'view-settings', render: () => fillSettings(), nav: 'me' },
 };
 let current = null;
@@ -47,6 +47,11 @@ function route() {
   for (const [k, def] of Object.entries(VIEWS)) $(def.el).hidden = k !== v;
   for (const a of document.querySelectorAll('.nav a')) {
     if (a.dataset.view === VIEWS[v].nav) a.setAttribute('aria-current', 'page');
+    else a.removeAttribute('aria-current');
+  }
+  // The three practice pages share one menu button and a row of links at the top.
+  for (const a of document.querySelectorAll('.ptabs a')) {
+    if (a.dataset.p === v) a.setAttribute('aria-current', 'page');
     else a.removeAttribute('aria-current');
   }
   current = v;

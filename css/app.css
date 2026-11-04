@@ -99,6 +99,10 @@ button { cursor: pointer; }
   padding: calc(env(safe-area-inset-top) + var(--sp-4)) var(--sp-4) calc(var(--nav-h) + env(safe-area-inset-bottom) + var(--sp-6));
 }
 .wrap { max-width: 880px; margin: 0 auto; width: 100%; }
+.ptabs { display: flex; gap: 6px; margin-bottom: var(--sp-4); overflow-x: auto; scrollbar-width: none; }
+.ptabs::-webkit-scrollbar { display: none; }
+.ptabs a { flex: 1 1 0; min-width: max-content; display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 10px; border: 1px solid var(--line); border-radius: var(--r-pill); color: var(--muted); text-decoration: none; font-weight: 650; font-size: var(--fs-sm); white-space: nowrap; background: var(--surface); }
+.ptabs a[aria-current="page"] { background: var(--accent-soft); border-color: var(--accent); color: var(--text); }
 
 @media (min-width: 900px) {
   .nav {
@@ -370,6 +374,14 @@ dialog.sheet h2 { margin: 0 0 var(--sp-2); font-size: var(--fs-lg); }
 .role-pick select:disabled { opacity: .75; }
 .emo { color: var(--muted); white-space: nowrap; transition: color .3s var(--ease); }
 .char-bar .btn { margin-left: auto; min-height: 30px; }
+.char-bar { flex-wrap: wrap; }
+.opts-toggle { display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 70%; min-height: 40px; border: 1px solid var(--line); border-radius: var(--r-pill); padding: 4px 12px; background: var(--surface-2); color: var(--text); font: inherit; cursor: pointer; }
+.opts-toggle span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.opts-toggle .caret { color: var(--muted); transition: transform .2s var(--ease); }
+.opts-toggle.open .caret { transform: rotate(180deg); }
+.char-opts { display: flex; flex-wrap: wrap; gap: var(--sp-2, 8px); width: 100%; }
+.char-opts[hidden] { display: none; }
+.char-opts .role-pick { max-width: 100%; }
 .intro { align-self: center; text-align: center; max-width: 420px; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: var(--sp-6, 24px) var(--sp-4); }
 .intro b { font-size: var(--fs-lg, 18px); }
 .intro p { margin: 0; }

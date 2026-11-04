@@ -1,5 +1,20 @@
 # Test Report
 
+## Review fixes, 2026-11-04
+
+- **Offline suite:** 11/11 files passed.
+- **Browser** (mock Worker, 375 px phone size):
+  - with empty storage the link is the default Worker and the "no Worker link" notice is gone;
+  - the menu has 5 buttons and marks "ฝึก" on the scenarios, voice and courses pages;
+  - the three practice links fit at 375 px;
+  - the chat options button opens and closes the pickers;
+  - the quota line is hidden at 0 use;
+  - Settings shows today's count.
+- **UI audit:** every page has no sideways overflow, one h1, no unnamed controls and 0 contrast failures. The smallest controls are 36–40 px (small buttons and chips, by design).
+- **Not tested:**
+  - chatting with the default Worker from the real site. The local test origin is not on the Worker's allow-list, so the Worker refused it as expected;
+  - a real iPhone.
+
 ## Phase 6 — final QA, 2026-11-04
 
 ### Offline suite: `node tests/run-all.mjs` — 11/11 files, 194 passed, 0 failed

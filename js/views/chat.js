@@ -286,6 +286,21 @@ function renderCharBar() {
   $('emoChip').textContent = `${ui.emoji} ${ui.th}`;
   $('emoChip').title = `อารมณ์ตอนนี้: ${ui.th} (${Math.round(e.intensity * 100)}%)`;
   $('roleReset').hidden = s.role === char.defaultRole || !!s.scenario;
+  // One short summary button; the two pickers open under it.
+  const mode = inScene ? ROLEPLAY_MODE : MODES[ms.value];
+  $('optsText').textContent = `${(ROLES[s.role] || ROLES.scene).th} · ${mode.icon} ${mode.th}`;
+  $('optsToggle').setAttribute('aria-label', `บทบาท ${(ROLES[s.role] || ROLES.scene).th}, โหมด ${mode.th} — แตะเพื่อเปลี่ยน`);
+  showOpts(optsOpen);
+}
+
+let optsOpen = false;
+try { optsOpen = localStorage.getItem('lb_opts_open') === '1'; } catch { /* private mode */ }
+function showOpts(open) {
+  optsOpen = open;
+  $('charOpts').hidden = !open;
+  $('optsToggle').setAttribute('aria-expanded', String(open));
+  $('optsToggle').classList.toggle('open', open);
+  try { localStorage.setItem('lb_opts_open', open ? '1' : '0'); } catch { /* ignore */ }
 }
 
 function setRole(roleId) {
@@ -328,6 +343,8 @@ export function renderQuota() {
   $('quotaBar').style.width = pct + '%';
   $('quotaBarWrap').className = 'bar ' + (u.out || (limit && u.requests >= limit) ? 'bad' : limit && u.requests >= limit * 0.8 ? 'warn' : '');
   q.classList.toggle('out', !!u.out);
+  // Only show the quota line when it matters: used up, or 80% of the daily limit reached.
+  q.hidden = !(u.out || (limit && u.requests >= limit * 0.8));
 }
 
 // The running scene: title, difficulty and how far it has got (stage names from the scenario data).
@@ -482,7 +499,8 @@ export function initChat() {
   });
   $('sceneEnd').addEventListener('click', endScene);
   $('roleSelect').addEventListener('change', (e) => setRole(e.target.value));
-  $('modeSelect').addEventListener('change', (e) => setMode(e.target.value));
+  $('modeSelect').addEventListener('change', (e) => { setMode(e.target.value); renderCharBar(); });
+  $('optsToggle').addEventListener('click', () => showOpts(!optsOpen));
   $('roleReset').addEventListener('click', () => setRole(activeChar().defaultRole));
   $('fixBtn').addEventListener('click', showFixSummary);
   $('quota').addEventListener('click', () => { location.hash = '#settings'; });

@@ -1,5 +1,18 @@
 # Changelog
 
+## Review fixes (2026-11-04)
+
+These come from the owner's app review.
+
+- **Works on first open:** the Worker link defaults to the owner's Worker (`DEFAULT_WORKER` in `store.js`), so a new learner can chat without visiting Settings. An empty saved link also falls back to it. The Settings field still lets anyone use their own Worker.
+  - Note: the Worker has no access code (the owner's choice), so anyone with the site link uses the owner's Gemini quota. The per-IP limit (40 requests a minute) still applies.
+- **Calmer chat header:**
+  - The role and mode pickers are folded into one summary button ("เพื่อน · 💬 คุยธรรมชาติ ▾") that opens them. The open/closed choice is remembered on this device.
+  - The quota line shows only when Gemini is used up or 80% of the daily limit is reached. Today's count is shown in Settings → การเชื่อมต่อ.
+- **Five menu buttons instead of six:** สถานการณ์, ฝึกเสียง and คอร์ส/IELTS share one "ฝึก" button. A row of three links at the top of each of those pages switches between them. The menu now marks "ฝึก" on the courses page, where it used to mark สถานการณ์.
+
+Service worker cache `buddy-v23`. No prompt or Worker changes.
+
 ## Phase 6 — Professional UX and QA (2026-11-04)
 
 ### Audit tool

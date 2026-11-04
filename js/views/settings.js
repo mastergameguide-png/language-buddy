@@ -4,6 +4,7 @@ import {
   settings, state, push, setSettings, saveSettings, replaceState, persist, emit, on,
   LANGS, CEFR, IELTS, DEFAULT_SETTINGS, LIMITS, cefrOf, logActivity, storageReport,
 } from '../store.js';
+import { todayUsage } from '../ai.js';
 import { pushStatus, enablePush, testPush, disablePush, syncPush, hh } from '../push.js';
 import { sync, runSync, startSync, stopSync, deleteServerCopy, newCode, cleanCode, showCode } from '../sync.js';
 
@@ -92,6 +93,8 @@ function renderStorage() {
 
 export function fillSettings() {
   f('sWorker').value = settings.workerUrl;
+  const u = todayUsage();
+  f('usageNow').textContent = `ใช้วันนี้: Gemini ${u.requests} ครั้ง` + (u.groq ? ` · Groq ${u.groq}` : '') + (u.out ? ' · Gemini หมดแล้ววันนี้' : '');
   f('sAccess').value = settings.accessCode;
   f('sLang').value = settings.lang;
   fillLevels(settings.lang, settings.level);

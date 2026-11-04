@@ -26,8 +26,7 @@
     <a href="#home" data-view="home" data-icon="home"><span>หน้าหลัก</span></a>
     <a href="#chat" data-view="chat" data-icon="chat"><span>แชต</span><span class="dot" id="chatDot" hidden></span></a>
     <a href="#review" data-view="review" data-icon="review"><span>ทบทวน</span><span class="dot" id="dueDot" hidden></span></a>
-    <a href="#roleplay" data-view="roleplay" data-icon="mask"><span>สถานการณ์</span></a>
-    <a href="#voice" data-view="voice" data-icon="mic"><span>ฝึกเสียง</span></a>
+    <a href="#roleplay" data-view="practice" data-icon="target"><span>ฝึก</span></a>
     <a href="#me" data-view="me" data-icon="me"><span>ฉัน</span></a>
   </nav>
 
@@ -43,16 +42,19 @@
         <a class="icon-btn" href="#roleplay" aria-label="ฝึกสถานการณ์" data-icon="mask"></a>
         <a class="icon-btn" href="#settings" aria-label="ตั้งค่า" data-icon="gear"></a>
       </header>
-      <button class="quota" id="quota" type="button" aria-label="โควตาวันนี้ แตะเพื่อตั้งค่า">
+      <button class="quota" id="quota" type="button" aria-label="โควตาวันนี้ แตะเพื่อตั้งค่า" hidden>
         <span id="quotaText">Gemini วันนี้ 0 ครั้ง</span>
         <div class="bar" id="quotaBarWrap"><i id="quotaBar"></i></div>
       </button>
       <div class="char-bar" id="charBar">
-        <label class="role-pick"><span aria-hidden="true">🎭</span><select id="roleSelect" aria-label="บทบาทของตัวละคร"></select></label>
-        <label class="role-pick"><select id="modeSelect" aria-label="โหมดการคุย"></select></label>
+        <button type="button" class="opts-toggle" id="optsToggle" aria-expanded="false" aria-controls="charOpts"><span id="optsText"></span><span class="caret" aria-hidden="true">▾</span></button>
         <span class="emo" id="emoChip" title="อารมณ์ตอนนี้"></span>
         <button type="button" class="btn sm ghost" id="roleReset" hidden>กลับเป็นปกติ</button>
         <button type="button" class="btn sm" id="fixBtn" hidden>✏️ คำแก้</button>
+        <div class="char-opts" id="charOpts" hidden>
+          <label class="role-pick"><span aria-hidden="true">🎭</span><select id="roleSelect" aria-label="บทบาทของตัวละคร"></select></label>
+          <label class="role-pick"><select id="modeSelect" aria-label="โหมดการคุย"></select></label>
+        </div>
       </div>
       <div class="scene-bar" id="sceneBar" hidden>
         <div class="scene-info">
@@ -82,10 +84,10 @@
 
     <section id="view-review" class="view" hidden><div class="scroll"><div class="wrap" id="reviewBody"></div></div></section>
     <section id="view-characters" class="view" hidden><div class="scroll"><div class="wrap" id="charsBody"></div></div></section>
-    <section id="view-roleplay" class="view" hidden><div class="scroll"><div class="wrap" id="roleBody"></div></div></section>
-    <section id="view-learn" class="view" hidden><div class="scroll"><div class="wrap" id="learnBody"></div></div></section>
+    <section id="view-roleplay" class="view" hidden><div class="scroll"><nav class="wrap ptabs" aria-label="ประเภทการฝึก"><a href="#roleplay" data-p="roleplay">🎭 สถานการณ์</a><a href="#voice" data-p="voice">🎙️ ฝึกเสียง</a><a href="#learn" data-p="learn">📚 คอร์ส</a></nav><div class="wrap" id="roleBody"></div></div></section>
+    <section id="view-learn" class="view" hidden><div class="scroll"><nav class="wrap ptabs" aria-label="ประเภทการฝึก"><a href="#roleplay" data-p="roleplay">🎭 สถานการณ์</a><a href="#voice" data-p="voice">🎙️ ฝึกเสียง</a><a href="#learn" data-p="learn">📚 คอร์ส</a></nav><div class="wrap" id="learnBody"></div></div></section>
     <section id="view-progress" class="view" hidden><div class="scroll"><div class="wrap" id="progressBody"></div></div></section>
-    <section id="view-voice" class="view" hidden><div class="scroll"><div class="wrap" id="voiceBody"></div></div></section>
+    <section id="view-voice" class="view" hidden><div class="scroll"><nav class="wrap ptabs" aria-label="ประเภทการฝึก"><a href="#roleplay" data-p="roleplay">🎭 สถานการณ์</a><a href="#voice" data-p="voice">🎙️ ฝึกเสียง</a><a href="#learn" data-p="learn">📚 คอร์ส</a></nav><div class="wrap" id="voiceBody"></div></div></section>
     <section id="view-me" class="view" hidden><div class="scroll"><div class="wrap" id="meBody"></div></div></section>
 
     <section id="view-settings" class="view" hidden>
@@ -211,9 +213,11 @@
           <div class="card set-group">
             <h3>☁️ การเชื่อมต่อ</h3>
             <label class="field"><span>ลิงก์ Cloudflare Worker</span><input class="input" id="sWorker" type="url" placeholder="https://language-buddy.xxx.workers.dev" autocomplete="off" inputmode="url"></label>
+            <div class="hint">ตั้งไว้ให้แล้ว เปลี่ยนเฉพาะถ้าคุณมี Worker ของตัวเอง · เว้นว่าง = ใช้ลิงก์เริ่มต้น</div>
             <label class="field"><span>รหัสเข้าใช้ Worker (ถ้าตั้งไว้)</span><input class="input" id="sAccess" type="password" autocomplete="off" maxlength="100"></label>
             <div class="hint">ใส่เฉพาะเมื่อตั้ง ACCESS_CODE ไว้ที่ Worker — กันคนอื่นใช้โควตาของคุณ (ไม่รวมในไฟล์สำรอง)</div>
             <label class="field"><span>โควตาฟรีของ Gemini ต่อวัน (จำนวนครั้ง)</span><input class="input" id="sLimit" type="number" min="0" step="1" inputmode="numeric" placeholder="เช่น 1000"></label>
+            <div class="hint" id="usageNow"></div>
             <div class="hint">ดูตัวเลข RPD ได้ที่ aistudio.google.com/rate-limit · แอปนับเฉพาะในเครื่องนี้ · รีเซ็ตเที่ยงคืนเวลาแปซิฟิก</div>
           </div>
 

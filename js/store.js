@@ -42,8 +42,11 @@ export const CATEGORIES = {
   other: 'อื่นๆ',
 };
 
+// The owner's Worker. Used whenever no other link is saved, so a new learner can chat right away.
+export const DEFAULT_WORKER = 'https://language-buddy.mastergameguide.workers.dev';
+
 export const DEFAULT_SETTINGS = {
-  workerUrl: '',
+  workerUrl: DEFAULT_WORKER,
   accessCode: '',               // optional; must match ACCESS_CODE on the Worker if that is set
   lang: 'English',
   level: 'B1',                  // CEFR (A1–C2) or, for English, an IELTS band such as 'IELTS 6.5'
@@ -239,11 +242,12 @@ export function normalizeState(raw) {
   return s;
 }
 
-export let settings = { ...DEFAULT_SETTINGS, ...load('lb_settings', {}) };
+const withDefaults = (s) => { const out = { ...DEFAULT_SETTINGS, ...s }; if (!out.workerUrl) out.workerUrl = DEFAULT_WORKER; return out; };
+export let settings = withDefaults(load('lb_settings', {}));
 export let state = normalizeState(load('lb_state', null));
 export let push = { id: '', enabled: false, lastSync: 0, ...load('lb_push', {}) };
 
-export function setSettings(next) { settings = { ...DEFAULT_SETTINGS, ...next }; save('lb_settings', settings); emit('settings'); }
+export function setSettings(next) { settings = withDefaults(next); save('lb_settings', settings); emit('settings'); }
 export function saveSettings() { save('lb_settings', settings); emit('settings'); }
 export function replaceState(next) { state = normalizeState(next); persist(); emit('state'); }
 export function persist() {
@@ -256,7 +260,7 @@ export function savePush() { save('lb_push', push); }
 // Another tab changed the data: pick it up instead of overwriting it later.
 window.addEventListener('storage', (e) => {
   if (e.key === 'lb_state' && e.newValue) { state = normalizeState(load('lb_state', null)); emit('state'); }
-  if (e.key === 'lb_settings' && e.newValue) { settings = { ...DEFAULT_SETTINGS, ...load('lb_settings', {}) }; emit('settings'); }
+  if (e.key === 'lb_settings' && e.newValue) { settings = withDefaults(load('lb_settings', {})); emit('settings'); }
 });
 
 // ---------- tiny event bus ----------
