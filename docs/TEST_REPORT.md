@@ -1,5 +1,42 @@
 # Test Report
 
+## Phase 4 — 2026-11-04
+
+### Offline suite: `node tests/run-all.mjs` — 10/10 files, 180 passed, 0 failed
+
+| File | Result |
+|---|---|
+| `analytics.test.mjs` (new) | 15 passed: local day ranges (including month ends); sums and active days; every metric has a source and rates have a minimum; confidence levels and hidden values below the minimum; rate and average maths; the weekly comparison with the right "good" direction (fewer hints is good); an empty week shows no made-up numbers; weak-spot rules (mistake type, forgotten cards, due pile, hints, no voice practice, low scenario criterion, weak listening, style tips not counted, no chat); recommendations capped at 3 with no repeated action; history; plan creation, rotation, progress from real counters, editing limits, validation |
+| `store.test.mjs` | 16 passed (new: the plan is validated on load) |
+| others | unchanged, all pass |
+
+The new tests found 1 defect, which is fixed: a target of 0 was treated as "missing".
+
+### Browser (mock Worker, 375 px) — all PASS
+- **Empty data:** the plan offers "สร้างแผน 7 วัน"; every rate shows "ข้อมูลยังไม่พอ"; the only recommendation is "ไม่ได้คุยมา 3 วัน"; the highlight says nothing was studied this week.
+- **Plan:**
+  - creating it gives 7 day pills and 3 tasks for today;
+  - "+" raised chat 10 → 15;
+  - "✕" removed a task, and "เพิ่มงาน" added study time;
+  - the change was saved;
+  - another day shows its own tasks.
+- **With 14 days of sample data:**
+  - the highlights read "5 จาก 7 วัน (มากกว่าสัปดาห์ก่อน 2 วัน)", "ความแม่นยำไวยากรณ์ 50% → 88%" and "Tense น้อยลง 4 → 0";
+  - all 13 metrics show this week and last week with arrows (9 good, 1 bad);
+  - tapping a row shows its source and sample size;
+  - mistake types show the change week on week;
+  - the history has 9 days.
+- **Recommendations:** frequent tense mistakes (→ practise in chat), forgotten cards (→ review), a low café criterion averaging 2.3/5 (→ replay).
+- **Today's plan:** shows real progress (chat 8/15, review 6/10, time 15/15 ✅).
+- **Home:** lists the plan tasks and the top 2 recommendations with their evidence.
+- **Recommendation button:** "ฝึกในแชต" opened the chat and sent the tense practice note to the (mock) AI.
+- **Layout:** after the fix, plan rows have their edit controls on a separate line. No horizontal overflow and no JS errors. The only console errors are the known localhost service-worker registration failure in this test browser.
+
+### Not tested
+- Real iPhone.
+- The recall metric needs new review data; it starts empty for existing users, by design.
+- Real AI: not needed; there are no prompt changes. The recommendation only reuses the existing practice note.
+
 ## Phase 3 — 2026-11-04
 
 ### Offline suite: `node tests/run-all.mjs` — 9/9 files, 164 passed, 0 failed

@@ -1,5 +1,50 @@
 # Changelog
 
+## Phase 4 — Learning analytics (2026-11-04)
+
+### Metric registry (4.1) — `js/engine/analytics.js` (pure)
+- There are 13 metrics, each with a Thai name, a unit, a written **source**, a kind (`count` = exact tally, `rate` = share or average) and which direction is good.
+- The metrics: study time, active days, messages, grammar accuracy, reviews, recall in review, new words, hint use, shadowing, words caught by the recogniser, listening accuracy, scenarios finished, average scenario score.
+- Rates are only shown with a minimum sample (`minN`). Below it they read "ข้อมูลยังไม่พอ".
+- Confidence labels are low / medium / high, at 1×, 3× and 10× the minimum. Counts are labelled "นับจริง".
+- New data collected from now on: review grades (`reviewsGraded`, `reviewForgot`) for the recall metric. Older reviews still count as reviews.
+
+### Weekly report (4.2)
+- This week (the last 7 days) against the 7 days before, for every metric: value, previous value, ▲▼, and whether the change is good (for hints, fewer is good).
+- Mistake types are compared week against week (style tips are not counted).
+- 2–5 plain-Thai highlights, built only from metrics with enough data.
+- A 30-day learning history, one line per active day.
+- A "ตัวเลขแต่ละตัวมาจากไหน" section lists every source. It states that there is no pronunciation score.
+
+### Weak spots and recommendations (4.3)
+- Rules, each with the evidence shown to the learner:
+  - a mistake type ≥3 times in 14 days;
+  - cards forgotten 2+ times;
+  - 10+ cards due;
+  - ≥50% of messages sent after opening a hint;
+  - a scenario criterion averaging ≤2.5/5 over 2+ attempts;
+  - listening accuracy below 60%;
+  - the recogniser catching below 70% of words;
+  - no voice practice this week;
+  - no chat in 3 days.
+- `recommendations()` picks the top 3, one per kind of action. Each has a button: practise in chat, open review, replay the scenario, open the voice page on the right tab, or open the chat.
+
+### Personal 7-day plan (4.4) — `js/engine/plan.js` (pure)
+- Built from the daily goals (messages, reviews) and the weak spots: every day has chat + review, plus one practice task that rotates through the focus areas (listening, shadowing, scenarios, words).
+- Task progress comes only from what was really done that day.
+- The learner can raise or lower targets, remove tasks, add tasks (up to 5 a day, no duplicates), and start a new plan.
+- Stored as `state.plan`, validated by `cleanPlan` and synced as the `x:plan` row.
+
+### Screens
+- New page "รายงานและแผนเรียน" (`#progress`), opened from Home and the Me page.
+- Home: "วันนี้ทำอะไรดี" now shows today's plan tasks with progress, plus the top recommendations with their evidence. These replace the old fixed rules.
+
+### Fixes found by the new tests
+- Lowering a plan target to 0 reset it to the default instead of the minimum, because 0 was treated as "missing".
+- Plan rows were cramped on a phone, so the edit controls moved to their own line.
+
+Service worker cache `buddy-v20`. No AI or Worker changes.
+
 ## Phase 3 — Voice and shadowing (2026-11-04)
 
 Owner decision applied: browser-only speech, no paid pronunciation provider. **No pronunciation score is shown anywhere.**

@@ -3,8 +3,9 @@ import { el, h, icon, num, fmtMinutes, ago } from '../util.js';
 import { settings, state, levelShort, cefrOf, CEFR, CATEGORIES, weakAreas, flag, activeChar, activeCharId } from '../store.js';
 import { today, streak, lastDays, totals, accuracy, vocabCounts, dueCards } from '../stats.js';
 import { switchCharacter } from './chat.js';
-import { practice } from '../conversation.js';
 import { suggestScene, openScenario } from './roleplay.js';
+import { todayTasks, runAction } from './progress.js';
+import { recommendations } from '../engine/analytics.js';
 import { CHARACTERS, customCharacter } from '../engine/characters.js';
 import { avatarEl } from './avatar.js';
 
@@ -93,20 +94,22 @@ export function renderHome(root) {
     stat('ความแม่นยำไวยากรณ์', acc == null ? '—' : `${acc}%`, acc == null ? 'คุยเพิ่มอีกนิดเพื่อวัดผล' : 'ข้อความที่ไม่ต้องแก้ · 7 วัน'),
     stat('ข้อผิดที่บันทึก', num(state.mistakes.length), weak ? `พลาดบ่อย: ${CATEGORIES[weak.category]}` : 'ยังไม่มี')));
 
-  // Personal plan
-  root.append(el('h2', 'sec', 'แผนแนะนำวันนี้'));
+  // Today: the 7-day plan's tasks (if any), then what the analytics suggest, each with its evidence.
+  root.append(h('div', { class: 'sec-row' }, el('h2', 'sec', 'วันนี้ทำอะไรดี'), h('a', { class: 'btn sm ghost', href: '#progress' }, 'รายงานและแผน 7 วัน')));
   const plan = h('div', { class: 'card' });
   let n = 1;
-  const step = (text, btnLabel, onClick, href) => {
+  const step = (text, btnLabel, onClick, href, sub) => {
     const b = btnLabel ? (href ? h('a', { class: 'btn sm', href }, btnLabel) : h('button', { class: 'btn sm', type: 'button', onclick: onClick }, btnLabel)) : null;
-    plan.append(h('div', { class: 'plan-step' }, el('span', 'n', String(n++)), el('span', 'grow small', text), b));
+    plan.append(h('div', { class: 'plan-step' }, el('span', 'n', String(n++)), h('div', { class: 'grow' }, el('div', 'small', text), sub ? el('div', 'xs muted', sub) : null), b));
   };
-  if (due) step(`ทบทวนคำและประโยคที่ถึงเวลา ${num(due)} ข้อ`, 'เริ่ม', null, '#review');
-  if (weak) step(`ฝึกจุดที่พลาดบ่อย: ${CATEGORIES[weak.category]} (${weak.count} ครั้งใน 30 วัน)`, 'ฝึก', () => practice(weak.category, CATEGORIES[weak.category]));
+  const tasks = todayTasks();
+  if (tasks) for (const tk of tasks) step(`${tk.complete ? '✅' : tk.icon} ${tk.th} ${tk.target} ${tk.unit}`, tk.complete ? null : 'ทำ', null, tk.href, `ทำแล้ว ${Math.min(tk.done, tk.target)}/${tk.target} · จากแผน 7 วัน`);
+  for (const r of recommendations({ days: state.days, mistakes: state.mistakes, vocab: state.vocab, results: state.results, labels: CATEGORIES }, Date.now(), tasks ? 2 : 3)) {
+    step(r.th, 'ไป', () => runAction(r.action), null, `ดูจาก: ${r.evidence}`);
+  }
   const sc = suggestScene();
-  if (sc) step(`ลองสถานการณ์: ${sc.icon} ${sc.th} (${sc.cefr[0]}–${sc.cefr[1]})`, 'ดู', () => openScenario(sc.id));
-  if (!t.shadow && !t.listen && (state.mistakes.length || state.vocab.length)) step('ฝึกพูดตามและฝึกฟัง 5 ประโยคจากคำที่คุณเคยพลาดและคำศัพท์ของคุณ', 'ฝึก', null, '#voice');
-  if (n === 1) step(`เริ่มคุยกับ ${activeChar().name} สัก 10 ข้อความ เพื่อให้แอปรู้จุดแข็งจุดอ่อนของคุณ`, 'คุยเลย', null, '#chat');
+  if (sc && n <= 4) step(`ลองสถานการณ์: ${sc.icon} ${sc.th} (${sc.cefr[0]}–${sc.cefr[1]})`, 'ดู', () => openScenario(sc.id));
+  if (!tasks) plan.append(h('div', { class: 'row', style: 'margin-top:10px' }, el('span', 'grow xs muted', 'อยากได้แผนทั้งสัปดาห์?'), h('a', { class: 'btn sm primary', href: '#progress' }, 'สร้างแผน 7 วัน')));
   root.append(plan);
 
   // Week

@@ -11,6 +11,7 @@ import { renderRoleplay } from './views/roleplay.js';
 import { renderMe } from './views/me.js';
 import { renderCharacters } from './views/characters.js';
 import { renderVoice } from './views/voice.js';
+import { renderProgress } from './views/progress.js';
 import { initSettings, fillSettings, applyTheme } from './views/settings.js';
 
 // A bug in one view should not take the whole app down; tell the user and keep going.
@@ -32,6 +33,7 @@ const VIEWS = {
   me: { el: 'view-me', render: () => renderMe($('meBody')), nav: 'me' },
   characters: { el: 'view-characters', render: () => renderCharacters($('charsBody')), nav: 'chat' },
   voice: { el: 'view-voice', render: () => renderVoice($('voiceBody')), nav: 'voice' },
+  progress: { el: 'view-progress', render: () => renderProgress($('progressBody')), nav: 'me' },
   settings: { el: 'view-settings', render: () => fillSettings(), nav: 'me' },
 };
 let current = null;

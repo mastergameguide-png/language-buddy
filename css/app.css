@@ -445,3 +445,24 @@ h3.sub { font-size: var(--fs-sm); margin: 6px 0 0; }
 .shadow-card .compare audio { height: 36px; max-width: 100%; }
 .shadow-card .btn.on { background: var(--bad); border-color: var(--bad); color: #fff; }
 @media (max-width: 380px) { .nav a { font-size: 10px; } }
+.day-pills { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; margin-bottom: 12px; }
+.day-pills button { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 6px 0; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--surface-2); color: var(--text); min-width: 0; }
+.day-pills button small { font-size: 10px; color: var(--muted); }
+.day-pills button .mark { font-size: 11px; height: 14px; color: var(--good); }
+.day-pills button.today { border-color: var(--accent); }
+.day-pills button[aria-selected="true"] { background: var(--accent-soft); }
+.day-pills button.done b { color: var(--good); }
+.plan-card .task { align-items: center; }
+.plan-card .task.complete .small { color: var(--good); }
+.task-edit { display: flex; align-items: center; gap: 4px; margin-top: 6px; }
+.icon-btn.sm { width: 30px; height: 30px; font-size: 15px; }
+.rec { align-items: center; }
+.metric-table { display: grid; gap: 0; }
+.metric-table .mrow { display: flex; align-items: center; gap: 8px; padding: 9px 0; border: 0; border-bottom: 1px solid var(--line); background: none; color: var(--text); text-align: left; width: 100%; }
+.metric-table .mrow.head { padding-top: 0; }
+.metric-table .mrow .v { width: 74px; text-align: right; flex: none; }
+.metric-table .mrow .t { width: 16px; text-align: center; flex: none; font-size: 12px; }
+.metric-table .msrc { padding: 4px 0 8px; }
+.good-text { color: var(--good); }
+.bad-text { color: var(--bad); }
+.hdate { width: 58px; flex: none; }

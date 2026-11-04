@@ -8,6 +8,7 @@ import { expire } from './engine/memory.js';
 import { SKILLS, FEEDBACK_TYPES, hintsOf } from './engine/response.js';
 import { QUALITY_KEYS } from './engine/checks.js';
 import { VOICE_KEEP } from './engine/shadowing.js';
+import { cleanPlan } from './engine/plan.js';
 
 export const LANGS = {
   English: { code: 'en-US', label: 'English (อังกฤษ)' },
@@ -79,7 +80,7 @@ const EMPTY_STATE = () => ({
   v: STATE_VERSION, messages: [], facts: [], mistakes: [], vocab: [], scene: null, lastSeen: 0,
   days: {}, activity: [], results: [],
   charMemory: {}, sessions: {}, skills: {}, topics: {},
-  trimmed: {}, quality: {}, voice: {},
+  trimmed: {}, quality: {}, voice: {}, plan: null,
 });
 // How much is kept on this device. Learning records (words, mistakes) are only trimmed at a
 // very high safety cap, and anything trimmed is counted in state.trimmed and shown in Settings,
@@ -202,6 +203,7 @@ export function normalizeState(raw) {
   s.voice = Object.fromEntries(Object.entries(obj(s.voice)).filter(([k, v]) => /^[a-z0-9]{1,12}$/.test(k) && v && typeof v === 'object' && ['shadow', 'listen'].includes(v.kind))
     .map(([k, v]) => [k, { kind: v.kind, best: v.best == null ? null : Math.max(0, Math.min(1, Number(v.best) || 0)), n: Math.max(0, Math.floor(Number(v.n) || 0)), t: Number(v.t) || 0 }])
     .sort((a, b) => b[1].t - a[1].t).slice(0, VOICE_KEEP));
+  s.plan = cleanPlan(s.plan);   // the 7-day study plan (engine/plan.js)
   s.lastSeen = Number(s.lastSeen) || 0;
   s.v = STATE_VERSION;
   return s;

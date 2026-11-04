@@ -1,7 +1,7 @@
 // Backup + sync across devices through the Worker's D1 (SQL) database.
 // Every learner item becomes one row ("c:" chat message, "m:" mistake, "w:" word, "f:" fact,
 // "r:" role-play result, "a:" activity, "d:" day stats, "s:" settings, "k:" character memory,
-// "x:" skills/topics, "v:" shadowing/listening progress per sentence). This device remembers a
+// "x:" skills/topics/plan, "v:" shadowing/listening progress per sentence). This device remembers a
 // short hash of each row it last sent or received, so a sync only uploads what changed here
 // (a missing row = deleted) and downloads what other devices changed since `cursor`.
 import { settings, state, load, save, persist, emit, setSettings, DEFAULT_SETTINGS, normalizeState } from './store.js';
@@ -53,6 +53,7 @@ function localRows() {
   for (const [cid, list] of Object.entries(state.charMemory || {})) for (const m of list) add(`k:${cid}:${safeId(m.id)}`, m);
   if (Object.keys(state.skills || {}).length) add('x:skills', state.skills);
   if (Object.keys(state.topics || {}).length) add('x:topics', state.topics);
+  if (state.plan) add('x:plan', state.plan);
   // One row per practised sentence: the whole map could pass the Worker's 20,000-character row limit.
   for (const [key, r] of Object.entries(state.voice || {})) add('v:' + key, r);
   const shared = { ...settings };
@@ -86,6 +87,7 @@ function applyRow(k, d) {
   } else if (kind === 'x') {
     const name = k.slice(2);
     if (name === 'skills' || name === 'topics') state[name] = v || {};
+    else if (name === 'plan') state.plan = v;   // validated by normalizeState after the sync
   } else if (kind === 'v') {
     // Practice progress for one sentence; two devices: keep the better record.
     const key = k.slice(2);

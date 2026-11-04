@@ -119,7 +119,7 @@ function grade(g, root) {
   cur.item.srs = schedule(cur.item.srs, g);
   session.done += 1;
   if (g === 0) { session.again += 1; session.queue.push(cur); }   // once more this session
-  recordReview();
+  recordReview(g);
   revealed = false;
   if (!session.queue.length) logActivity('review', `ทบทวน ${session.done} ข้อ`);
   persist();

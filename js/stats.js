@@ -13,7 +13,7 @@ export function today() {
   const k = dayKey();
   const d = (state.days[k] ||= { msgs: 0, checked: 0, corrected: 0, secs: 0, reviews: 0, words: 0, voice: 0 });
   // Fields added later start at 0 on older days.
-  for (const f of ['hints', 'hintFull', 'helper', 'shadow', 'shadowWords', 'shadowHeard', 'listen', 'listenOk']) d[f] ||= 0;
+  for (const f of ['hints', 'hintFull', 'helper', 'shadow', 'shadowWords', 'shadowHeard', 'listen', 'listenOk', 'reviewsGraded', 'reviewForgot']) d[f] ||= 0;
   return d;
 }
 function prune() {
@@ -32,7 +32,12 @@ export function recordMessage(text, corrected, voice) {
   }
   prune();
 }
-export function recordReview() { today().reviews += 1; }
+// grade: 0 forgot … 3 easy. Older callers without a grade still count the review.
+export function recordReview(grade) {
+  const d = today();
+  d.reviews += 1;
+  if (Number.isInteger(grade)) { d.reviewsGraded += 1; if (grade === 0) d.reviewForgot += 1; }
+}
 // level: the highest hint step the learner opened before answering (4 = saw a full example).
 export function recordHint(level) { const d = today(); d.hints += 1; if (level >= 4) d.hintFull += 1; }
 export function recordHelper() { today().helper += 1; }

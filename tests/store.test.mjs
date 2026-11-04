@@ -90,6 +90,13 @@ await test('voice practice records are validated', async () => {
   const s = S.normalizeState({ voice: { abc1: { kind: 'shadow', best: 1.7, n: 2, t: 5 }, zz: { kind: 'listen', best: null, n: 1, t: 6 }, 'bad key!': { kind: 'shadow' }, x9: { kind: 'other' } } });
   if (JSON.stringify(s.voice) !== '{"zz":{"kind":"listen","best":null,"n":1,"t":6},"abc1":{"kind":"shadow","best":1,"n":2,"t":5}}') throw new Error(JSON.stringify(s.voice));
 });
+await test('the 7-day plan is validated on load; a broken one is dropped', async () => {
+  let s = S.normalizeState({ plan: { days: [{ key: '2026-11-04', tasks: [{ id: 'a', kind: 'listen', target: 3 }, { kind: 'evil' }] }] } });
+  if (s.plan?.days[0].tasks.length !== 1 || s.plan.days[0].tasks[0].kind !== 'listen') throw new Error(JSON.stringify(s.plan));
+  s = S.normalizeState({ plan: 'nonsense' });
+  if (s.plan !== null) throw new Error('kept a bad plan');
+  if (S.normalizeState({}).plan !== null) throw new Error('missing plan should be null');
+});
 await test('addResult keeps up to the results limit', async () => {
   S.replaceState({});
   for (let i = 0; i < 60; i++) S.addResult({ t: i, scene: 's', score: 5 });

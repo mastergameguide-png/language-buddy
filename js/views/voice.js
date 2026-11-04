@@ -30,6 +30,12 @@ export function practiseSentence(text, th = '') {
   location.hash = '#voice';
 }
 
+// Opens the page on one tab ('shadow' or 'listen'), e.g. from a recommendation.
+export function openVoice(which = 'shadow') {
+  tab = which === 'listen' ? 'listen' : 'shadow';
+  if (location.hash === '#voice') render(document.getElementById('voiceBody')); else location.hash = '#voice';
+}
+
 function levelExpressions() {
   return searchScenarios(SCENARIOS, { cefr: cefrOf(), english: isEnglish() }).flatMap((s) => s.expressions);
 }
