@@ -9,6 +9,8 @@ import { SKILLS, FEEDBACK_TYPES, hintsOf } from './engine/response.js';
 import { QUALITY_KEYS } from './engine/checks.js';
 import { VOICE_KEEP } from './engine/shadowing.js';
 import { cleanPlan } from './engine/plan.js';
+import { cleanCourses } from './engine/courses.js';
+import { cleanBand } from './engine/ielts.js';
 
 export const LANGS = {
   English: { code: 'en-US', label: 'English (อังกฤษ)' },
@@ -80,12 +82,12 @@ const EMPTY_STATE = () => ({
   v: STATE_VERSION, messages: [], facts: [], mistakes: [], vocab: [], scene: null, lastSeen: 0,
   days: {}, activity: [], results: [],
   charMemory: {}, sessions: {}, skills: {}, topics: {},
-  trimmed: {}, quality: {}, voice: {}, plan: null,
+  trimmed: {}, quality: {}, voice: {}, plan: null, ielts: [], courses: {},
 });
 // How much is kept on this device. Learning records (words, mistakes) are only trimmed at a
 // very high safety cap, and anything trimmed is counted in state.trimmed and shown in Settings,
 // so nothing disappears silently. Chat keeps the latest messages per character.
-export const LIMITS = { messagesPerChar: 500, mistakes: 5000, vocab: 5000, results: 500, activity: 40, days: 730 };
+export const LIMITS = { messagesPerChar: 500, mistakes: 5000, vocab: 5000, results: 500, activity: 40, days: 730, ielts: 300 };
 const TRIM_KINDS = ['messages', 'mistakes', 'vocab', 'results'];
 
 // Keeps the newest `max` items and counts what was removed in s.trimmed[kind].
@@ -169,6 +171,32 @@ function cleanMessage(m) {
   return out;
 }
 
+// One IELTS practice attempt (Phase 5). Bands are practice estimates; listening keeps a raw score only.
+const bands = (o) => Object.fromEntries(Object.entries(o && typeof o === 'object' ? o : {}).slice(0, 4).map(([k, v]) => [str(k, 30), cleanBand(v)]).filter(([, v]) => v != null));
+function cleanIeltsAttempt(a) {
+  if (!a || !['speaking', 'writing', 'listening'].includes(a.kind) || !Number(a.t)) return null;
+  const out = { t: Number(a.t), kind: a.kind, id: str(a.id, 40) };
+  if (a.kind === 'speaking') out.part = [1, 2, 3].includes(a.part) ? a.part : 1;
+  if (a.kind === 'writing') out.task = a.task === 1 ? 1 : 2;
+  if (a.kind === 'listening') { out.score = Math.max(0, Math.floor(Number(a.score) || 0)); out.total = Math.max(out.score, Math.floor(Number(a.total) || 0)); return out; }
+  out.question = str(a.question, 400);
+  out.answer = str(a.answer, a.kind === 'writing' ? 6000 : 2500);
+  out.words = Math.max(0, Math.floor(Number(a.words) || 0));
+  out.criteria = bands(a.criteria);
+  out.overall = cleanBand(a.overall);
+  out.target = cleanBand(a.target);
+  if (a.feedback && typeof a.feedback === 'object') {
+    const f = a.feedback, s = (v, n) => str(v, n);
+    out.feedback = {
+      strengths: (Array.isArray(f.strengths) ? f.strengths : []).slice(0, 4).map((x) => s(x, 300)),
+      improvements: (Array.isArray(f.improvements) ? f.improvements : []).slice(0, 5).map((x) => ({ original: s(x?.original, 300), better: s(x?.better, 400), why: s(x?.why, 300) })),
+      vocab: (Array.isArray(f.vocab) ? f.vocab : []).slice(0, 6).map((x) => ({ word: s(x?.word, 60), th: s(x?.th, 120) })),
+      sample: s(f.sample, 2000), structure: s(f.structure, 600), improved: s(f.improved, 1500), note: s(f.note, 400),
+    };
+  }
+  return out;
+}
+
 // The running role-play. step/total/done/variant were added in Phase 2.
 function cleanScene(sc) {
   const total = Math.max(0, Math.min(20, Math.floor(Number(sc.total) || 0)));
@@ -204,6 +232,8 @@ export function normalizeState(raw) {
     .map(([k, v]) => [k, { kind: v.kind, best: v.best == null ? null : Math.max(0, Math.min(1, Number(v.best) || 0)), n: Math.max(0, Math.floor(Number(v.n) || 0)), t: Number(v.t) || 0 }])
     .sort((a, b) => b[1].t - a[1].t).slice(0, VOICE_KEEP));
   s.plan = cleanPlan(s.plan);   // the 7-day study plan (engine/plan.js)
+  s.ielts = (Array.isArray(s.ielts) ? s.ielts : []).map(cleanIeltsAttempt).filter(Boolean).sort((a, b) => a.t - b.t).slice(-LIMITS.ielts);
+  s.courses = cleanCourses(s.courses);
   s.lastSeen = Number(s.lastSeen) || 0;
   s.v = STATE_VERSION;
   return s;

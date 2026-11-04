@@ -65,7 +65,8 @@ export function renderHome(root) {
         el('div', 'xs muted', 'วันติดต่อกัน'))),
     h('div', { class: 'row wrap-ok', style: 'margin-top:16px; gap:8px' },
       h('a', { class: 'btn primary', href: '#chat' }, icon('chat'), `คุยกับ ${activeChar().name}`),
-      due ? h('a', { class: 'btn', href: '#review' }, icon('review'), `ทบทวน ${num(due)} ข้อ`) : null));
+      due ? h('a', { class: 'btn', href: '#review' }, icon('review'), `ทบทวน ${num(due)} ข้อ`) : null,
+      h('a', { class: 'btn', href: '#learn' }, '🎓 คอร์สและ IELTS')));
   root.append(hero);
 
   // Characters

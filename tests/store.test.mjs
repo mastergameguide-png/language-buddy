@@ -97,6 +97,22 @@ await test('the 7-day plan is validated on load; a broken one is dropped', async
   if (s.plan !== null) throw new Error('kept a bad plan');
   if (S.normalizeState({}).plan !== null) throw new Error('missing plan should be null');
 });
+await test('IELTS attempts and course progress are validated', async () => {
+  const s = S.normalizeState({
+    ielts: [
+      { t: 2, kind: 'writing', task: 2, id: 'cars', answer: 'x'.repeat(7000), criteria: { task: 6.2, grammar: 11, hack: 'a' }, overall: 6.3, feedback: { strengths: ['ดี'], improvements: [{ better: 'b' }] } },
+      { t: 1, kind: 'listening', id: 'gym', score: 3, total: 4 },
+      { t: 3, kind: 'nope' },
+      { t: 4, kind: 'speaking', part: 9 },
+    ],
+    courses: { cafe: { start: 10 }, fake: { start: 1 } },
+  });
+  const [l, w, sp] = s.ielts;
+  if (l.kind !== 'listening' || l.score !== 3 || l.total !== 4 || 'criteria' in l) throw new Error(JSON.stringify(l));
+  if (w.answer.length !== 6000 || JSON.stringify(w.criteria) !== '{"task":6}' || w.overall !== 6.5 || w.feedback.improvements[0].better !== 'b') throw new Error(JSON.stringify(w).slice(0, 300));
+  if (sp.part !== 1 || s.ielts.length !== 3) throw new Error('bad speaking attempt kept');
+  if (JSON.stringify(s.courses) !== '{"cafe":{"start":10}}') throw new Error(JSON.stringify(s.courses));
+});
 await test('addResult keeps up to the results limit', async () => {
   S.replaceState({});
   for (let i = 0; i < 60; i++) S.addResult({ t: i, scene: 's', score: 5 });

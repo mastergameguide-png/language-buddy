@@ -148,6 +148,7 @@ function drawList(root) {
 
 export function renderRoleplay(root) {
   root.textContent = '';
+  root.append(h('a', { class: 'btn sm ghost', href: '#learn', style: 'float:right' }, '🎓 คอร์สและ IELTS'));
   root.append(h('div', { class: 'page-head' }, h('div', {}, el('h1', '', 'ฝึกสถานการณ์จริง'),
     el('p', '', `${SCENARIOS.filter((s) => !s.englishOnly || isEnglish()).length} สถานการณ์ เลือกความยากและตัวละครได้ ระหว่างฝึกจะเห็นว่าถึงขั้นไหนแล้ว พอเสร็จกด "จบและขอคำแนะนำ" จะได้คะแนนแยกตามเกณฑ์และเทียบกับครั้งก่อน`))));
 

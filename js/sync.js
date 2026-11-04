@@ -1,7 +1,7 @@
 // Backup + sync across devices through the Worker's D1 (SQL) database.
 // Every learner item becomes one row ("c:" chat message, "m:" mistake, "w:" word, "f:" fact,
 // "r:" role-play result, "a:" activity, "d:" day stats, "s:" settings, "k:" character memory,
-// "x:" skills/topics/plan, "v:" shadowing/listening progress per sentence). This device remembers a
+// "x:" skills/topics/plan/courses, "i:" IELTS practice attempts, "v:" shadowing/listening progress per sentence). This device remembers a
 // short hash of each row it last sent or received, so a sync only uploads what changed here
 // (a missing row = deleted) and downloads what other devices changed since `cursor`.
 import { settings, state, load, save, persist, emit, setSettings, DEFAULT_SETTINGS, normalizeState } from './store.js';
@@ -54,6 +54,8 @@ function localRows() {
   if (Object.keys(state.skills || {}).length) add('x:skills', state.skills);
   if (Object.keys(state.topics || {}).length) add('x:topics', state.topics);
   if (state.plan) add('x:plan', state.plan);
+  if (Object.keys(state.courses || {}).length) add('x:courses', state.courses);
+  for (const a of state.ielts || []) add(`i:${a.t}`, a);
   // One row per practised sentence: the whole map could pass the Worker's 20,000-character row limit.
   for (const [key, r] of Object.entries(state.voice || {})) add('v:' + key, r);
   const shared = { ...settings };
@@ -79,6 +81,7 @@ function applyRow(k, d) {
   else if (kind === 'w') upsert(state.vocab, (w) => 'w:' + safeId(w.id) === k);
   else if (kind === 'f') upsert(state.facts, (f) => 'f:' + hash(f) === k);
   else if (kind === 'r') upsert(state.results, (r) => `r:${r.t}` === k);
+  else if (kind === 'i') upsert((state.ielts ||= []), (a) => `i:${a.t}` === k);
   else if (kind === 'a') upsert(state.activity, (a) => `a:${a.t}-${hash(a.text || '')}` === k);
   else if (kind === 'k') {
     const cid = k.split(':')[1];
@@ -88,6 +91,7 @@ function applyRow(k, d) {
     const name = k.slice(2);
     if (name === 'skills' || name === 'topics') state[name] = v || {};
     else if (name === 'plan') state.plan = v;   // validated by normalizeState after the sync
+    else if (name === 'courses') state.courses = { ...(v || {}), ...state.courses };
   } else if (kind === 'v') {
     // Practice progress for one sentence; two devices: keep the better record.
     const key = k.slice(2);

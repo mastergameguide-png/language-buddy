@@ -1,5 +1,63 @@
 # Changelog
 
+## Phase 5 — IELTS and courses (2026-11-04)
+
+Owner decision applied: **original practice material only.** No content is taken from official or published test books. Every band is labelled as a practice estimate.
+
+### IELTS engine — `js/engine/ielts.js` (pure)
+- Practice material, written for this app:
+  - 8 Part 1 topics × 4 questions;
+  - 10 Part 2 cue cards, each with 4 points, 3 Part 3 questions and topic vocabulary;
+  - 8 Writing Task 2 prompts (opinion, discussion, advantages/disadvantages, problem/solution);
+  - 3 Task 1 tables with made-up data, labelled as such;
+  - 4 listening scripts with 4 questions each (gap-fill and multiple choice), read aloud by the device voice.
+- Bands:
+  - `cleanBand` accepts 0–9 in half steps only.
+  - `overallBand` uses IELTS-style rounding (.25 → .5, .75 → next whole band).
+  - **The overall band is always computed by the app from the criteria, never taken from the model.**
+- `analyseWriting`: an instant check with no AI. It counts words against the minimum, paragraphs, sentences and average sentence length, and finds linking words and over-repeated words. It also gives notes (too short, paragraphing, a missing Task 1 overview or Task 2 conclusion).
+- `buildSpeakingPrompt` / `buildWritingPrompt`:
+  - examiner-style practice feedback per official criterion name, for a chosen target band;
+  - Thai notes, improvements and useful vocabulary;
+  - a sample answer (Speaking) or a rewritten paragraph (Writing);
+  - pronunciation is never judged, and instructions inside the learner's text are ignored.
+- `parseIeltsFeedback` validates every field. If any criterion is missing, the feedback is rejected rather than shown with a guess.
+- Listening checking accepts listed spellings and number words. Listening shows a raw score only (x/4), because a short set cannot be converted into a band honestly.
+
+### Courses — `js/engine/courses.js` (pure)
+- 4 courses built from existing activities:
+  - ordering food and drinks (6 steps);
+  - travel (7);
+  - English for work (6);
+  - IELTS starter (7, English only).
+- A step is done only with evidence dated after the course started: a scenario result, voice-practice and review counts, or IELTS attempts by part/task.
+- Stored as `state.courses = { id: { start } }`.
+
+### Screen — "คอร์สและ IELTS" (`#learn`)
+- Opened from Home, the scenario page and the Me page.
+- **คอร์ส:** start, a progress bar, the steps with ✅, the next step highlighted, a "ไป" button that opens the right activity, and restart.
+- **Speaking:**
+  - Part 1/2/3 and a target band;
+  - hear the question, or get another one;
+  - a Part 2 timer (1 minute to prepare, then 2 minutes);
+  - typed or spoken answers (speech recognition keeps listening during the Part 2 talk);
+  - no AI request below the minimum words (15 / 60 / 25).
+- **Writing:**
+  - Task 1 (table) and Task 2;
+  - live analysis while typing;
+  - the draft is saved on the device;
+  - an AI request only from half the minimum word count.
+- **Listening:** play normally or slowly, answer, check, see the script.
+- Feedback card: overall ≈ band, per-criterion bars, the disclaimer on every result, strengths, improvements, vocabulary, and the model answer (which can be played aloud).
+- Recent attempts are listed on each tab.
+
+### Data
+- `state.ielts` holds attempts (up to 300, validated on load: bands cleaned, text clipped, listening keeps only its score).
+- Each attempt syncs as an `i:<time>` row; courses sync as `x:courses`.
+- `ai.js askIelts` makes one separate request per feedback; nothing is added to the chat.
+
+Service worker cache `buddy-v21`. The Worker is unchanged (v12).
+
 ## Phase 4 — Learning analytics (2026-11-04)
 
 ### Metric registry (4.1) — `js/engine/analytics.js` (pure)

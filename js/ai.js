@@ -160,6 +160,12 @@ export async function askAI(extraUserTurn) {
   return { ...parseReply(data.text), provider: data.provider === 'groq' ? 'groq' : 'gemini', ctx };
 }
 
+// IELTS practice feedback: one separate request; the learner's answer is the user turn. Nothing goes into the chat.
+export async function askIelts(system, answer) {
+  const data = await callWorker(system, [{ role: 'user', parts: [{ text: clampStr(answer, 6000) }] }]);
+  return data.text;
+}
+
 // "Say it in English": the learner's Thai text → up to 3 ways to say it. Nothing goes into the chat.
 export async function askHelper(thaiText) {
   const char = activeChar();
