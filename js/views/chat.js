@@ -96,14 +96,32 @@ export function renderChat() {
   }
   for (const m of msgs.slice(start)) b.append(renderMessage(m));
   const last = msgs[msgs.length - 1];
-  if (last && last.role === 'model' && last.suggestion && !busy) {
-    const sug = h('button', { type: 'button', class: 'suggest' }, el('span', 'muted', '💡 ลองตอบ: '), el('span', '', last.suggestion));
-    sug.addEventListener('click', () => { input().value = last.suggestion; autoGrow(); refreshSend(); input().focus(); });
-    b.append(sug);
-  }
+  showSuggestions();
   if (!settings.workerUrl) notice('ยังไม่ได้ใส่ลิงก์ Cloudflare Worker — ใส่ในหน้าตั้งค่าก่อนเริ่มคุย', false, 'เปิดตั้งค่า', () => { location.hash = '#settings'; });
   if (waiting) typing(true);
   scrollDown();
+}
+
+// Shows reply ideas for the latest message (only when nothing is in flight).
+function showSuggestions() {
+  const b = box();
+  if (!b) return;
+  b.querySelector('.suggest-box')?.remove();
+  const msgs = threadOf();
+  const last = msgs[msgs.length - 1];
+  if (last && last.role === 'model' && last.suggestions?.length && !busy && !waiting) { b.append(suggestBox(last.suggestions)); scrollDown(); }
+}
+
+// Reply ideas under the latest message. Tapping one puts it in the box so the learner can edit it first.
+function suggestBox(list) {
+  const box = el('div', 'suggest-box');
+  box.append(el('div', 'suggest-head', '💡 ลองตอบ — แตะเพื่อใส่ในช่องพิมพ์ แก้ได้ก่อนส่ง'));
+  for (const s of list) {
+    const btn = h('button', { type: 'button', class: 'suggest' }, s.label ? el('span', 'suggest-tag', s.label) : '', el('span', '', s.text));
+    btn.addEventListener('click', () => { input().value = s.text; autoGrow(); refreshSend(); input().focus(); });
+    box.append(btn);
+  }
+  return box;
 }
 
 function notice(text, isErr, btnLabel, onClick) {
@@ -255,7 +273,7 @@ function applyAI(ai, userMsg, opts) {
 
   const botMsg = { role: 'model', text: ai.reply, t: Date.now(), emotion: session.emotion, as: session.role };
   if (char.id !== 'buddy') botMsg.char = char.id;
-  if (ai.suggestion) botMsg.suggestion = ai.suggestion;
+  if (ai.suggestions?.length) botMsg.suggestions = ai.suggestions;
   if (ai.provider === 'groq') botMsg.ai = 'groq';
   if (ai.newWord && addWord(ai.newWord)) {
     botMsg.newWord = { word: ai.newWord.word, meaning: ai.newWord.meaning };
@@ -282,6 +300,7 @@ export async function run(userText, hiddenTurn, photo, opts = {}) {
   if (busy) { toast('รอให้ตอบข้อความก่อนหน้าเสร็จก่อนนะ'); return; }
   busy = true;
   refreshSend();
+  box()?.querySelector('.suggest-box')?.remove();
   opts = { ...opts, charId: activeCharId() };
   let userMsg = opts.retryMsg || null;
   if (userMsg) { delete userMsg.failed; renderChat(); }
@@ -323,6 +342,7 @@ export async function run(userText, hiddenTurn, photo, opts = {}) {
     if (userMsg && ok) delete userMsg.photoData;   // the model only sees each photo once
     busy = false;
     refreshSend();
+    if (ok) showSuggestions();
   }
   return ok;
 }

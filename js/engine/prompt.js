@@ -62,7 +62,7 @@ export function buildSystemPrompt(c) {
   const detailed = c.feedback === 'detailed';
   const learnerMem = c.memoryOn.learner ? list(c.facts) : '(memory is turned off by the learner)';
   const charMem = !c.memoryOn.character ? '(memory is turned off by the learner)'
-    : c.charMemories.length ? list(c.charMemories) : '(no past chats with you yet — do not pretend to remember any)';
+    : c.charMemories.length ? list(c.charMemories) : '(none — this is new to you. Words like "again" or "as usual" do not mean you know it: admit in your own words that you do not know yet and ask)';
 
   return `${characterBlock(ch, c)}
 
@@ -94,7 +94,7 @@ HOW TO TALK:
 - React to what they actually said before asking anything; ask at most one question per turn and do not repeat questions or greetings you already used in this chat.
 - Have opinions; do not always agree. Use humor when it fits your character.
 - Use what you already know about the learner (shared memory above): build on it instead of asking for things you already know.
-- Only refer to past chats that appear in your memory list or in this conversation. Never invent shared history or details about the learner ("the place you mentioned last week", "you always…"); if you don't know, ask an open question instead of guessing.
+- Only refer to past chats that appear in your memory list or in this conversation. Never invent shared history or details about the learner ("the place you mentioned last week", "you always…"); if you don't know, ask an open question instead of guessing. Never say "that same place", "your favorite spot", "knowing you" or similar unless it is in your memory list.
 - Stay in ${c.lang} in "message" unless the learner is clearly stuck and asks for Thai, or an [App note] asks for Thai.
 - Do not mention corrections inside "message"; the app shows "language_feedback" separately.
 - ${detailed ? 'Give feedback for real errors and clearly unnatural phrasing.' : 'Give feedback only for clear errors, at most one per turn; skip tiny slips, especially if you gave feedback last turn, unless the mistake keeps repeating.'}
@@ -117,7 +117,12 @@ Answer with one JSON object only (every key in double quotes), shaped like this 
     "example": "one more short example using the same rule"
   },
   "new_word": {"word": "useful word from your message", "meaning": "Thai meaning", "example": "short example"},
-  "suggested_follow_up": "a short reply the learner could send next",
+  "suggested_replies": [
+    {"label": "ตอบตรงๆ", "text": "a direct answer to your question"},
+    {"label": "เล่าเพิ่ม", "text": "an answer that adds a detail, reason or feeling"},
+    {"label": "ถามกลับ", "text": "a reply that asks you something back"},
+    {"label": "เปลี่ยนเรื่อง", "text": "a natural way to move to a related topic"}
+  ],
   "memory_updates": [{"scope": "learner", "text": "has a cat named Mochi"}],
   "topic": "weekend plans",
   "summary": null,
@@ -129,7 +134,7 @@ Field rules:
 - active_role: "${s.role}" unless the role rules above say to change it.
 - language_feedback: null if the learner's last message was fine or in Thai. category is one of: ${cats}. explanation is 1 short Thai sentence${thaiPolite(ch)}.
 - new_word: null most of the time; at most every few messages, a word probably new at this level.
-- suggested_follow_up: an easy reply at the learner's level, or "".
+- suggested_replies: 3–4 different replies the learner could send next, each a different kind (answer directly, add detail or opinion, ask back, change topic, or in role-play: a polite request, a problem, a question). label is 1–3 Thai words naming the kind. Write them as the learner (first person), at the learner's level, natural and varied — not the same sentence reworded. In role-play, fit the learner's role. [] only when an [App note] asks for a score.
 - memory_updates: usually []. scope "learner" = a durable fact about the learner; scope "character" = something you (${ch.name}) and the learner did or talked about that you should remember. Never passwords, numbers, addresses or private data.
 - summary: null, except every ~8 turns or when the topic changes: 1–2 sentences summarising this conversation.
 - assessment: null unless the learner's last message has 6+ words; then 1–5 per skill from that message only (text only, never pronunciation).

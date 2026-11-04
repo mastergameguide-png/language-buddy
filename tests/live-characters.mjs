@@ -54,6 +54,12 @@ for (const ch of CHARACTERS) {
   });
 }
 
+await check('Several reply ideas of different kinds', async () => {
+  const r = await ask(ctx(getCharacter('emma', {}), { cefr: 'B2', levelText: 'CEFR B2' }), ["I'm studying English today."]);
+  const labels = new Set(r.suggestions.map((s) => s.label));
+  return { ok: r.suggestions.length >= 3 && labels.size >= 3, note: r.suggestions.map((s) => `[${s.label}] ${s.text}`).join(' | ') };
+});
+
 const emma = getCharacter('emma', {});
 await check('Emma switches to interviewer when asked (auto role)', async () => {
   const r = await ask(ctx(emma), ['Can we practise a job interview? I am applying for a receptionist job at a hotel.']);

@@ -124,7 +124,10 @@ function cleanMessage(m) {
   if (m.char && CHARACTER_IDS.includes(m.char) && m.char !== 'buddy') out.char = m.char;
   if (m.role === 'model' && m.emotion && EMOTIONS.includes(m.emotion.state)) out.emotion = { state: m.emotion.state, intensity: Math.max(0, Math.min(1, Number(m.emotion.intensity) || 0.5)) };
   if (m.as && ROLES[m.as]) out.as = m.as;
-  if (m.suggestion) out.suggestion = str(m.suggestion, 200);
+  if (Array.isArray(m.suggestions)) {
+    const s = m.suggestions.filter((x) => x && x.text).slice(0, 4).map((x) => ({ label: str(x.label, 24), text: str(x.text, 200) }));
+    if (s.length) out.suggestions = s;
+  } else if (m.suggestion) out.suggestions = [{ label: '', text: str(m.suggestion, 200) }];   // older single suggestion
   const c = cleanCorrection(m.correction);
   if (c) out.correction = c;
   if (m.newWord && m.newWord.word) out.newWord = { word: str(m.newWord.word, 80), meaning: str(m.newWord.meaning, 200) };

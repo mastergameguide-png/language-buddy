@@ -65,6 +65,27 @@ function memoryOf(j) {
   return out.filter((u) => u.text);
 }
 
+// Reply ideas for the learner: up to 4 { label, text }, each a different kind of answer.
+// Accepts the new "suggested_replies" list and the older single "suggested_follow_up" string.
+export function suggestionsOf(j) {
+  const out = [];
+  const seen = new Set();
+  const add = (label, text) => {
+    const t = clean(text, 200);
+    if (!t || seen.has(t.toLowerCase())) return;
+    seen.add(t.toLowerCase());
+    out.push({ label: clean(label, 24), text: t });
+  };
+  if (Array.isArray(j.suggested_replies)) {
+    for (const s of j.suggested_replies.slice(0, 6)) {
+      if (typeof s === 'string') add('', s);
+      else if (s && typeof s === 'object') add(s.label || s.type, s.text || s.reply);
+    }
+  }
+  if (typeof j.suggested_follow_up === 'string') add('', j.suggested_follow_up);
+  return out.slice(0, 4);
+}
+
 function assessmentOf(a) {
   if (!a || typeof a !== 'object') return null;
   const out = {};
@@ -81,7 +102,7 @@ export function parseStructured(text, { charId = null, roles = [] } = {}) {
   const { json: j, raw } = extractJSON(text);
   const message = j && typeof j === 'object' ? (typeof j.message === 'string' ? j.message : typeof j.reply === 'string' ? j.reply : null) : null;
   if (message == null) {
-    return { reply: clean(raw, 4000) || '…', malformed: true, characterId: charId, emotion: null, activeRole: null, correction: null, newWord: null, memoryUpdates: [], suggestion: '', score: null, topic: '', summary: '', assessment: null };
+    return { reply: clean(raw, 4000) || '…', malformed: true, characterId: charId, emotion: null, activeRole: null, correction: null, newWord: null, memoryUpdates: [], suggestions: [], score: null, topic: '', summary: '', assessment: null };
   }
   const w = j.new_word;
   const role = typeof j.active_role === 'string' ? j.active_role.trim().toLowerCase().replace(/[\s-]+/g, '_') : null;
@@ -96,7 +117,7 @@ export function parseStructured(text, { charId = null, roles = [] } = {}) {
     correction: feedbackOf(j),
     newWord: w && typeof w === 'object' && clean(w.word, 80) ? { word: clean(w.word, 80), meaning: clean(w.meaning, 200), example: clean(w.example, 300) } : null,
     memoryUpdates: memoryOf(j),
-    suggestion: clean(j.suggested_follow_up, 200),
+    suggestions: suggestionsOf(j),
     score: Number.isFinite(score) ? Math.max(0, Math.min(10, score)) : null,
     topic: clean(j.topic, 60),
     summary: clean(j.summary, 400),

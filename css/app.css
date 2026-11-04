@@ -374,6 +374,10 @@ dialog.sheet h2 { margin: 0 0 var(--sp-2); font-size: var(--fs-lg); }
 .intro p { margin: 0; }
 .suggest { align-self: flex-start; max-width: min(82%, 560px); border: 1px dashed var(--line-strong); background: transparent; color: var(--text-2); border-radius: var(--r-md); padding: 7px 12px; font-size: var(--fs-sm); text-align: left; animation: rise .3s var(--ease); }
 .suggest:hover { border-color: var(--accent); }
+.suggest-box { align-self: stretch; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; animation: rise .3s var(--ease); }
+.suggest-head { font-size: var(--fs-xs, 12px); color: var(--text-3, var(--text-2)); }
+.suggest-box .suggest { animation: none; display: flex; gap: 8px; align-items: baseline; }
+.suggest-tag { flex: none; font-size: var(--fs-xs, 12px); color: var(--accent); border: 1px solid var(--line-strong); border-radius: 999px; padding: 0 7px; white-space: nowrap; }
 .msg { animation: rise .25s var(--ease); }
 @keyframes rise { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 .sec-row { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); }

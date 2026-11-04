@@ -130,6 +130,16 @@ test('response: full structured reply is validated', () => {
   assert.deepEqual(r.assessment, { grammar: 3 });
   assert.equal(r.memoryUpdates[0].scope, 'character');
 });
+test('response: several reply ideas, deduped and capped', () => {
+  const r = parseStructured(JSON.stringify({ message: 'Hi', suggested_replies: [
+    { label: 'ตอบตรงๆ', text: 'I am studying for IELTS.' }, { label: 'ถามกลับ', text: 'What about you?' },
+    'I like movies.', { label: 'x', text: 'what about you?' }, { label: 'a', text: 'One' }, { label: 'b', text: 'Two' }] }));
+  assert.equal(r.suggestions.length, 4);
+  assert.deepEqual(r.suggestions[0], { label: 'ตอบตรงๆ', text: 'I am studying for IELTS.' });
+  assert.equal(r.suggestions[2].label, '');
+  assert.deepEqual(parseStructured('{"message":"Hi","suggested_follow_up":"Sure!"}').suggestions, [{ label: '', text: 'Sure!' }]);
+  assert.deepEqual(parseStructured('not json').suggestions, []);
+});
 test('response: older field names still work', () => {
   const r = parseStructured('```json\n{"reply":"Hi","correction":{"wrong":"I go","right":"I went","category":"tense","why":"past"},"remember":["likes tea"]}\n```');
   assert.equal(r.reply, 'Hi'); assert.equal(r.correction.wrong, 'I go'); assert.deepEqual(r.memoryUpdates, [{ scope: 'learner', text: 'likes tea' }]);
