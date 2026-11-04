@@ -105,6 +105,7 @@ export function renderHome(root) {
   if (weak) step(`ฝึกจุดที่พลาดบ่อย: ${CATEGORIES[weak.category]} (${weak.count} ครั้งใน 30 วัน)`, 'ฝึก', () => practice(weak.category, CATEGORIES[weak.category]));
   const sc = suggestScene();
   if (sc) step(`ลองสถานการณ์: ${sc.icon} ${sc.th} (${sc.cefr[0]}–${sc.cefr[1]})`, 'ดู', () => openScenario(sc.id));
+  if (!t.shadow && !t.listen && (state.mistakes.length || state.vocab.length)) step('ฝึกพูดตามและฝึกฟัง 5 ประโยคจากคำที่คุณเคยพลาดและคำศัพท์ของคุณ', 'ฝึก', null, '#voice');
   if (n === 1) step(`เริ่มคุยกับ ${activeChar().name} สัก 10 ข้อความ เพื่อให้แอปรู้จุดแข็งจุดอ่อนของคุณ`, 'คุยเลย', null, '#chat');
   root.append(plan);
 

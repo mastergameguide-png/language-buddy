@@ -3,6 +3,7 @@
 import { state, persist } from './store.js';
 import { dayKey } from './util.js';
 import { status, isDue } from './srs.js';
+import { tts } from './voice/tts.js';
 
 const KEEP_DAYS = 730;   // per-day records are tiny; two years of history
 const ACTIVE_WINDOW = 90 * 1000;   // counts as learning time if the user did something in the last 90 s
@@ -12,7 +13,7 @@ export function today() {
   const k = dayKey();
   const d = (state.days[k] ||= { msgs: 0, checked: 0, corrected: 0, secs: 0, reviews: 0, words: 0, voice: 0 });
   // Fields added later start at 0 on older days.
-  for (const f of ['hints', 'hintFull', 'helper']) d[f] ||= 0;
+  for (const f of ['hints', 'hintFull', 'helper', 'shadow', 'shadowWords', 'shadowHeard', 'listen', 'listenOk']) d[f] ||= 0;
   return d;
 }
 function prune() {
@@ -35,6 +36,9 @@ export function recordReview() { today().reviews += 1; }
 // level: the highest hint step the learner opened before answering (4 = saw a full example).
 export function recordHint(level) { const d = today(); d.hints += 1; if (level >= 4) d.hintFull += 1; }
 export function recordHelper() { today().helper += 1; }
+// Shadowing: one finished sentence. words/heard only when speech recognition was used.
+export function recordShadow(words, heard) { const d = today(); d.shadow += 1; if (words) { d.shadowWords += words; d.shadowHeard += heard; } }
+export function recordListen(ok) { const d = today(); d.listen += 1; if (ok) d.listenOk += 1; }
 export function recordWord() { today().words += 1; }
 
 let lastAction = Date.now();
@@ -43,7 +47,7 @@ export function startTimeTracking() {
   const mark = () => { lastAction = Date.now(); };
   for (const ev of ['pointerdown', 'keydown', 'touchstart', 'wheel']) window.addEventListener(ev, mark, { passive: true });
   setInterval(() => {
-    const speaking = window.speechSynthesis && speechSynthesis.speaking;
+    const speaking = tts().speaking();
     if (document.visibilityState === 'visible' && (Date.now() - lastAction < ACTIVE_WINDOW || speaking)) {
       today().secs += TICK / 1000;
       pendingSecs += TICK / 1000;
@@ -78,11 +82,13 @@ export function lastDays(n = 7) {
 
 export function totals() {
   let secs = 0, msgs = 0, checked = 0, corrected = 0, reviews = 0, voice = 0, hints = 0, hintFull = 0, helper = 0;
+  let shadow = 0, shadowWords = 0, shadowHeard = 0, listen = 0, listenOk = 0;
   for (const d of Object.values(state.days)) {
     secs += d.secs || 0; msgs += d.msgs || 0; checked += d.checked || 0; corrected += d.corrected || 0; reviews += d.reviews || 0; voice += d.voice || 0;
     hints += d.hints || 0; hintFull += d.hintFull || 0; helper += d.helper || 0;
+    shadow += d.shadow || 0; shadowWords += d.shadowWords || 0; shadowHeard += d.shadowHeard || 0; listen += d.listen || 0; listenOk += d.listenOk || 0;
   }
-  return { secs, msgs, checked, corrected, reviews, voice, hints, hintFull, helper };
+  return { secs, msgs, checked, corrected, reviews, voice, hints, hintFull, helper, shadow, shadowWords, shadowHeard, listen, listenOk };
 }
 
 // Share of checked messages with no correction; null when there is too little to say.

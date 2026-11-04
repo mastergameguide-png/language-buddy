@@ -432,3 +432,16 @@ h3.sub { font-size: var(--fs-sm); margin: 6px 0 0; }
 .scene-filters .chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; -webkit-overflow-scrolling: touch; }
 .scene-filters .chips::-webkit-scrollbar { display: none; }
 .scene-filters .chip { flex: none; }
+.shadow-card { display: grid; gap: 12px; }
+.shadow-text { font-size: var(--fs-lg, 20px); line-height: 1.5; font-weight: 600; }
+.shadow-text.sm { font-size: var(--fs-md, 16px); }
+.shadow-text .w-ok { color: var(--good); }
+.shadow-text .w-miss { color: var(--muted); text-decoration: underline dotted; }
+.shadow-text .phrase { color: var(--muted); }
+.shadow-text .phrase.on { color: var(--text); background: var(--accent-soft); border-radius: 6px; padding: 0 4px; }
+.shadow-card .live { min-height: 1.4em; }
+.shadow-card .result { border-top: 1px solid var(--line); padding-top: 10px; display: grid; gap: 4px; }
+.shadow-card .compare { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.shadow-card .compare audio { height: 36px; max-width: 100%; }
+.shadow-card .btn.on { background: var(--bad); border-color: var(--bad); color: #fff; }
+@media (max-width: 380px) { .nav a { font-size: 10px; } }

@@ -4,7 +4,8 @@ Status:
 - **Phase 0.5: DONE (2026-11-04)**, approved without access control (R-H1). Details in [CHANGELOG.md](CHANGELOG.md), test results in [TEST_REPORT.md](TEST_REPORT.md).
 - **Phase 1: DONE (2026-11-04).** All of steps 1.1–1.8; see CHANGELOG and TEST_REPORT.
 - **Phase 2: DONE (2026-11-04).** Schema v2, 25 scenarios, variants, step progress, history, library UI.
-- Phase 3 and later are **waiting for owner approval**. More scenarios (toward ~40) can be added in reviewed batches at any time.
+- **Phase 3: DONE (2026-11-04)** with browser-only speech (3.1–3.4). 3.5, a pronunciation provider, was not built (owner decision).
+- Phase 4 and later are **waiting for owner approval**. More scenarios (toward ~40) can be added in reviewed batches at any time.
 
 Owner decisions (2026-11-04):
 - Keep the Worker open (no access code).

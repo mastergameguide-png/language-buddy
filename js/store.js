@@ -7,6 +7,7 @@ import { freshSession } from './engine/roles.js';
 import { expire } from './engine/memory.js';
 import { SKILLS, FEEDBACK_TYPES, hintsOf } from './engine/response.js';
 import { QUALITY_KEYS } from './engine/checks.js';
+import { VOICE_KEEP } from './engine/shadowing.js';
 
 export const LANGS = {
   English: { code: 'en-US', label: 'English (อังกฤษ)' },
@@ -78,7 +79,7 @@ const EMPTY_STATE = () => ({
   v: STATE_VERSION, messages: [], facts: [], mistakes: [], vocab: [], scene: null, lastSeen: 0,
   days: {}, activity: [], results: [],
   charMemory: {}, sessions: {}, skills: {}, topics: {},
-  trimmed: {}, quality: {},
+  trimmed: {}, quality: {}, voice: {},
 });
 // How much is kept on this device. Learning records (words, mistakes) are only trimmed at a
 // very high safety cap, and anything trimmed is counted in state.trimmed and shown in Settings,
@@ -197,6 +198,10 @@ export function normalizeState(raw) {
   s.skills = Object.fromEntries(Object.entries(obj(s.skills)).filter(([k, v]) => SKILLS.includes(k) && Array.isArray(v)).map(([k, v]) => [k, v.map(Number).filter((n) => n >= 1 && n <= 5).slice(-30)]));
   s.topics = Object.fromEntries(Object.entries(obj(s.topics)).filter(([, n]) => Number(n) > 0).sort((a, b) => b[1] - a[1]).slice(0, 30).map(([k, n]) => [str(k, 60), Number(n)]));
   s.quality = Object.fromEntries(QUALITY_KEYS.map((k) => [k, Math.max(0, Math.floor(Number(s.quality?.[k]) || 0))]).filter(([, n]) => n));
+  // Shadowing / listening progress per sentence: { key: { kind, best 0–1 or null, n, t } }.
+  s.voice = Object.fromEntries(Object.entries(obj(s.voice)).filter(([k, v]) => /^[a-z0-9]{1,12}$/.test(k) && v && typeof v === 'object' && ['shadow', 'listen'].includes(v.kind))
+    .map(([k, v]) => [k, { kind: v.kind, best: v.best == null ? null : Math.max(0, Math.min(1, Number(v.best) || 0)), n: Math.max(0, Math.floor(Number(v.n) || 0)), t: Number(v.t) || 0 }])
+    .sort((a, b) => b[1].t - a[1].t).slice(0, VOICE_KEEP));
   s.lastSeen = Number(s.lastSeen) || 0;
   s.v = STATE_VERSION;
   return s;

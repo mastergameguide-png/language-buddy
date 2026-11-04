@@ -1,5 +1,47 @@
 # Changelog
 
+## Phase 3 — Voice and shadowing (2026-11-04)
+
+Owner decision applied: browser-only speech, no paid pronunciation provider. **No pronunciation score is shown anywhere.**
+
+### Provider interfaces (3.1) — `js/voice/`
+- `tts.js`: a TTS provider interface (`speak → Promise`, `cancel`, `speaking`, `unlock`, `available`) and `browserTts`. Capabilities: accents yes; voice gender **no**; rate and pitch yes; word timing no.
+- `stt.js`: an STT provider interface (`start({lang, onText, onEnd(text, confidence), onError})`, `stop`) and `browserStt`. Capabilities: `pronunciationScore: false`.
+- `setTtsProvider` and `setSttProvider` let another engine be plugged in without touching the learning features; invalid providers are ignored.
+- `js/speech.js` is now a thin layer over the providers with the same exports, so the chat and review pages are unchanged. `speak()` returns a promise and has a `slow` option (×0.7).
+- `recorder.js`: records the learner's voice with MediaRecorder (mp4 on Safari, webm elsewhere). The audio is kept in memory only (`blob:` URL); it is never uploaded or saved. It stops by itself after 30 s.
+
+### Shadowing (3.2, 3.3) — new page "ฝึกเสียง" (`#voice`, new nav item)
+- Sentences come from the learner's own data, most useful first:
+  - corrected mistakes (with the Thai translation);
+  - word-bank examples;
+  - lines the characters said in chat (split into sentences; emoji removed);
+  - phrases from scenarios that fit the learner's level.
+- Source filter chips.
+- Buttons: 🔊 ฟัง, 🐢 ฟังช้า, and "ทีละท่อน" (phrase by phrase, highlighted).
+- **"พูดตาม (ให้เครื่องฟัง)"** uses speech recognition, then marks each word as heard or missed. It shows "จับคำได้ x/y คำ (z%)", what was heard, and extra words. A note says this is the browser recogniser catching words, not a pronunciation score.
+- **"อัดเสียงตัวเอง"** records the learner, then plays back their recording next to the model sentence.
+- Without speech recognition (for example on some iPhones), the word check is hidden and "✓ พูดตามแล้ว" marks the sentence done.
+- A capability line shows what this device can do.
+- Corrections in the chat have a new "🎙️ ฝึกพูดประโยคนี้" button that opens the page with that sentence first.
+
+### Listening (3.4)
+- **Gap-fill:** a word-bank example is spoken and the learner types the missing word.
+- **Dictation:** the learner types a short sentence they heard.
+- Checking ignores case and punctuation and accepts "I'm" = "I am" and "five" = "5". One typo in a longer word counts as "≈ เกือบถูก". Dictation shows which words were right.
+- Only the first check of an item per visit counts toward the stats.
+
+### Tracking
+- `state.voice`: best result, attempts and time per sentence (up to 400 kept, validated on load).
+- Days now record `shadow`, `shadowWords`, `shadowHeard`, `listen` and `listenOk`.
+- The Me page has a "พูดและฟัง" card, and the home plan suggests voice practice.
+- Sync: one `v:<key>` row per sentence. One combined row could have passed the Worker's 20,000-character row limit and made every sync fail. Two devices merge by keeping the better record.
+
+### Engine — `js/engine/shadowing.js` (pure)
+- `compareWords` (an order-aware LCS alignment, with contractions and numbers normalised), `splitPhrases`, `practiceItems`, `listeningItems`, `checkAnswer`, `recordAttempt` and `itemKey`.
+
+Service worker cache `buddy-v19`. No AI or Worker changes.
+
 ## Phase 2 — Scenario learning (2026-11-04)
 
 ### Schema v2 (2.1) — `js/engine/scenarios.js`

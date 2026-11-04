@@ -93,6 +93,7 @@ Users can view and delete facts (Me page) and character memories (Characters pag
 ## 6. Speech lifecycle
 
 - **TTS**: `speak()` picks a browser voice by language code. English characters use their own accent (en-US/GB/AU/CA when the device has it). Speed = user rate × level factor (A1 0.8 … C2 1.06) × emotion factor. Pitch comes from the emotion. iOS is unlocked with a silent utterance on the first tap.
+- **Since Phase 3:** `js/speech.js` delegates to replaceable providers in `js/voice/` (`tts.js`, `stt.js`, and `recorder.js` for the learner's own recordings, kept in memory only). Shadowing and listening practice live in `views/voice.js`, with the pure logic in `engine/shadowing.js`.
 - **STT**: `listen()` uses `SpeechRecognition` (availability varies by browser and iOS version; when it is missing, the app tells the user to use keyboard dictation). The transcript goes into the text box and is auto-sent if that setting is on. **No audio is recorded, stored or analysed.** No pronunciation scoring exists.
 
 ## 7. Storage and database structure

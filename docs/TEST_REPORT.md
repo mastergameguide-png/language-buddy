@@ -1,5 +1,42 @@
 # Test Report
 
+## Phase 3 — 2026-11-04
+
+### Offline suite: `node tests/run-all.mjs` — 9/9 files, 164 passed, 0 failed
+
+| File | Result |
+|---|---|
+| `voice.test.mjs` (new) | 9 passed: token keys (contractions, numbers, punctuation); heard/missed words in order; extra words; phrases keep every word; practice items (order of sources, dedupe, placeholders and emoji skipped); listening items; answer checking (exact, one-typo "close", dictation by word, extra word not perfect); progress records (best kept, self-check, cap); provider capabilities are honest (`pronunciationScore: false`, `voiceGender: false`), providers are replaceable and invalid ones ignored; voice choice by accent |
+| `store.test.mjs` | 15 passed (new: voice records validated) |
+| others | unchanged, all pass |
+
+Found and fixed during this phase:
+- Chat sentences with emoji ("I'm Sam 😊 What did…") became practice sentences with the emoji inside. Sentences now split at emoji and leave them out (a test was added).
+- A single sync row for all practice records could pass the Worker's 20,000-character row limit, which would make sync fail. It was changed to one row per sentence before release.
+
+### Browser (mock Worker, 375 px; the speech recogniser was replaced by a test provider through `setSttProvider`, since a real microphone cannot be used in the test browser)
+
+All PASS.
+
+- **Page and capability line:** the page opens from the new 6th nav item. The capability line shows reading ✓, listening ✓, recording ✓, and pronunciation "ยังวัดไม่ได้".
+- **Speak-along:**
+  - the first sentence comes from the Mistake Book with its Thai translation;
+  - a fake "I love coffee" for "I really love coffee." marked "really" as missed and showed "จับคำได้ 3/4 คำ (75%)" with the not-a-score note;
+  - the best score went 75% → 100% on the second try, and the daily count went up.
+- **Phrase mode and filter:** phrase mode highlights the current phrase and moves between phrases; the source filter "สถานการณ์" works.
+- **No speech recognition:** the word check is hidden, "✓ พูดตามแล้ว" appears, counts the sentence and moves to the next one, and the capability line shows ✗.
+- **Listening:**
+  - gap-fill "My _____ takes an hour.": "comute" → ≈ เกือบถูก with the answer; "commute" → ✅;
+  - the stats counted only the first check;
+  - dictation showed word-by-word results.
+- **Chat and Me page:** "ฝึกพูดประโยคนี้" in a chat correction opens the page with that sentence first. The Me page shows the "พูดและฟัง" card.
+- No JS errors and no horizontal overflow.
+
+### Not tested
+- **Real microphone:** recording (MediaRecorder) and real speech recognition were not tried, because the test browser cannot use the microphone. Recording on iPhone Safari needs to be tried on the device.
+- **Real iPhone:** voice availability and speech recognition support vary by iOS version.
+- **Real AI:** not needed; no prompt or Worker changes.
+
 ## Phase 2 — 2026-11-04
 
 ### Offline suite: `node tests/run-all.mjs` — 8/8 files, 153 passed, 0 failed

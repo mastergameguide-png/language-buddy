@@ -12,6 +12,7 @@ import { avatarEl } from './avatar.js';
 import { todayUsage, nextReset, askHelper } from '../ai.js';
 import { speak, unlockSpeech, listen, stopListening, listening, canListen } from '../speech.js';
 import { run, isBusy, isWaiting, setCharacter, maybeGreet, endScene, unseenCorrections, markCorrectionsSeen } from '../conversation.js';
+import { practiseSentence } from './voice.js';
 
 export { maybeGreet };
 
@@ -64,7 +65,9 @@ function fixDetails(c) {
   if (c.natural || c.right) {
     const say = h('button', { type: 'button', class: 'btn sm ghost', style: 'margin-top:8px' }, icon('speaker'), 'ฟังประโยคที่ถูก');
     say.addEventListener('click', () => speak(c.natural || c.right, { plain: true }));
-    out.push(say);
+    const drill = h('button', { type: 'button', class: 'btn sm ghost', style: 'margin-top:8px' }, icon('mic'), 'ฝึกพูดประโยคนี้');
+    drill.addEventListener('click', () => practiseSentence(c.natural || c.right, c.th || ''));
+    out.push(h('div', { class: 'row wrap-ok' }, say, drill));
   }
   return out;
 }

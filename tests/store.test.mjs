@@ -86,6 +86,10 @@ await test('running scene: progress fields are cleaned, old scenes get defaults'
   s = S.normalizeState({ scene: { id: 'hotel', th: 'โรงแรม' } });   // saved before Phase 2
   if (s.scene.total !== 0 || s.scene.step !== 0 || s.scene.char !== 'buddy') throw new Error(JSON.stringify(s.scene));
 });
+await test('voice practice records are validated', async () => {
+  const s = S.normalizeState({ voice: { abc1: { kind: 'shadow', best: 1.7, n: 2, t: 5 }, zz: { kind: 'listen', best: null, n: 1, t: 6 }, 'bad key!': { kind: 'shadow' }, x9: { kind: 'other' } } });
+  if (JSON.stringify(s.voice) !== '{"zz":{"kind":"listen","best":null,"n":1,"t":6},"abc1":{"kind":"shadow","best":1,"n":2,"t":5}}') throw new Error(JSON.stringify(s.voice));
+});
 await test('addResult keeps up to the results limit', async () => {
   S.replaceState({});
   for (let i = 0; i < 60; i++) S.addResult({ t: i, scene: 's', score: 5 });

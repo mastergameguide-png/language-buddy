@@ -98,6 +98,15 @@ export function renderMe(root) {
   }
   root.append(sk);
 
+  // Speaking and listening practice, from the voice page.
+  root.append(el('h2', 'sec', 'พูดและฟัง'));
+  const heard = tot.shadowWords ? Math.round((tot.shadowHeard / tot.shadowWords) * 100) : null;
+  root.append(h('div', { class: 'card' },
+    el('div', 'small', `พูดตาม ${num(tot.shadow)} ประโยค${heard == null ? '' : ` · ระบบจับคำได้เฉลี่ย ${heard}%`}`),
+    el('div', 'small', tot.listen ? `ฝึกฟัง ${num(tot.listen)} ข้อ · ถูก ${num(tot.listenOk)} (${Math.round((tot.listenOk / tot.listen) * 100)}%)` : 'ยังไม่ได้ฝึกฟัง'),
+    el('p', 'xs muted', '"จับคำได้" มาจากระบบฟังเสียงในเบราว์เซอร์ บอกได้แค่ว่าได้ยินคำครบไหม ไม่ใช่คะแนนการออกเสียง'),
+    h('a', { class: 'btn sm', href: '#voice' }, 'ไปฝึกเสียง')));
+
   // How much help the learner used, measured from what they tapped (not from the AI).
   root.append(el('h2', 'sec', 'การใช้ตัวช่วย'));
   const help = h('div', { class: 'card' });
