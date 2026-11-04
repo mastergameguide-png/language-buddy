@@ -19,6 +19,8 @@
 </head>
 <body>
 <div class="app">
+  <div id="srLive" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+  <button type="button" class="skip-link" id="skipLink">ข้ามไปเนื้อหา</button>
   <nav class="nav" aria-label="เมนูหลัก">
     <div class="nav-brand"><img src="icons/icon-192.png" alt=""> Language Buddy</div>
     <a href="#home" data-view="home" data-icon="home"><span>หน้าหลัก</span></a>
@@ -36,7 +38,7 @@
       <header class="chat-head">
         <a class="who-btn grow" href="#characters" aria-label="เลือกหรือดูโปรไฟล์ตัวละคร">
           <span id="avatarSlot"></span>
-          <span class="who"><b id="buddyName">Sam</b><small id="buddyStatus"></small></span>
+          <span class="who"><h1 id="buddyName" class="who-name">Sam</h1><small id="buddyStatus"></small></span>
         </a>
         <a class="icon-btn" href="#roleplay" aria-label="ฝึกสถานการณ์" data-icon="mask"></a>
         <a class="icon-btn" href="#settings" aria-label="ตั้งค่า" data-icon="gear"></a>
@@ -60,7 +62,7 @@
         </div>
         <button type="button" class="btn sm" id="sceneEnd">จบและขอคำแนะนำ</button>
       </div>
-      <div class="messages" id="messages" aria-live="polite"></div>
+      <div class="messages" id="messages" role="log" aria-live="off" aria-label="ข้อความในแชต"></div>
       <div class="composer">
         <div class="preview" id="preview" hidden>
           <img id="previewImg" alt="รูปที่เลือก">

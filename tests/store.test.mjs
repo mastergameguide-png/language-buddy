@@ -113,6 +113,10 @@ await test('IELTS attempts and course progress are validated', async () => {
   if (sp.part !== 1 || s.ielts.length !== 3) throw new Error('bad speaking attempt kept');
   if (JSON.stringify(s.courses) !== '{"cafe":{"start":10}}') throw new Error(JSON.stringify(s.courses));
 });
+await test('mistake categories: the labels and the AI category list stay the same set', async () => {
+  const { CATEGORY_IDS } = await import('../js/engine/response.js');
+  if (JSON.stringify([...CATEGORY_IDS].sort()) !== JSON.stringify(Object.keys(S.CATEGORIES).sort())) throw new Error('CATEGORIES and CATEGORY_IDS differ');
+});
 await test('addResult keeps up to the results limit', async () => {
   S.replaceState({});
   for (let i = 0; i < 60; i++) S.addResult({ t: i, scene: 's', score: 5 });

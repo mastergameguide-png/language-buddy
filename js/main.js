@@ -74,7 +74,38 @@ on('state', () => {
 on('badges', updateBadges);
 on('settings', () => { applyTheme(settings.theme); if (current && current !== 'settings' && current !== 'chat') VIEWS[current].render(); });
 
+function showUpdateBar() {
+  if (document.querySelector('.update-bar')) return;
+  const bar = document.createElement('div');
+  bar.className = 'update-bar';
+  bar.setAttribute('role', 'status');
+  bar.append('มีเวอร์ชันใหม่แล้ว');
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'btn sm primary';
+  b.textContent = 'โหลดใหม่';
+  b.addEventListener('click', () => location.reload());
+  const x = document.createElement('button');
+  x.type = 'button';
+  x.className = 'icon-btn sm';
+  x.setAttribute('aria-label', 'ปิด');
+  x.textContent = '✕';
+  x.addEventListener('click', () => bar.remove());
+  bar.append(b, x);
+  document.body.append(bar);
+}
+
+// Keyboard users can jump past the menu to the current page's heading.
+function skipToContent() {
+  const view = document.querySelector('.view:not([hidden])');
+  const target = view?.querySelector('h1') || view;
+  if (!target) return;
+  target.setAttribute('tabindex', '-1');
+  target.focus();
+}
+
 function boot() {
+  $('skipLink').addEventListener('click', skipToContent);
   // Data from an older version was upgraded in memory; write the new shape back once.
   if ((load('lb_state', null) || {}).v !== STATE_VERSION && state.messages.length + state.mistakes.length) persist();
   for (const n of document.querySelectorAll('[data-icon]')) n.prepend(icon(n.dataset.icon));
@@ -97,7 +128,14 @@ function boot() {
       persist();
     }
   });
-  if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(() => {});
+  if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+    const hadController = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.register('sw.js').then((reg) => {
+      // Look for a new version when the app comes back to the screen.
+      document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') reg.update().catch(() => {}); });
+    }).catch(() => {});
+    navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadController) showUpdateBar(); });
+  }
 }
 
 boot();

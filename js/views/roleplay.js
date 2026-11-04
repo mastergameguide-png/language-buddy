@@ -10,6 +10,7 @@ import { CHARACTERS, getCharacter, ROLES } from '../engine/characters.js';
 import { roleForScenario } from '../engine/roles.js';
 import { avatarEl } from './avatar.js';
 import { startScene } from '../conversation.js';
+import { emptyState, sectionHeader } from './ui.js';
 
 let picked = null;                                 // scenario id whose details are open
 let filter = { q: '', category: '', myLevel: false };
@@ -128,7 +129,7 @@ function drawList(root) {
   if (!list) return;
   list.textContent = '';
   const found = searchScenarios(SCENARIOS, { q: filter.q, category: filter.category, cefr: filter.myLevel ? cefrOf() : '', english: isEnglish() });
-  if (!found.length) { list.append(h('div', { class: 'card empty-state' }, el('div', 'big', '🔍'), el('p', 'small', 'ไม่พบสถานการณ์ที่ตรงกับตัวกรอง — ลองคำอื่น หรือสร้างสถานการณ์เองด้านล่าง'))); return; }
+  if (!found.length) { list.append(emptyState('🔍', 'ไม่พบสถานการณ์ที่ตรงกับตัวกรอง — ลองคำอื่น หรือสร้างสถานการณ์เองด้านล่าง')); return; }
   for (const cat of SCENARIO_CATEGORIES) {
     const items = found.filter((s) => s.category === cat.id);
     if (!items.length) continue;
@@ -184,7 +185,7 @@ export function renderRoleplay(root) {
       const item = h('div', { class: 'item', style: 'flex-direction:column; align-items:stretch; cursor:pointer', tabindex: '0', role: 'button', 'aria-expanded': 'false' },
         h('div', { class: 'row' }, el('span', 'ico', r.icon || '🎭'), el('span', 'grow small', r.scene + who), score, el('span', 'xs muted', fmtDate(r.t))));
       const crit = (r.criteria || []).map((c) => `${c.name} ${c.score}/5`).join(' · ');
-      const sum = el('div', 'small muted', r.summary + (crit ? `\n\n📊 ${crit}` : '') + (resultNote(r) ? `\n\n⚠️ ${resultNote(r)}` : ''));
+      const sum = el('div', 'small muted', (r.summary || '') + (crit ? `\n\n📊 ${crit}` : '') + (resultNote(r) ? `\n\n⚠️ ${resultNote(r)}` : ''));
       sum.hidden = true;
       sum.style.whiteSpace = 'pre-wrap';
       item.append(sum);

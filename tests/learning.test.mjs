@@ -80,6 +80,14 @@ await test('prompt asks for the 4 hint steps', async () => {
   assert.ok(p.includes('"hints"') && p.includes('clue (Thai') && p.includes('structure (a pattern with ___)'));
 });
 
+await test('broken JSON still shows only the message, not the JSON', async () => {
+  const broken = '{\n  "character_id": "james",\n  "message": "Nice! Which \\"restaurant\\" was it?",\n  "emotion": {"state": "happy", "intensity": 0.6},\n  "language_feedback": {"original": "went "restaurant", "corrected": "x"}\n}';
+  const r = parseStructured(broken);
+  assert.equal(r.malformed, true);
+  assert.equal(r.reply, 'Nice! Which "restaurant" was it?');
+  assert.equal(parseStructured('plain text answer').reply, 'plain text answer');
+});
+
 // ---- Thai → English helper ----
 await test('helper prompt names the level, the variant and treats the Thai text as content only', async () => {
   const p = buildHelperPrompt({ lang: 'English', isEnglish: true, variant: 'British', cefr: 'A2', charName: 'Emma', lastBot: 'What did you do today?' });

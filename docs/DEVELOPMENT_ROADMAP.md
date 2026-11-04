@@ -7,7 +7,8 @@ Status:
 - **Phase 3: DONE (2026-11-04)** with browser-only speech (3.1–3.4). 3.5, a pronunciation provider, was not built (owner decision).
 - **Phase 4: DONE (2026-11-04).** Metric registry, weekly report, weak spots and recommendations, 7-day plan.
 - **Phase 5: DONE (2026-11-04).** IELTS Speaking/Writing/Listening with original material and practice band estimates, and 4 courses.
-- Phase 6 (professional UX and QA) is **waiting for owner approval**. More scenarios (toward ~40) can be added in reviewed batches at any time.
+- **Phase 6: DONE (2026-11-04).** Accessibility, consistency, update prompt, full regression.
+- **All planned phases (0.5–6) are done.** Not built, by owner decision or because it needs an outside service: access control on the Worker, sync encryption, a pronunciation-assessment provider, licensed IELTS material, character images. More scenarios (toward ~40) can be added in reviewed batches at any time.
 
 Owner decisions (2026-11-04):
 - Keep the Worker open (no access code).

@@ -5,6 +5,7 @@ import { schedule, preview, status, STATUS_TH, isDue } from '../srs.js';
 import { dueCards, recordReview } from '../stats.js';
 import { speak } from '../speech.js';
 import { quiz } from '../conversation.js';
+import { emptyState, sectionHeader } from './ui.js';
 
 let tab = 'review';
 let session = null;        // { queue: [{kind,item}], done, again }
@@ -149,7 +150,7 @@ function renderVocab(body, root) {
     list.textContent = '';
     const q = norm(vQuery);
     const items = state.vocab.filter((v) => !q || norm(v.word + ' ' + v.meaning).includes(q)).slice().reverse();
-    if (!items.length) { list.append(h('div', { class: 'empty-state' }, el('div', 'big', '📘'), el('p', 'small', state.vocab.length ? 'ไม่พบคำที่ค้นหา' : 'ยังไม่มีคำ — เพื่อน AI จะเก็บคำใหม่ให้ระหว่างคุย หรือเพิ่มเองด้านบน'))); return; }
+    if (!items.length) { list.append(emptyState('📘', state.vocab.length ? 'ไม่พบคำที่ค้นหา' : 'ยังไม่มีคำ — เพื่อน AI จะเก็บคำใหม่ให้ระหว่างคุย หรือเพิ่มเองด้านบน', null, { card: false })); return; }
     for (const v of items) {
       const del = h('button', { type: 'button', class: 'icon-btn', 'aria-label': `ลบ ${v.word}` }, icon('trash'));
       del.addEventListener('click', () => {
@@ -198,7 +199,7 @@ function renderMistakes(body, root) {
       (!q || norm(`${m.wrong} ${m.right} ${m.why} ${m.natural}`).includes(q)) &&
       (!mFilter.cat || m.category === mFilter.cat) &&
       (!mFilter.st || (mFilter.st === 'due' ? isDue(m.srs) : status(m.srs) === mFilter.st))).slice().reverse();
-    if (!items.length) { list.append(h('div', { class: 'empty-state' }, el('div', 'big', '📕'), el('p', 'small', state.mistakes.length ? 'ไม่พบข้อที่ตรงกับตัวกรอง' : 'ยังไม่มี — คุยไปเรื่อยๆ แล้วข้อที่พลาดจะมาอยู่ที่นี่'))); return; }
+    if (!items.length) { list.append(emptyState('📕', state.mistakes.length ? 'ไม่พบข้อที่ตรงกับตัวกรอง' : 'ยังไม่มี — คุยไปเรื่อยๆ แล้วข้อที่พลาดจะมาอยู่ที่นี่', null, { card: false })); return; }
     for (const m of items) list.append(mistakeCard(m, root));
   }
   draw();

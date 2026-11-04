@@ -13,6 +13,7 @@ import { todayUsage, nextReset, askHelper } from '../ai.js';
 import { speak, unlockSpeech, listen, stopListening, listening, canListen } from '../speech.js';
 import { run, isBusy, isWaiting, setCharacter, maybeGreet, endScene, unseenCorrections, markCorrectionsSeen } from '../conversation.js';
 import { practiseSentence } from './voice.js';
+import { announce } from './ui.js';
 
 export { maybeGreet };
 
@@ -441,7 +442,7 @@ function listenToConversation() {
     scrollDown();
   });
   on('chat:waiting', (w) => { if (w) box()?.querySelector('.suggest-box')?.remove(); typing(w); });
-  on('chat:reply', ({ charId }) => { if (here(charId)) { renderHeader(); renderChat(); } });
+  on('chat:reply', ({ charId, msg }) => { if (here(charId)) { renderHeader(); renderChat(); announce(`${activeChar().name}: ${msg.text}`); } });
   on('chat:failed', ({ error }) => { renderChat(); toast(error, true); });
   on('chat:error', ({ error, retry }) => notice('ส่งไม่สำเร็จ: ' + error, true, 'ลองอีกครั้ง', retry));
   on('chat:open', () => { showAll = false; if (location.hash !== '#chat') location.hash = '#chat'; else { renderHeader(); renderChat(); } });

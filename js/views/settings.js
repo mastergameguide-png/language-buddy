@@ -128,7 +128,28 @@ const int = (id, min, max, dflt) => {
   return Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : dflt;
 };
 
+// A sticky row of buttons that scroll to each settings section (built from the cards' headings,
+// so a new section appears here by itself). Buttons, not links: the hash is the app's router.
+function buildJumpBar() {
+  const form = f('settingsForm');
+  if (!form || form.querySelector('.set-jump')) return;
+  const bar = el('nav', 'set-jump');
+  bar.setAttribute('aria-label', 'หมวดการตั้งค่า');
+  const row = el('div', 'chips');
+  for (const card of form.querySelectorAll('.set-group')) {
+    const title = card.querySelector('h3');
+    if (!title) continue;
+    const b = el('button', 'chip', title.textContent.replace(/\s*\(.*\)\s*$/, ''));
+    b.type = 'button';
+    b.addEventListener('click', () => { card.scrollIntoView({ behavior: 'smooth', block: 'start' }); title.setAttribute('tabindex', '-1'); title.focus({ preventScroll: true }); });
+    row.append(b);
+  }
+  bar.append(row);
+  form.prepend(bar);
+}
+
 export function initSettings() {
+  buildJumpBar();
   for (const [key, v] of Object.entries(LANGS)) { const o = el('option', '', v.label); o.value = key; f('sLang').append(o); }
   for (let h = 0; h <= 24; h++) {
     if (h < 24) { const o = el('option', '', hh(h)); o.value = h; f('sFrom').append(o); }

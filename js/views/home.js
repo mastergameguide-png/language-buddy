@@ -8,6 +8,7 @@ import { todayTasks, runAction } from './progress.js';
 import { recommendations } from '../engine/analytics.js';
 import { CHARACTERS, customCharacter } from '../engine/characters.js';
 import { avatarEl } from './avatar.js';
+import { emptyState, sectionHeader } from './ui.js';
 
 function goal(label, value, target, unit) {
   const pct = target ? Math.min(100, Math.round((value / target) * 100)) : 0;
@@ -56,7 +57,7 @@ export function renderHome(root) {
     h('div', { class: 'row' },
       h('div', { class: 'grow' },
         el('div', 'small muted', `${hello}${settings.learnerName ? ', ' + settings.learnerName : ''}`),
-        h('div', { style: 'font-size:var(--fs-xl); font-weight:750; margin-top:2px' }, 'พร้อมฝึกภาษาวันนี้ไหม?'),
+        el('h1', 'hero-title', 'พร้อมฝึกภาษาวันนี้ไหม?'),
         h('div', { class: 'row', style: 'margin-top:6px; gap:8px' },
           el('span', 'chip', `${settings.lang} ${flag()}`),
           el('span', 'chip', `${levelShort()} · ${CEFR[cefrOf()] || ''}`))),
@@ -70,7 +71,7 @@ export function renderHome(root) {
   root.append(hero);
 
   // Characters
-  root.append(h('div', { class: 'sec-row' }, el('h2', 'sec', 'คุยกับใครดีวันนี้'), h('a', { class: 'btn sm ghost', href: '#characters' }, 'ดูทั้งหมด')));
+  root.append(sectionHeader('คุยกับใครดีวันนี้', h('a', { class: 'btn sm ghost', href: '#characters' }, 'ดูทั้งหมด')));
   const strip = h('div', { class: 'char-strip' });
   for (const c of [...CHARACTERS, customCharacter(settings)]) {
     const b = h('button', { type: 'button', class: 'char-pick' + (c.id === activeCharId() ? ' on' : ''), 'aria-label': `คุยกับ ${c.name}` },
@@ -96,7 +97,7 @@ export function renderHome(root) {
     stat('ข้อผิดที่บันทึก', num(state.mistakes.length), weak ? `พลาดบ่อย: ${CATEGORIES[weak.category]}` : 'ยังไม่มี')));
 
   // Today: the 7-day plan's tasks (if any), then what the analytics suggest, each with its evidence.
-  root.append(h('div', { class: 'sec-row' }, el('h2', 'sec', 'วันนี้ทำอะไรดี'), h('a', { class: 'btn sm ghost', href: '#progress' }, 'รายงานและแผน 7 วัน')));
+  root.append(sectionHeader('วันนี้ทำอะไรดี', h('a', { class: 'btn sm ghost', href: '#progress' }, 'รายงานและแผน 7 วัน')));
   const plan = h('div', { class: 'card' });
   let n = 1;
   const step = (text, btnLabel, onClick, href, sub) => {

@@ -11,6 +11,7 @@ import { tts } from '../voice/tts.js';
 import { canRecord, startRecording } from '../voice/recorder.js';
 import { recordShadow, recordListen } from '../stats.js';
 import { isEnglish } from '../store.js';
+import { emptyState, sectionHeader } from './ui.js';
 
 let tab = 'shadow';
 let source = '';
@@ -63,7 +64,7 @@ function renderShadow(body, root) {
   body.append(chips);
   const list = shadowList();
   if (!list.length) {
-    body.append(h('div', { class: 'card empty-state' }, el('div', 'big', '🎙️'), el('p', 'small', 'ยังไม่มีประโยคในหมวดนี้ — คุยกับตัวละคร หรือเพิ่มคำศัพท์ แล้วประโยคจะมาอยู่ที่นี่')));
+    body.append(emptyState('🎙️', 'ยังไม่มีประโยคในหมวดนี้ — คุยกับตัวละคร หรือเพิ่มคำศัพท์ แล้วประโยคจะมาอยู่ที่นี่'));
     return;
   }
   idx = Math.min(idx, list.length - 1);
@@ -188,7 +189,7 @@ function next(n) { idx = (idx + 1) % Math.max(1, n); phrase = 0; lastCompare = n
 function renderListen(body, root) {
   const list = listeningItems({ vocab: state.vocab, mistakes: state.mistakes, expressions: levelExpressions() });
   if (!list.length) {
-    body.append(h('div', { class: 'card empty-state' }, el('div', 'big', '👂'), el('p', 'small', 'ยังไม่มีข้อฝึกฟัง — เพิ่มคำศัพท์ที่มีประโยคตัวอย่าง หรือคุยกับตัวละครก่อน')));
+    body.append(emptyState('👂', 'ยังไม่มีข้อฝึกฟัง — เพิ่มคำศัพท์ที่มีประโยคตัวอย่าง หรือคุยกับตัวละครก่อน'));
     return;
   }
   lIdx = Math.min(lIdx, list.length - 1);

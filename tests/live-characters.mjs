@@ -158,7 +158,8 @@ await check('Correction mode catches a clear error', async () => {
 });
 await check('IELTS mode asks an IELTS-style question and gives no band', async () => {
   const r = await ask(ctx(david, { mode: 'ielts', cefr: 'B2', levelText: 'IELTS band 6.5 (about CEFR B2)' }), ['Hi, I want to practise for IELTS speaking.']);
-  return { ok: /\?/.test(r.reply) && !/band\s*\d/i.test(r.reply), note: `"${r.reply}"` };
+  // "Tell me about…" is as much an IELTS question as one ending in "?".
+  return { ok: (/\?/.test(r.reply) || /\b(tell me|describe|talk about)\b/i.test(r.reply)) && !/band\s*\d/i.test(r.reply), note: `"${r.reply}"` };
 });
 await check('Short length setting keeps replies to at most 2 sentences', async () => {
   const r = await ask(ctx(getCharacter('sofia', {}), { length: 'short' }), ['I went to the beach last weekend with my friends and we played volleyball all day.']);

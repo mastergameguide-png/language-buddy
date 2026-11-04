@@ -136,13 +136,21 @@ function assessmentOf(a) {
   return Object.keys(out).length ? out : null;
 }
 
+// Broken JSON (for example a stray quote somewhere else) should not show the learner a wall of
+// JSON: if a "message" string can still be read, show just that.
+export function salvageMessage(raw) {
+  const m = String(raw || '').match(/"(?:message|reply)"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+  if (!m) return null;
+  try { return JSON.parse(`"${m[1]}"`); } catch { return m[1]; }
+}
+
 // Returns a safe object. `malformed` is true when the reply was not the JSON we asked for;
 // the text is still shown so the chat never breaks.
 export function parseStructured(text, { charId = null, roles = [] } = {}) {
   const { json: j, raw } = extractJSON(text);
   const message = j && typeof j === 'object' ? (typeof j.message === 'string' ? j.message : typeof j.reply === 'string' ? j.reply : null) : null;
   if (message == null) {
-    return { reply: clean(raw, 4000) || '…', malformed: true, characterId: charId, emotion: null, activeRole: null, correction: null, newWord: null, memoryUpdates: [], suggestions: [], hints: null, score: null, topic: '', summary: '', assessment: null, scenarioStep: null, scenarioDone: false, criteriaScores: [] };
+    return { reply: clean(salvageMessage(raw) ?? raw, 4000) || '…', malformed: true, characterId: charId, emotion: null, activeRole: null, correction: null, newWord: null, memoryUpdates: [], suggestions: [], hints: null, score: null, topic: '', summary: '', assessment: null, scenarioStep: null, scenarioDone: false, criteriaScores: [] };
   }
   const w = j.new_word;
   const role = typeof j.active_role === 'string' ? j.active_role.trim().toLowerCase().replace(/[\s-]+/g, '_') : null;

@@ -3,6 +3,7 @@ import { el, h, icon, num, fmtMinutes, toast } from '../util.js';
 import { settings, state, persist, emit, levelShort, cefrOf, CEFR, CATEGORIES, weakAreas, flag, setSettings } from '../store.js';
 import { streak, totals, accuracy, lastDays, vocabCounts } from '../stats.js';
 import { practice } from '../conversation.js';
+import { emptyState, sectionHeader } from './ui.js';
 
 function stat(label, value, sub) {
   return h('div', { class: 'card stat' }, el('div', 'label', label), el('div', 'value', value), sub ? el('div', 'sub', sub) : null);
@@ -31,13 +32,13 @@ export function renderMe(root) {
 
   root.append(h('div', { class: 'card hero pad-lg' },
     h('div', { class: 'row' },
-      el('div', 'avatar', (settings.learnerName || 'ฉ').trim().charAt(0).toUpperCase()),
+      h('div', { class: 'avatar', 'aria-hidden': 'true' }, (settings.learnerName || 'ฉ').trim().charAt(0).toUpperCase()),
       h('div', { class: 'grow' },
-        el('div', '', settings.learnerName || 'ผู้เรียน'),
+        el('h1', 'me-name', settings.learnerName || 'ผู้เรียน'),
         el('div', 'xs muted', `${settings.lang} ${flag()} · ${levelShort()} (${CEFR[cefrOf()] || ''})${settings.goalText ? ' · ' + settings.goalText : ''}`)),
       h('a', { class: 'btn sm', href: '#settings' }, icon('gear'), 'ตั้งค่า'))));
 
-  root.append(h('div', { class: 'sec-row' }, el('h2', 'sec', 'ความก้าวหน้า'), h('div', { class: 'row wrap-ok' }, h('a', { class: 'btn sm', href: '#learn' }, '🎓 คอร์สและ IELTS'), h('a', { class: 'btn sm primary', href: '#progress' }, '📈 รายงานและแผน 7 วัน'))));
+  root.append(sectionHeader('ความก้าวหน้า', h('div', { class: 'row wrap-ok' }, h('a', { class: 'btn sm', href: '#learn' }, '🎓 คอร์สและ IELTS'), h('a', { class: 'btn sm primary', href: '#progress' }, '📈 รายงานและแผน 7 วัน'))));
   root.append(h('div', { class: 'grid cols-4' },
     stat('เรียนต่อเนื่อง', `🔥 ${streak()} วัน`),
     stat('เวลาเรียน', fmtMinutes(tot.secs)),
@@ -124,7 +125,7 @@ export function renderMe(root) {
       `ตรวจคำตอบของ AI อัตโนมัติ ${num(q.replies)} ครั้ง: ประโยคยาวเกินระดับ ${rate(q.tooLong)} · อ้างถึงเรื่องที่ไม่เคยคุย ${rate(q.invented)} · ถามหลายคำถาม ${rate(q.manyQuestions)} · รูปแบบเสีย ${rate(q.malformed)}`));
   }
 
-  root.append(h('div', { class: 'sec-row' }, el('h2', 'sec', 'ความจำร่วม: สิ่งที่ตัวละครรู้เกี่ยวกับคุณ'), h('a', { class: 'btn sm ghost', href: '#characters' }, 'ความจำของแต่ละตัว')));
+  root.append(sectionHeader('ความจำร่วม: สิ่งที่ตัวละครรู้เกี่ยวกับคุณ', h('a', { class: 'btn sm ghost', href: '#characters' }, 'ความจำของแต่ละตัว')));
   if (settings.memoryLearner === false) root.append(el('p', 'xs muted', 'ปิดความจำร่วมอยู่ (เปิดได้ที่ ตั้งค่า → ความจำ)'));
   const facts = h('div', { class: 'list' });
   if (!state.facts.length) facts.append(h('div', { class: 'card small muted' }, 'ยังไม่มี — เล่าเรื่องตัวเองให้เพื่อน AI ฟังได้เลย'));

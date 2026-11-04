@@ -70,7 +70,7 @@ export function buildSystemPrompt(c) {
   const learnerMem = c.memoryOn.learner ? list(c.facts) : '(memory is turned off by the learner)';
   const steps = c.scenario && !c.scenario.custom && c.scenario.steps?.length ? c.scenario.steps : null;
   const charMem = !c.memoryOn.character ? '(memory is turned off by the learner)'
-    : c.charMemories.length ? list(c.charMemories) : '(none — this is new to you. Words like "again" or "as usual" do not mean you know it: admit in your own words that you do not know yet and ask)';
+    : c.charMemories.length ? list(c.charMemories) : '(no past chats with you yet. The learner facts above are still true: use them. Only shared history is unknown: if the learner says "again" or "as usual", say in your own words you do not know that part yet and ask)';
 
   return `${characterBlock(ch, c)}
 

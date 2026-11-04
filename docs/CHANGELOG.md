@@ -1,5 +1,62 @@
 # Changelog
 
+## Phase 6 — Professional UX and QA (2026-11-04)
+
+### Audit tool
+- New `tests/browser/ui-audit.js` runs in the app (loaded as a module, since the app's CSP blocks `eval`). On every page it reports:
+  - horizontal overflow;
+  - controls under 44 px;
+  - controls with no accessible name;
+  - the number of `<h1>`;
+  - images without alt;
+  - text below WCAG AA contrast.
+- Decorative content marked `aria-hidden` (avatar initials, emoji badges) is skipped.
+
+### Accessibility
+- **Contrast (light theme):** these tokens were below 4.5:1 and are darkened in both the light and "auto" themes:
+  - `--muted`: 4.40 → about 5.3
+  - `--accent`
+  - `--good`: 3.77
+  - `--warn`: 2.87
+  - `--bad`: 4.31
+
+  The dark theme already passed.
+- **Headings:** every page now has exactly one `<h1>`. Home, Me and Chat had none; the chat header's character name is now the `<h1>`.
+- **Touch targets:**
+  - 44 px for buttons, icon buttons, round composer buttons and tabs;
+  - 40 px for small buttons and chips on touch screens;
+  - 36 px for the reply-replay button.
+  - Nothing is under the WCAG 2.2 AA minimum of 24 px. Dense rows of small buttons and chips stay at 40 px, below 44.
+- **Screen readers:** the message list is no longer a live region. It was redrawn on each reply, which made screen readers re-read it. It is now `role="log"` with `aria-live="off"`, and each new reply is announced once ("Name: text") through a separate polite live region (`#srLive`, `ui.announce`).
+- **Keyboard:**
+  - a "ข้ามไปเนื้อหา" button, the first stop for the Tab key, moves focus to the current page's heading;
+  - the focus ring is visible on all controls;
+  - the Settings section buttons move focus to the chosen section's heading.
+- The Me page avatar is marked decorative.
+
+### Consistency
+- New `js/views/ui.js`: `pageHead`, `sectionHeader`, `emptyState`, `errorBox` and `announce`. Empty states and section headers on Home, Me, Review, Scenarios and Voice now use them.
+- The Settings page has a sticky row of section buttons (Profile, Language, AI friend, Memory, Notifications, Appearance, Connection, Sync, Data), built from the cards' headings.
+- A test now fails if the mistake-category labels (`store.CATEGORIES`) and the AI category list (`response.CATEGORY_IDS`) drift apart (audit item TD7).
+
+### Updates
+- **"มีเวอร์ชันใหม่แล้ว · โหลดใหม่" bar:** when a new service worker takes over a page that already had one, this bar appears. It reloads only when the learner taps, so nothing they are typing is lost. The app also checks for updates when it comes back to the screen.
+- `manifest.json` colours now match the dark UI (they were an old green and beige).
+
+### Fixes found during QA
+- **Raw JSON in the chat:** a reply from the AI with broken JSON used to show the raw JSON in the chat. It happened once in about 20 replies in the regression run. Now `salvageMessage` shows just the message text whenever it can be read.
+- **"undefined" in results:** a scenario result with no summary text showed the word "undefined" in the results list.
+- **IELTS live check:** the check now also accepts "tell me about…" prompts, not only questions ending in "?".
+- **Regression from Phase 1, found by the full live run:**
+  - The Phase 1 wording of the empty character-memory line ("admit you do not know yet") made a character ignore the learner facts it had been given. The failing case: James said he did not know the learner's background despite "nurse at Bangkok Hospital, wants to work in Australia".
+  - The line now says the learner facts are still true and should be used, and that only shared history is unknown.
+  - Re-check: shared facts used 5/5.
+- **Stray control characters:** a few came from shell patches (`\b` written as a backspace character) and were removed. A scan confirmed there are none left in the code.
+
+Prompt change: only the empty-memory line in `engine/prompt.js`.
+
+Service worker cache `buddy-v22`. No prompt or Worker changes.
+
 ## Phase 5 — IELTS and courses (2026-11-04)
 
 Owner decision applied: **original practice material only.** No content is taken from official or published test books. Every band is labelled as a practice estimate.

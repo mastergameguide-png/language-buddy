@@ -1,5 +1,46 @@
 # Test Report
 
+## Phase 6 — final QA, 2026-11-04
+
+### Offline suite: `node tests/run-all.mjs` — 11/11 files, 194 passed, 0 failed
+New tests: the mistake-category lists stay in sync (store); broken JSON shows only the message (learning).
+
+### UI audit (`tests/browser/ui-audit.js`, mock Worker, every page)
+
+| Check | Before Phase 6 | After |
+|---|---|---|
+| Horizontal overflow at 375 / 768 / 1280 px | none | none |
+| Pages without exactly one `<h1>` | Home, Chat, Me | none |
+| Text below WCAG AA contrast, dark theme | 0 (only decorative avatar initials) | 0 |
+| Text below WCAG AA contrast, light theme | muted text 4.40, success 3.77, warning 2.87, danger 4.31, selected chip 3.80 | 0 |
+| Controls without an accessible name | 0 | 0 |
+| Controls under 24 px (WCAG 2.2 AA) | 0 | 0 |
+| Controls under 44 px | many at 28–42 px | main buttons, icons, tabs and composer at 44 px; small buttons and chips 40 px (by design, dense rows) |
+
+Other checks:
+- **Screen-reader announcement:** after a reply, `#srLive` read "Sam: [buddy] Pizza! What toppings?". The message list is `role=log` with `aria-live=off`.
+- **Settings jump bar:** 9 section buttons; tapping "ซิงก์" scrolls to it and focuses its heading.
+- **Skip button:** it moves focus to the page `<h1>` ("ฝึกสถานการณ์จริง"), and the visible focus ring was confirmed on the nav. Showing the button on focus could not be confirmed here: the test browser window was not itself focused, so `:focus` did not apply. The page order puts the button first.
+
+### Real AI — full regression (approved by the owner, about 95 requests in total)
+
+| Suite | First full run | After the fix |
+|---|---|---|
+| `live-characters.mjs` (28 checks, all phases) | 26/28: one malformed JSON reply (James), and an IELTS-mode reply that asked with "tell me…" (test too strict). On a second run: 26/28, with shared memory not used (a **Phase 1 regression**) and invented "that same place" | **28/28** |
+| `live-scenarios.mjs` | 10/10 | — |
+| `live-ielts.mjs` | 10/10 | — |
+
+Extra investigation:
+- **Malformed JSON:** 0 malformed in 12 extra James requests. Output was about 600 of the 2,048 token limit, so it was not truncation. The app now shows only the message when JSON is broken.
+- **Memory after the fix, 5 runs each:**
+  - shared learner facts were used 5/5;
+  - invented shared history appeared 1/5 ("that same restaurant") — a known intermittent model behaviour. It is counted by the reply-quality check, and the Me page shows it.
+
+### Not tested
+- **"New version" bar:** not yet seen in practice. It only appears from the next update onward (v22 → v23), because older pages do not have the listener.
+- **Real iPhone:** Safari PWA, VoiceOver, microphone and recording, and push.
+- **Screen readers:** checked by DOM structure only; not tried with a real screen reader.
+
 ## Phase 5 — 2026-11-04
 
 ### Offline suite: `node tests/run-all.mjs` — 11/11 files, 192 passed, 0 failed
