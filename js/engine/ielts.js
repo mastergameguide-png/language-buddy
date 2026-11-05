@@ -15,6 +15,7 @@ export const PART1 = [
   { id: 'phone', topic: 'Phones and apps', qs: ['How often do you use your phone each day?', 'Which app do you use most, and why?', 'Do you ever try to spend less time on your phone?', 'What did people do before smartphones, do you think?'] },
   { id: 'weather', topic: 'Weather', qs: ['What is the weather usually like where you live?', 'What kind of weather do you like best?', 'Does the weather change your mood?', 'Do you check the weather forecast often?'] },
   { id: 'travel', topic: 'Getting around', qs: ['How do you usually get to work or school?', 'Is public transport good in your city?', 'Do you prefer walking or cycling?', 'How could transport in your city be improved?'] },
+  { id: 'career', topic: 'Your career and English', qs: ['Why did you choose the job you do, or the job you are training for?', 'How do you practise English outside class or work?', 'In what situations could English be useful in your job?', 'Would you like to study or work abroad one day? Why or why not?'] },
   { id: 'music', topic: 'Music', qs: ['What kind of music do you listen to?', 'When do you usually listen to music?', 'Did you learn to play an instrument at school?', 'Is live music popular where you live?'] },
 ];
 
@@ -38,6 +39,8 @@ export const CUE_CARDS = [
     part3: ['Do films influence how people behave?', 'Are people reading less than before? Why?', 'Should children be allowed to choose any book they like?'], vocab: ['thought-provoking', 'the main character', 'a twist', 'it stayed with me', 'eye-opening'] },
   { id: 'neighbour', title: 'Describe a person in your community who you admire.', points: ['who this person is', 'how you know them', 'what they do for the community', 'and explain why you admire them'],
     part3: ['What makes a good neighbour?', 'Do people know their neighbours less than in the past?', 'How can communities become closer?'], vocab: ['look up to', 'down-to-earth', 'give back', 'well-respected', 'make a difference'] },
+  { id: 'safety', title: 'Describe a person whose job helps to keep people safe.', points: ['who the person is', 'what their job involves', 'how you know about their work', 'and explain why you think their job is important'],
+    part3: ['What qualities does a good police officer need?', 'Should people who keep the public safe be paid more?', 'How can the police build trust with local communities?'], vocab: ['on duty', 'stay calm under pressure', 'serve the community', 'put their lives at risk', 'earn people\'s trust'] },
   { id: 'change', title: 'Describe a change you made to become healthier.', points: ['what the change was', 'when you made it', 'how difficult it was', 'and explain how it has affected you'],
     part3: ['Why is it hard for people to change their habits?', 'Should governments make unhealthy food more expensive?', 'Are people today healthier than in the past?'], vocab: ['cut down on', 'a balanced diet', 'stick to it', 'energetic', 'make a habit of'] },
 ];
@@ -51,6 +54,8 @@ export const TASK2 = [
   { id: 'waste', type: 'problem', prompt: 'In many countries, the amount of food that is thrown away is increasing. What are the causes of this problem, and what can be done to reduce it?' },
   { id: 'arts', type: 'discussion', prompt: 'Some people think governments should spend money on supporting the arts, while others believe the money should go to healthcare and education instead. Discuss both views and give your opinion.' },
   { id: 'older', type: 'problem', prompt: 'In many societies, the number of older people is growing faster than the number of young people. What problems can this cause, and what solutions can you suggest?' },
+  { id: 'english_public', type: 'opinion', prompt: 'Some people believe that everyone who works in public services, such as the police, should be required to reach a good level of English. To what extent do you agree or disagree?' },
+  { id: 'cameras', type: 'discussion', prompt: 'Some people think that putting more security cameras in public places is the best way to reduce crime, while others believe that having more police officers on the streets is more effective. Discuss both views and give your own opinion.' },
   { id: 'online', type: 'advantages', prompt: 'More and more university courses are now taught entirely online. Is this a positive or negative development?' },
 ];
 // Task 1 with small, made-up data shown as a table in the app.

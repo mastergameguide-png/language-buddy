@@ -174,14 +174,14 @@ function cleanMessage(m) {
   return out;
 }
 
-// One IELTS practice attempt (Phase 5). Bands are practice estimates; listening keeps a raw score only.
+// One IELTS practice attempt (Phase 5). Bands are practice estimates; listening and reading keep a raw score only.
 const bands = (o) => Object.fromEntries(Object.entries(o && typeof o === 'object' ? o : {}).slice(0, 4).map(([k, v]) => [str(k, 30), cleanBand(v)]).filter(([, v]) => v != null));
 function cleanIeltsAttempt(a) {
-  if (!a || !['speaking', 'writing', 'listening'].includes(a.kind) || !Number(a.t)) return null;
+  if (!a || !['speaking', 'writing', 'listening', 'reading'].includes(a.kind) || !Number(a.t)) return null;
   const out = { t: Number(a.t), kind: a.kind, id: str(a.id, 40) };
   if (a.kind === 'speaking') out.part = [1, 2, 3].includes(a.part) ? a.part : 1;
   if (a.kind === 'writing') out.task = a.task === 1 ? 1 : 2;
-  if (a.kind === 'listening') { out.score = Math.max(0, Math.floor(Number(a.score) || 0)); out.total = Math.max(out.score, Math.floor(Number(a.total) || 0)); return out; }
+  if (a.kind === 'listening' || a.kind === 'reading') { out.score = Math.max(0, Math.floor(Number(a.score) || 0)); out.total = Math.max(out.score, Math.floor(Number(a.total) || 0)); return out; }
   out.question = str(a.question, 400);
   out.answer = str(a.answer, a.kind === 'writing' ? 6000 : 2500);
   out.words = Math.max(0, Math.floor(Number(a.words) || 0));

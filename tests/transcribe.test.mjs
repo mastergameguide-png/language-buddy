@@ -101,7 +101,7 @@ await test('code: one shared resize helper, photos never stored by the Writing p
 
 await test('scoring is unchanged: transcription never calls the Writing feedback by itself', async () => {
   const learn = src('js/views/learn.js');
-  const fn = learn.slice(learn.indexOf('async function attachEssayPhotos'), learn.indexOf('// ---------- listening'));
+  const fn = learn.slice(learn.indexOf('async function attachEssayPhotos'), learn.indexOf('// ---------- reading'));
   assert.ok(fn.length > 100);
   assert.ok(!/getFeedback|askIelts|saveAttempt/.test(fn));
 });

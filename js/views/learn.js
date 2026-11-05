@@ -1,14 +1,16 @@
 // Courses and IELTS practice: short courses built from the app's activities, and IELTS Speaking
-// (Parts 1–3, Part 2 timer, typed or spoken answers), Writing (Task 1 and 2 with instant checks)
-// and Listening (original scripts read by the device voice). AI feedback gives PRACTICE band
+// (Parts 1–3, Part 2 timer, typed or spoken answers), Writing (Task 1 and 2 with instant checks and
+// an exam-length countdown), Reading (original passages, checked offline) and Listening (original
+// scripts read by the device voice). An overall band calculator sits under the courses. AI feedback gives PRACTICE band
 // estimates only; listening shows a raw score, never a band.
 import { el, h, icon, toast, fmtDate, preparePhoto } from '../util.js';
 import { settings, state, persist, emit, isEnglish, ieltsBand } from '../store.js';
 import {
   CUE_CARDS, TASK1, TASK2, LISTENING, IELTS_DISCLAIMER, SPEAKING_CRITERIA, WRITING_CRITERIA, MIN_SPEAKING_WORDS,
   analyseWriting, checkListening, buildSpeakingPrompt, buildWritingPrompt, parseIeltsFeedback, pickSpeaking, wordCount,
-  ESSAY_PHOTO_MAX, ESSAY_PHOTO_SIDE, TRANSCRIBE_PROMPT, TRANSCRIBE_NOTE, checkEssayFiles, parseTranscript, joinPages,
+  ESSAY_PHOTO_MAX, ESSAY_PHOTO_SIDE, TRANSCRIBE_PROMPT, TRANSCRIBE_NOTE, checkEssayFiles, parseTranscript, joinPages, overallBand,
 } from '../engine/ielts.js';
+import { READING, TFNG, checkReading, scoreReading, withinLimit, limitText, answerText } from '../engine/reading.js';
 import { COURSES, courseProgress } from '../engine/courses.js';
 import { askIelts, askTranscribe } from '../ai.js';
 import { speak, listen, stopListening, unlockSpeech, stopSpeaking } from '../speech.js';
@@ -26,6 +28,11 @@ let micOn = false;
 let wr = { task: 2, idx: 0, answer: '', busy: false, result: null };
 // Listening
 let ls = { idx: 0, answers: {}, checked: false, showScript: false, counted: new Set() };
+// Reading
+let rd = { idx: 0, answers: {}, checked: false, counted: new Set() };
+// Writing / Reading countdown (one at a time); calc = the overall band calculator's picks
+let cd = { key: '', left: 0, id: 0 };
+let calc = {};
 
 const targetBand = () => target ?? Math.min(8, (Number(ieltsBand()) || 6) + 0.5);
 const evidence = () => ({ results: state.results, ielts: state.ielts, days: state.days });
@@ -38,6 +45,7 @@ function saveDraft(t) { try { localStorage.setItem(draftKey(), t); } catch {} }
 export function openLearn(which = 'courses', opts = {}) {
   tab = which;
   if (which === 'speaking' && opts.part) { sp = { ...sp, part: opts.part, item: null, result: null, answer: '' }; }
+  if (which === 'reading' && opts.id) { const i = READING.findIndex((r) => r.id === opts.id); if (i >= 0) rd = { ...rd, idx: i, answers: {}, checked: false }; }
   if (which === 'writing' && opts.task) { wr = { ...wr, task: opts.task, idx: 0, result: null }; wr.answer = loadDraft(); }
   if (location.hash === '#learn') render(document.getElementById('learnBody')); else location.hash = '#learn';
 }
@@ -79,13 +87,14 @@ function feedbackCard(f, kind) {
   if (f.note) card.append(el('p', 'small', '💡 ' + f.note));
   return card;
 }
+const rawScore = (kind) => kind === 'listening' || kind === 'reading';
 function historyList(kind, extra = () => true) {
   const items = (state.ielts || []).filter((a) => a.kind === kind && extra(a)).slice(-5).reverse();
   if (!items.length) return null;
   return h('div', {}, el('h2', 'sec', 'ฝึกล่าสุด'), h('div', { class: 'list' }, ...items.map((a) => h('div', { class: 'item' },
     el('span', 'grow small', `${fmtDate(a.t)} · ${kind === 'speaking' ? `Part ${a.part}` : kind === 'writing' ? `Task ${a.task}` : a.id}${a.words ? ` · ${a.words} คำ` : ''}`),
-    el('span', 'chip', kind === 'listening' ? `${a.score}/${a.total}` : `${fmtBand(a.overall)}`)))),
-  kind !== 'listening' ? el('p', 'xs muted', 'band ทั้งหมดเป็นการประมาณจากการฝึก') : null);
+    el('span', 'chip', rawScore(kind) ? `${a.score}/${a.total}` : `${fmtBand(a.overall)}`)))),
+  !rawScore(kind) ? el('p', 'xs muted', 'band ทั้งหมดเป็นการประมาณจากการฝึก') : null);
 }
 function targetPicker(root) {
   const sel = h('select', { class: 'input', 'aria-label': 'band เป้าหมาย' }, ...[5, 5.5, 6, 6.5, 7, 7.5, 8].map((b) => Object.assign(el('option', '', `เป้า ${b}`), { value: String(b) })));
@@ -106,7 +115,7 @@ function stepAction(step) {
   else if (step.type === 'shadow') openVoice('shadow');
   else if (step.type === 'listen') openVoice('listen');
   else if (step.type === 'review') location.hash = '#review';
-  else if (step.type === 'ielts') openLearn(step.kind, { part: step.part, task: step.task });
+  else if (step.type === 'ielts') openLearn(step.kind, { part: step.part, task: step.task, id: step.id });
 }
 function renderCourses(body, root) {
   body.append(el('p', 'small muted', 'คอร์สสั้นที่เรียงกิจกรรมในแอปให้ทำตามลำดับ ขั้นที่ทำแล้วจะติ๊กเองจากสิ่งที่คุณทำจริงหลังเริ่มคอร์ส'));
@@ -134,6 +143,53 @@ function renderCourses(body, root) {
     }
     body.append(card);
   }
+  if (isEnglish()) body.append(bandCalculator());
+}
+
+// Overall band = the average of the four skill bands, rounded to the nearest half band
+// (.25 rounds up to .5 and .75 up to the next whole band). Nothing is saved.
+function bandCalculator() {
+  const box = h('details', { class: 'card' }, h('summary', { class: 'small' }, h('b', {}, '🧮 คำนวณ band รวม (Overall)')));
+  const out = h('p', { class: 'small', role: 'status' });
+  const draw = () => {
+    const vals = ['listening', 'reading', 'writing', 'speaking'].map((k) => calc[k]).filter((v) => v != null);
+    out.textContent = vals.length < 4 ? 'เลือกให้ครบ 4 ทักษะ'
+      : `ค่าเฉลี่ย ${(vals.reduce((a, b) => a + b, 0) / 4).toFixed(3).replace(/0+$/, '').replace(/\.$/, '')} → Overall band ${overallBand(calc).toFixed(1)}`;
+  };
+  const grid = h('div', { class: 'band-calc' });
+  for (const [k, label] of [['listening', 'Listening'], ['reading', 'Reading'], ['writing', 'Writing'], ['speaking', 'Speaking']]) {
+    const sel = h('select', { class: 'input', 'aria-label': `band ${label}` }, Object.assign(el('option', '', '—'), { value: '' }),
+      ...Array.from({ length: 19 }, (_, i) => i / 2).reverse().map((b) => Object.assign(el('option', '', b.toFixed(1)), { value: String(b) })));
+    sel.value = calc[k] == null ? '' : String(calc[k]);
+    sel.addEventListener('change', () => { if (sel.value === '') delete calc[k]; else calc[k] = Number(sel.value); draw(); });
+    grid.append(h('label', { class: 'xs muted' }, label, sel));
+  }
+  box.append(el('p', 'xs muted', 'band รวมคือค่าเฉลี่ย 4 ทักษะ ปัดเป็น .0 หรือ .5 ที่ใกล้ที่สุด (ลงท้าย .25 ปัดขึ้นเป็น .5 และ .75 ปัดขึ้นเป็นเต็ม)'), grid, out);
+  draw();
+  return box;
+}
+
+// ---------- countdown (Writing and Reading) ----------
+// Only the clock text changes each second, so typing in the essay box is never interrupted.
+function stopCountdown() { clearInterval(cd.id); cd = { key: '', left: 0, id: 0 }; }
+function countdownRow(key, minutes, root) {
+  const running = cd.key === key && cd.id;
+  const clockEl = h('span', { class: 'chip countdown', id: 'cdClock', 'data-key': key }, clock(running ? cd.left : minutes * 60));
+  const btn = h('button', { type: 'button', class: 'btn sm ghost' }, running ? 'หยุดจับเวลา' : `⏱ จับเวลา ${minutes} นาที`);
+  btn.addEventListener('click', () => {
+    if (running) stopCountdown();
+    else {
+      stopCountdown();
+      cd = { key, left: minutes * 60, id: setInterval(() => {
+        cd.left -= 1;
+        const c = document.getElementById('cdClock');
+        if (c && c.dataset.key === cd.key) c.textContent = clock(cd.left);   // another task's clock is not touched
+        if (cd.left <= 0) { stopCountdown(); toast('หมดเวลาแล้ว (สอบจริงต้องหยุดตอนนี้)'); render(root); }
+      }, 1000) };
+    }
+    render(root);
+  });
+  return h('div', { class: 'row wrap-ok' }, btn, clockEl, el('span', 'xs muted grow', running ? 'กำลังจับเวลา' : 'เวลาเท่าสอบจริง'));
 }
 
 // ---------- speaking ----------
@@ -283,7 +339,7 @@ function renderWriting(body, root) {
   };
   ta.addEventListener('input', () => { wr.answer = ta.value; saveDraft(ta.value); draw(); });
   draw();
-  card.append(essayPhotoRow(root), ta, live, el('p', 'xs muted', 'ตัวเลขด้านบนคำนวณในเครื่องทันที (ไม่ใช้ AI)'));
+  card.append(countdownRow(`w${wr.task}`, wr.task === 1 ? 20 : 40, root), essayPhotoRow(root), ta, live, el('p', 'xs muted', 'ตัวเลขด้านบนคำนวณในเครื่องทันที (ไม่ใช้ AI)'));
 
   const ocrBusy = wr.ocr?.busy;
   const ask = h('button', { type: 'button', class: 'btn primary' }, wr.busy ? 'กำลังประเมิน…' : 'ขอคำติชม (AI)');
@@ -376,6 +432,68 @@ async function attachEssayPhotos(picked, root) {
   render(root);
 }
 
+// ---------- reading ----------
+function renderReading(body, root) {
+  const item = READING[rd.idx];
+  const pick = h('select', { class: 'input', 'aria-label': 'เลือกบทอ่าน' }, ...READING.map((r, i) => Object.assign(el('option', '', `${r.theme === 'police' ? '👮 ' : ''}${r.title} (${r.level})`), { value: String(i) })));
+  pick.value = String(rd.idx);
+  pick.addEventListener('change', () => { rd = { ...rd, idx: Number(pick.value), answers: {}, checked: false }; render(root); });
+  body.append(pick);
+
+  const card = h('div', { class: 'card pad-lg shadow-card' });
+  card.append(el('div', 'xs muted', `บทอ่านเขียนขึ้นใหม่สำหรับแอปนี้ · ${item.questions.length} ข้อ · ประมาณ ${item.minutes} นาที`), countdownRow(`r${item.id}`, item.minutes, root));
+  card.append(h('div', { class: 'reading-text', lang: 'en' }, el('h2', 'sec', item.title),
+    ...item.paragraphs.map((p, i) => h('p', { class: 'small' }, h('b', {}, 'ABCDEFG'[i]), p))));
+  body.append(card);
+
+  const qs = h('div', { class: 'card pad-lg' });
+  qs.append(el('h2', 'sec', 'คำถาม'), el('p', 'xs muted', 'TRUE = ตรงกับบทอ่าน · FALSE = ขัดกับบทอ่าน · NOT GIVEN = บทอ่านไม่ได้บอกไว้'));
+  item.questions.forEach((q, i) => {
+    const ok = rd.checked ? checkReading(q, rd.answers[i]) : null;
+    const row = h('div', { class: 'lq' + (ok === true ? ' ok' : ok === false ? ' bad' : ''), lang: 'en' }, el('div', 'small', `${i + 1}. ${q.q}`));
+    const radios = (opts) => opts.forEach(([value, label]) => {
+      const r = h('input', { type: 'radio', name: `rq${i}`, value });
+      r.checked = rd.answers[i] === value;
+      r.disabled = rd.checked;
+      r.addEventListener('change', () => { rd.answers[i] = value; });
+      row.append(h('label', { class: 'small opt' }, r, ' ', label));
+    });
+    if (q.type === 'tfng') radios(TFNG);
+    else if (q.type === 'mc') radios(q.options.map((o, j) => [String(j), `${'ABC'[j]}  ${o}`]));
+    else {
+      const inp = h('input', { class: 'input', type: 'text', lang: 'en', autocomplete: 'off', 'aria-label': `คำตอบข้อ ${i + 1} (${limitText(q.max)})` });
+      inp.value = rd.answers[i] || '';
+      inp.disabled = rd.checked;
+      inp.addEventListener('input', () => { rd.answers[i] = inp.value; });
+      row.append(inp, el('div', 'xs muted', `ตอบ${limitText(q.max)} ใช้คำจากบทอ่าน`));
+    }
+    if (rd.checked && !ok) {
+      const over = q.type === 'gap' && rd.answers[i] && !withinLimit(rd.answers[i], q.max);
+      row.append(el('div', 'xs', `${over ? 'เกินจำนวนคำที่กำหนด (สอบจริงนับว่าผิด) · ' : ''}คำตอบ: ${answerText(q)}`));
+    }
+    qs.append(row);
+  });
+  if (!rd.checked) {
+    const check = h('button', { type: 'button', class: 'btn primary' }, 'ตรวจคำตอบ');
+    check.addEventListener('click', () => {
+      rd.checked = true;
+      if (cd.key === `r${item.id}`) stopCountdown();
+      // Only the first check of a passage on each visit is saved.
+      if (!rd.counted.has(item.id)) { rd.counted.add(item.id); saveAttempt({ t: Date.now(), kind: 'reading', id: item.id, score: scoreReading(item, rd.answers), total: item.questions.length }); }
+      render(root);
+    });
+    qs.append(check);
+  } else {
+    qs.append(el('div', 'small', `ได้ ${scoreReading(item, rd.answers)}/${item.questions.length} ข้อ`), el('p', 'xs muted', 'IELTS Reading จริงมี 40 ข้อใน 60 นาที แอปจึงไม่แปลงคะแนนชุดสั้นนี้เป็น band'));
+    const again = h('button', { type: 'button', class: 'btn sm ghost' }, 'ลองใหม่');
+    again.addEventListener('click', () => { rd = { ...rd, answers: {}, checked: false }; render(root); });
+    qs.append(again);
+  }
+  body.append(qs);
+  const hist = historyList('reading');
+  if (hist) body.append(hist);
+}
+
 // ---------- listening ----------
 function renderListening(body, root) {
   const item = LISTENING[ls.idx];
@@ -441,9 +559,9 @@ function renderListening(body, root) {
 function render(root) {
   root.textContent = '';
   root.append(h('div', { class: 'page-head' }, h('div', {}, el('h1', '', 'คอร์สและ IELTS'),
-    el('p', '', 'คอร์สสั้นจากกิจกรรมในแอป และฝึก IELTS Speaking, Writing, Listening ด้วยโจทย์ที่เขียนขึ้นใหม่ — band ทั้งหมดเป็นการประมาณจากการฝึก'))));
+    el('p', '', 'คอร์สสั้นจากกิจกรรมในแอป และฝึก IELTS ครบ 4 ทักษะด้วยโจทย์ที่เขียนขึ้นใหม่ — band ทั้งหมดเป็นการประมาณจากการฝึก'))));
   const tabs = h('div', { class: 'tabs', role: 'tablist' });
-  for (const [id, label] of [['courses', '📚 คอร์ส'], ['speaking', '🎤 Speaking'], ['writing', '✍️ Writing'], ['listening', '👂 Listening']]) {
+  for (const [id, label] of [['courses', '📚 คอร์ส'], ['speaking', '🎤 Speaking'], ['writing', '✍️ Writing'], ['reading', '📖 Reading'], ['listening', '👂 Listening']]) {
     const b = h('button', { type: 'button', role: 'tab', 'aria-selected': String(tab === id) }, label);
     b.addEventListener('click', () => { if (micOn) { micOn = false; stopListening(); } tab = id; render(root); });
     tabs.append(b);
@@ -455,6 +573,7 @@ function render(root) {
   if (tab === 'courses') renderCourses(body, root);
   else if (tab === 'speaking') renderSpeaking(body, root);
   else if (tab === 'writing') renderWriting(body, root);
+  else if (tab === 'reading') renderReading(body, root);
   else renderListening(body, root);
 }
 
@@ -464,5 +583,6 @@ export const renderLearn = render;
 window.addEventListener('hashchange', () => {
   if (location.hash === '#learn') return;
   stopTimer();
+  stopCountdown();
   if (micOn) { micOn = false; stopListening(); }
 });

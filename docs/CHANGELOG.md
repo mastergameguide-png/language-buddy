@@ -1,5 +1,36 @@
 # Changelog
 
+## IELTS Reading, cadet course, exam timer and band calculator (2026-11-05)
+
+These come from the owner's IELTS Session 1 handout (police cadet IELTS club). The handout was only used to see what the real test needs. Its passages and its listening task were not copied.
+
+- **IELTS Reading (new tab "📖 Reading"):**
+  - 4 original passages of 250–300 words each, in `js/engine/reading.js`. Two are police-themed: "Working across languages" and "Cameras or community officers?". The other two are "Sleep and shift work" and "Cooling cities with trees".
+  - Each passage has 7 questions. Every passage mixes TRUE / FALSE / NOT GIVEN, gap completion and multiple choice, and paragraphs are lettered A, B, C…
+  - Checked offline, no AI. A gap answer over the word limit ("NO MORE THAN TWO WORDS AND/OR A NUMBER") is marked wrong, as in the real test, and the app says why.
+  - The raw score is saved as a `reading` attempt (like Listening). No band is shown, because the real test has 40 questions in 60 minutes.
+- **Work-and-English content:**
+  - Speaking Part 1 topic "Your career and English";
+  - Part 2 card "Describe a person whose job helps to keep people safe", with Part 3 questions about the police and community trust;
+  - two Task 2 essays: English for public-service workers, and cameras versus more officers.
+- **Course "👮 ภาษาอังกฤษสำหรับนักเรียนนายร้อยตำรวจ":** 7 steps, using the existing police and emergency scenarios, the two police passages, Speaking Part 1, Writing Task 2 and review. A reading step only ticks when that exact passage is done (`stepDone` now checks `step.id`).
+- **Exam-length countdown:**
+  - Writing has a 20-minute timer for Task 1 and a 40-minute timer for Task 2; each reading passage has its own suggested time.
+  - Only the clock text changes each second, so typing is not interrupted. Each clock belongs to its own task, so switching tasks never shows another task's time.
+  - The timer stops when the page is left. When time is up, a message says that the real test would stop here.
+- **Overall band calculator** (under the courses): pick the four skill bands. It shows the average and the overall band, rounded to the nearest half band (.25 rounds up to .5 and .75 up to the next whole band), using the existing `overallBand`. Nothing is saved.
+- **Five IELTS tabs** wrap onto two rows on small phones.
+- **Tests:** `tests/reading.test.mjs` (9 checks):
+  - the passage bank, and that every gap answer is in its passage and within the word limit;
+  - the word-limit rule and the checker;
+  - the new content and the cadet course;
+  - storing reading attempts;
+  - band rounding;
+  - the page wiring, including that the countdown does not redraw the page every second.
+  - `sw.js` caches `js/engine/reading.js`.
+
+No AI prompt, Worker or CSP change.
+
 ## IELTS Writing: attach essay photos (2026-11-05)
 
 - **"แนบภาพเรียงความ" button on the Writing page:**

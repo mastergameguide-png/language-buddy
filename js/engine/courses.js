@@ -1,5 +1,5 @@
 // Short courses: ordered steps built from activities the app already has (scenarios, voice
-// practice, review, IELTS practice). Progress is worked out from what the learner really did after
+// practice, review, IELTS practice including Reading). Progress is worked out from what the learner really did after
 // starting the course, so nothing can be ticked off without doing it. Pure.
 import { dayRange } from './analytics.js';
 
@@ -46,6 +46,17 @@ export const COURSES = [
       { type: 'ielts', kind: 'writing', task: 2, n: 1, th: 'Writing Task 2 หนึ่งเรียงความ' },
       { type: 'scenario', id: 'ielts', th: 'สอบพูดจำลองครบ 3 Part' },
     ] },
+  { id: 'cadet', icon: '👮', th: 'ภาษาอังกฤษสำหรับนักเรียนนายร้อยตำรวจ', level: 'B1–B2', days: 7, englishOnly: true,
+    desc: 'แจ้งความและเหตุฉุกเฉิน บทอ่านเรื่องงานตำรวจ พูดเรื่องอาชีพ และเขียนเรียงความแบบ IELTS',
+    steps: [
+      { type: 'scenario', id: 'police', th: 'รับแจ้งความ (คุยกับตำรวจ)' },
+      { type: 'ielts', kind: 'reading', id: 'mission', n: 1, th: 'Reading: Working across languages' },
+      { type: 'scenario', id: 'emergency', th: 'โทรแจ้งเหตุฉุกเฉิน' },
+      { type: 'ielts', kind: 'speaking', part: 1, n: 2, th: 'Speaking Part 1 สองคำถาม' },
+      { type: 'ielts', kind: 'reading', id: 'cameras', n: 1, th: 'Reading: Cameras or community officers?' },
+      { type: 'ielts', kind: 'writing', task: 2, n: 1, th: 'Writing Task 2 หนึ่งเรียงความ' },
+      { type: 'review', n: 10, th: 'ทบทวนคำที่เจอ 10 ข้อ' },
+    ] },
 ];
 export const courseById = (id) => COURSES.find((c) => c.id === id) || null;
 
@@ -53,7 +64,7 @@ export const courseById = (id) => COURSES.find((c) => c.id === id) || null;
 export function stepDone(step, { start = 0, results = [], ielts = [], days = {} } = {}, now = Date.now()) {
   if (step.type === 'scenario') return results.some((r) => r.id === step.id && r.t >= start);
   if (step.type === 'ielts') {
-    const n = ielts.filter((a) => a.kind === step.kind && a.t >= start && (!step.part || a.part === step.part) && (!step.task || a.task === step.task)).length;
+    const n = ielts.filter((a) => a.kind === step.kind && a.t >= start && (!step.part || a.part === step.part) && (!step.task || a.task === step.task) && (!step.id || a.id === step.id)).length;
     return n >= (step.n || 1);
   }
   const field = { shadow: 'shadow', listen: 'listen', review: 'reviews' }[step.type];
