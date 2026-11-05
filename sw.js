@@ -1,23 +1,47 @@
-// Bump this when you change any app file so phones pick up the new version.
+// The deploy workflow (.github/workflows/pages.yml) replaces this value with the commit SHA on
+// every push to main, so phones pick up each release. Opened locally, the value below is used as is.
 const CACHE = 'buddy-v23';
+// Thai web font from Google Fonts. Kept in its own cache so it survives app updates and works offline.
+const FONT_CACHE = 'buddy-fonts-v1';
+const FONT_HOSTS = ['fonts.googleapis.com', 'fonts.gstatic.com'];
+const FONT_CSS = 'https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;700&display=swap';
 const SHELL = [
   './', 'index.html', 'manifest.json', 'css/app.css',
   'js/main.js', 'js/util.js', 'js/store.js', 'js/srs.js', 'js/stats.js', 'js/ai.js', 'js/conversation.js', 'js/speech.js', 'js/push.js', 'js/sync.js',
   'js/engine/characters.js', 'js/engine/emotion.js', 'js/engine/roles.js', 'js/engine/memory.js', 'js/engine/scenarios.js', 'js/engine/response.js', 'js/engine/prompt.js', 'js/engine/modes.js', 'js/engine/checks.js',
   'js/views/avatar.js', 'js/views/characters.js', 'js/views/voice.js', 'js/views/progress.js', 'js/views/learn.js', 'js/views/ui.js', 'js/engine/ielts.js', 'js/engine/courses.js', 'js/engine/shadowing.js', 'js/engine/analytics.js', 'js/engine/plan.js', 'js/voice/tts.js', 'js/voice/stt.js', 'js/voice/recorder.js',
-  'js/views/chat.js', 'js/views/home.js', 'js/views/review.js', 'js/views/roleplay.js', 'js/views/me.js', 'js/views/settings.js',
+  'js/views/onboarding.js', 'js/views/chat.js', 'js/views/home.js', 'js/views/review.js', 'js/views/roleplay.js', 'js/views/me.js', 'js/views/settings.js',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png',
 ];
 
 self.addEventListener('install', (e) => {
   // `reload` skips the browser's HTTP cache so the offline copy is the new version, not a stale one.
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL.map((u) => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting()));
+  e.waitUntil(
+    Promise.all([
+      caches.open(CACHE).then((c) => c.addAll(SHELL.map((u) => new Request(u, { cache: 'reload' })))),
+      precacheFonts(),
+    ]).then(() => self.skipWaiting())
+  );
 });
+
+// Saves the font stylesheet and the font files it lists, so the first offline visit already has them.
+// Best effort: if the network or Google Fonts is unavailable, the app still installs.
+async function precacheFonts() {
+  try {
+    const cache = await caches.open(FONT_CACHE);
+    const res = await fetch(FONT_CSS);
+    if (!res.ok) return;
+    const css = await res.clone().text();
+    await cache.put(FONT_CSS, res);
+    const files = new Set(css.match(/https:\/\/fonts\.gstatic\.com\/[^)'"\s]+/g) || []);
+    await Promise.all([...files].map((u) => fetch(u).then((r) => (r.ok ? cache.put(u, r) : null)).catch(() => {})));
+  } catch { /* offline now; the fetch handler caches fonts on first use */ }
+}
 
 self.addEventListener('activate', (e) => {
   e.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE && k !== FONT_CACHE).map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
@@ -25,9 +49,25 @@ self.addEventListener('activate', (e) => {
 // Network first for the app's own files (so updates show up), cache when offline.
 // `no-cache` asks the server every time (a quick 304 when unchanged): GitHub Pages lets the
 // browser keep files for 10 minutes, which could mix a new index.html with old scripts.
+// Fonts: use the saved copy right away and refresh it in the background.
+async function fontResponse(e) {
+  const cache = await caches.open(FONT_CACHE);
+  const hit = await cache.match(e.request, { ignoreVary: true });
+  const fresh = fetch(e.request).then((res) => {
+    // Stylesheets requested without CORS come back "opaque" (status 0); they are still usable.
+    if (res.ok || res.type === 'opaque') cache.put(e.request, res.clone());
+    return res;
+  });
+  if (hit) { e.waitUntil(fresh.catch(() => {})); return hit; }
+  return fresh;
+}
+
 self.addEventListener('fetch', (e) => {
   const req = e.request;
-  if (req.method !== 'GET' || new URL(req.url).origin !== location.origin) return;
+  if (req.method !== 'GET') return;
+  const url = new URL(req.url);
+  if (FONT_HOSTS.includes(url.hostname)) { e.respondWith(fontResponse(e)); return; }
+  if (url.origin !== location.origin) return;
   e.respondWith(
     fetch(req.url, { cache: 'no-cache', credentials: 'same-origin' })
       .then((res) => {

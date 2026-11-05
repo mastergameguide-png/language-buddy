@@ -1,5 +1,18 @@
 # Changelog
 
+## Thai font, simpler Settings, first-run guide, auto cache version (2026-11-05)
+
+- **Thai font:** "Noto Sans Thai" (400/500/700, `display=swap`, with `preconnect`) from Google Fonts; the font stack is `"Noto Sans Thai", "Sarabun", system-ui, sans-serif`. The service worker keeps the font files in their own cache (`buddy-fonts-v1`, not removed on updates) and saves them at install, so Thai text keeps its font offline.
+- **Settings in two parts:** "ทั่วไป" (language and level, voice speed, auto-send, notifications, profile, how corrections are shown, custom buddy, memory, theme, your data) and a collapsed "ขั้นสูง" `<details>` (server address, server password, AI choice, daily quota, D1 sync). Technical words are replaced with plain Thai (the original term stays in brackets) and every field has a short hint tied to it with `aria-describedby`. The Worker field is empty by default and says "กำลังใช้เซิร์ฟเวอร์เริ่มต้น" (the built-in server is still used when it is empty). The jump buttons open the advanced part before scrolling to it.
+- **Tighter CSP:** `connect-src` is now `'self'`, the Worker (`language-buddy.mastergameguide.workers.dev`), Google Fonts and `localhost` (for `wrangler dev`), instead of any `https:`. `style-src` and `font-src` allow Google Fonts only. Using another Worker now needs its domain added to `connect-src` in `index.html` (Settings warns about this when saving).
+- **Cache version from the commit:** `.github/workflows/pages.yml` runs the tests, replaces `buddy-v23` in `sw.js` with `buddy-<short SHA>` and deploys to Pages on every push to `main`. The file in the repo is left alone, so opening the app locally needs no Action. One-time setup: Settings → Pages → Source: GitHub Actions.
+- **First-run guide:** `js/views/onboarding.js`, a modal `<dialog>` with three steps (what the app does → language and level → pick a buddy and start chatting). "ข้าม" is on every step, Escape also skips, focus moves to the step heading, and the browser keeps Tab inside the dialog. One flag, `lb_onboarded`, remembers it was shown. People who already have chats, words or mistakes never see it.
+- **Share links and search:** description, `og:*` and `twitter:*` tags, canonical link, and `og-image.png` (1200×630, app name and the six buddies).
+- **Accessibility pass:** the audit (`tests/browser/ui-audit.js`) finds no unnamed buttons, no contrast below 4.5:1 and no horizontal overflow on any page at 390×844 and on desktop, in dark and light themes. The advanced `<details>` opens with Enter or Space.
+- **Tests:** `tests/site.test.mjs` checks the CSP, fonts, share tags, offline file list, workflow and Settings structure.
+
+Service worker cache is now set by the deploy workflow (`buddy-v23` locally). No prompt or Worker changes.
+
 ## Review fixes (2026-11-04)
 
 These come from the owner's app review.

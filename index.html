@@ -4,13 +4,31 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
 <title>Language Buddy</title>
-<meta name="description" content="เพื่อน AI สำหรับฝึกภาษา: คุย แก้ไวยากรณ์ ทบทวนคำศัพท์ และฝึกสถานการณ์จริง">
+<meta name="description" content="Language Buddy เพื่อน AI สำหรับฝึกภาษา: คุยกับตัวละคร แก้ไวยากรณ์ ทบทวนคำศัพท์ ฝึกสถานการณ์จริง และเตรียมสอบ IELTS ฟรี ใช้ได้บนมือถือ">
+<link rel="canonical" href="https://mastergameguide-png.github.io/language-buddy/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Language Buddy">
+<meta property="og:locale" content="th_TH">
+<meta property="og:title" content="Language Buddy — เพื่อน AI ฝึกภาษา">
+<meta property="og:description" content="คุยกับเพื่อน AI แก้ไวยากรณ์ให้ทันที ทบทวนคำศัพท์ ฝึกสถานการณ์จริงและ IELTS ใช้ฟรีบนมือถือ">
+<meta property="og:url" content="https://mastergameguide-png.github.io/language-buddy/">
+<meta property="og:image" content="https://mastergameguide-png.github.io/language-buddy/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Language Buddy และตัวละคร AI Emma, James, Mika, David, Sofia, Alex">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Language Buddy — เพื่อน AI ฝึกภาษา">
+<meta name="twitter:description" content="คุยกับเพื่อน AI แก้ไวยากรณ์ให้ทันที ทบทวนคำศัพท์ ฝึกสถานการณ์จริงและ IELTS ใช้ฟรีบนมือถือ">
+<meta name="twitter:image" content="https://mastergameguide-png.github.io/language-buddy/og-image.png">
 <meta name="theme-color" content="#10131a">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Buddy">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https: http://localhost:* http://127.0.0.1:*; media-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://language-buddy.mastergameguide.workers.dev https://fonts.googleapis.com https://fonts.gstatic.com http://localhost:* http://127.0.0.1:*; media-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;700&display=swap">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
@@ -92,97 +110,54 @@
 
     <section id="view-settings" class="view" hidden>
       <div class="scroll"><div class="wrap">
-        <div class="page-head"><div><h1>ตั้งค่า</h1><p>โปรไฟล์ ภาษา เพื่อน AI การแจ้งเตือน และข้อมูลของคุณ</p></div></div>
+        <div class="page-head"><div><h1>ตั้งค่า</h1><p>ภาษา เสียง การแจ้งเตือน และข้อมูลของคุณ</p></div></div>
         <form id="settingsForm" novalidate>
-          <div class="card set-group">
-            <h3>👤 โปรไฟล์ผู้เรียน</h3>
-            <label class="field"><span>ชื่อของคุณ (ให้เพื่อน AI เรียก)</span><input class="input" id="sLearner" type="text" maxlength="40" autocomplete="nickname"></label>
-            <label class="field"><span>เป้าหมาย</span><input class="input" id="sGoalText" type="text" maxlength="200" placeholder="เช่น สอบ IELTS 7 ให้ได้ภายในปีนี้ / ใช้คุยงาน / เที่ยวต่างประเทศ"></label>
-            <div class="grid cols-4" style="grid-template-columns:repeat(3,minmax(0,1fr))">
-              <label class="field"><span>นาที/วัน</span><input class="input" id="sGoalMin" type="number" min="1" max="240" inputmode="numeric"></label>
-              <label class="field"><span>ข้อความ/วัน</span><input class="input" id="sGoalMsg" type="number" min="1" max="200" inputmode="numeric"></label>
-              <label class="field"><span>ทบทวน/วัน</span><input class="input" id="sGoalRev" type="number" min="1" max="200" inputmode="numeric"></label>
-            </div>
-          </div>
+          <h2 class="set-part" id="partGeneral">ทั่วไป</h2>
 
           <div class="card set-group">
             <h3>🌐 ภาษาและระดับ</h3>
             <div class="grid md-2">
-              <label class="field"><span>ภาษาที่ฝึก</span><select class="input" id="sLang"></select></label>
-              <label class="field"><span>ระดับ (IELTS หรือ CEFR)</span><select class="input" id="sLevel"></select></label>
+              <label class="field"><span>ภาษาที่อยากฝึก</span><select class="input" id="sLang" aria-describedby="hLang"></select></label>
+              <label class="field"><span>ระดับของคุณ</span><select class="input" id="sLevel" aria-describedby="hLevel"></select></label>
             </div>
+            <div class="hint" id="hLang">เปลี่ยนภาษาได้ทุกเมื่อ ประวัติแชตและคำศัพท์ยังอยู่</div>
+            <div class="hint" id="hLevel">เลือกระดับที่ใกล้เคียง เพื่อน AI จะเลือกคำและความยากให้พอดี (A1 เริ่มต้น → C2 เชี่ยวชาญ)</div>
             <label class="field" id="variantBox"><span>สำเนียงและคำศัพท์</span>
-              <select class="input" id="sVariant">
+              <select class="input" id="sVariant" aria-describedby="hVariant">
                 <option value="American">🇺🇸 อเมริกัน (color, apartment, vacation)</option>
                 <option value="British">🇬🇧 บริติช (colour, flat, holiday)</option>
-              </select></label>
-            <label class="field"><span>รูปแบบการแก้คำผิด</span>
-              <select class="input" id="sFeedback">
-                <option value="gentle">แก้เฉพาะข้อผิดชัดเจน (ไม่ขัดจังหวะ)</option>
-                <option value="detailed">ละเอียด — แก้ทั้งข้อผิดและสำนวนที่ไม่เป็นธรรมชาติ</option>
-              </select></label>
-            <label class="field"><span>แสดงคำแก้เมื่อไร</span>
-              <select class="input" id="sTiming">
-                <option value="immediate">ทันที — เปิดคำอธิบายให้เลย</option>
-                <option value="after_turn">ย่อไว้ใต้ข้อความ (แตะดู)</option>
-                <option value="end">เก็บไว้ดูตอนท้าย — ไม่ขัดจังหวะการคุย</option>
-              </select></label>
-            <label class="field"><span>ความยาวคำตอบของตัวละคร</span>
-              <select class="input" id="sLength">
-                <option value="short">สั้น (1–2 ประโยค)</option>
-                <option value="normal">ปกติ</option>
-                <option value="long">ยาวขึ้น (ได้อ่านมากขึ้น)</option>
-              </select></label>
-            <label class="field"><span>ระดับการสอน</span>
-              <select class="input" id="sTeach">
-                <option value="low">น้อย — คุยล้วนๆ</option>
-                <option value="medium">กลาง</option>
-                <option value="high">มาก — สอดแทรกการสอนบ่อย</option>
-              </select></label>
-            <div class="hint">โหมดการคุย (คุยธรรมชาติ / เรียนไปคุยไป / เน้นแก้ภาษา / ฝึก IELTS) เปลี่ยนได้ที่แถบใต้ชื่อตัวละครในหน้าแชต</div>
+              </select>
+              <small class="hint" id="hVariant">ใช้เมื่อฝึกภาษาอังกฤษ</small></label>
           </div>
 
           <div class="card set-group">
-            <h3>🤖 เพื่อน AI</h3>
-            <div class="hint">มีตัวละคร 6 คน (Emma, James, Mika, David, Sofia, Alex) ให้เลือกที่หน้า <a href="#characters">ตัวละคร</a> · ช่องด้านล่างใช้กับ "เพื่อนที่สร้างเอง"</div>
-            <label class="field"><span>ชื่อเพื่อนที่สร้างเอง</span><input class="input" id="sName" type="text" maxlength="20"></label>
-            <label class="field"><span>นิสัย/บุคลิก</span><textarea class="input" id="sPersona" maxlength="400"></textarea></label>
-            <label class="field"><span>AI ที่ใช้คุย</span>
-              <select class="input" id="sAi">
-                <option value="auto">อัตโนมัติ (แนะนำ) — Gemini ก่อน ถ้าไม่ได้สลับไป Groq</option>
-                <option value="groq">Groq ก่อน (เร็วกว่า) — ถ้าไม่ได้สลับไป Gemini</option>
-                <option value="gemini">Gemini อย่างเดียว</option>
-              </select></label>
-            <div class="hint">รูปใช้ Gemini เสมอ (Groq ดูรูปไม่ได้) · ข้อความทักผ่านการแจ้งเตือนใช้ Groq ก่อน เพื่อประหยัดโควตา Gemini</div>
-            <label class="field"><span>ความเร็วเสียงพูด</span><input class="range" id="sRate" type="range" min="0.6" max="1.2" step="0.05"></label>
-            <label class="check"><input id="sVoice" type="checkbox"> อ่านคำตอบออกเสียงอัตโนมัติ</label>
-            <label class="check"><input id="sAutoSend" type="checkbox"> พูดจบแล้วส่งทันที</label>
-            <label class="check"><input id="sAdaptVoice" type="checkbox"> ปรับเสียงอัตโนมัติ (ช้าลงสำหรับมือใหม่ · น้ำเสียงตามอารมณ์ตัวละคร · สำเนียงของแต่ละตัวละคร)</label>
-          </div>
-
-          <div class="card set-group">
-            <h3>🧠 ความจำ</h3>
-            <div class="hint">ความจำเก็บเป็นประโยคสั้นๆ ในเครื่องนี้ (และในฐานข้อมูลของคุณถ้าเปิดซิงก์) ไม่เก็บรหัสผ่าน เลขบัตร เบอร์โทร หรืออีเมล</div>
-            <label class="check"><input id="sMemLearner" type="checkbox"> ความจำร่วม: ให้ตัวละครทุกตัวจำข้อมูลเกี่ยวกับคุณ (งานอดิเรก เป้าหมาย หัวข้อที่ชอบ)</label>
-            <label class="check"><input id="sMemChar" type="checkbox"> ความจำของตัวละคร: แต่ละตัวจำเรื่องที่เคยคุยกับคุณ (แยกกัน)</label>
-            <div class="hint">ดูและลบความจำได้ที่หน้า ฉัน (ความจำร่วม) และหน้า ตัวละคร → โปรไฟล์ (ความจำของแต่ละตัว) · การปิดจะหยุดทั้งการจำเพิ่มและการใช้ความจำเดิม</div>
-            <div class="row wrap-ok" style="margin-top:12px"><button class="btn danger" type="button" id="memClear">ลบความจำทั้งหมด</button></div>
+            <h3>🔊 เสียง</h3>
+            <label class="field"><span>ความเร็วเสียงพูด</span><input class="range" id="sRate" type="range" min="0.6" max="1.2" step="0.05" aria-describedby="hRate"></label>
+            <div class="hint" id="hRate">เลื่อนไปทางซ้ายเพื่อให้พูดช้าลง ฟังง่ายขึ้นสำหรับมือใหม่</div>
+            <label class="check"><input id="sVoice" type="checkbox" aria-describedby="hVoice"> อ่านคำตอบออกเสียงให้อัตโนมัติ</label>
+            <div class="hint" id="hVoice">เพื่อน AI จะพูดคำตอบให้ฟังทุกครั้ง ปิดไว้ถ้าอยู่ในที่เงียบ</div>
+            <label class="check"><input id="sAutoSend" type="checkbox" aria-describedby="hAuto"> พูดจบแล้วส่งข้อความทันที</label>
+            <div class="hint" id="hAuto">ตอนกดไมค์พูด พอหยุดพูดข้อความจะถูกส่งเลย ไม่ต้องกดปุ่มส่ง</div>
+            <label class="check"><input id="sAdaptVoice" type="checkbox" aria-describedby="hAdapt"> ปรับเสียงให้เข้ากับตัวละครและระดับของคุณ</label>
+            <div class="hint" id="hAdapt">พูดช้าลงสำหรับมือใหม่ น้ำเสียงเปลี่ยนตามอารมณ์ และใช้สำเนียงของแต่ละตัวละคร</div>
           </div>
 
           <div class="card set-group">
             <h3>🔔 ให้เพื่อนทักมาก่อน (แจ้งเตือน)</h3>
-            <div class="hint" id="pushStatus">กำลังตรวจสอบ…</div>
+            <div class="hint" id="pushStatus" role="status">กำลังตรวจสอบ…</div>
             <label class="field"><span>ให้ทักเมื่อไหร่</span>
-              <select class="input" id="sPushMode">
+              <select class="input" id="sPushMode" aria-describedby="hPush">
                 <option value="random">🎲 สุ่มเวลา เหมือนเพื่อนทักมาเอง</option>
                 <option value="fixed">🕐 กำหนดเวลาเอง</option>
               </select></label>
+            <div class="hint" id="hPush">แจ้งเตือนจะส่งมาเป็นข้อความสั้นๆ จากเพื่อน AI ชวนคุยต่อ</div>
             <div id="pushRandom">
               <div class="grid" style="grid-template-columns:repeat(3,minmax(0,1fr))">
                 <label class="field"><span>ตั้งแต่</span><select class="input" id="sFrom"></select></label>
                 <label class="field"><span>ถึง</span><select class="input" id="sTo"></select></label>
                 <label class="field"><span>วันละ</span><select class="input" id="sPerDay"><option value="1">1 ครั้ง</option><option value="2">2 ครั้ง</option><option value="3">3 ครั้ง</option></select></label>
               </div>
+              <div class="hint">จะสุ่มทักในช่วงเวลาที่เลือก ตามจำนวนครั้งต่อวัน</div>
             </div>
             <div id="pushFixed" hidden>
               <label class="field"><span>เวลาที่ให้ทัก (สูงสุด 3 เวลา เว้นว่างได้)</span></label>
@@ -201,49 +176,77 @@
           </div>
 
           <div class="card set-group">
+            <h3>👤 โปรไฟล์และเป้าหมาย</h3>
+            <label class="field"><span>ชื่อของคุณ</span><input class="input" id="sLearner" type="text" maxlength="40" autocomplete="nickname" aria-describedby="hLearner"></label>
+            <div class="hint" id="hLearner">ชื่อที่ให้เพื่อน AI เรียกคุณ</div>
+            <label class="field"><span>เป้าหมายของคุณ</span><input class="input" id="sGoalText" type="text" maxlength="200" placeholder="เช่น สอบ IELTS 7 ให้ได้ภายในปีนี้ / ใช้คุยงาน / เที่ยวต่างประเทศ" aria-describedby="hGoal"></label>
+            <div class="hint" id="hGoal">เพื่อน AI จะเลือกเรื่องคุยและคำศัพท์ให้ตรงกับเป้าหมายนี้</div>
+            <div class="grid cols-3">
+              <label class="field"><span>นาที/วัน</span><input class="input" id="sGoalMin" type="number" min="1" max="240" inputmode="numeric"></label>
+              <label class="field"><span>ข้อความ/วัน</span><input class="input" id="sGoalMsg" type="number" min="1" max="200" inputmode="numeric"></label>
+              <label class="field"><span>ทบทวน/วัน</span><input class="input" id="sGoalRev" type="number" min="1" max="200" inputmode="numeric"></label>
+            </div>
+            <div class="hint">เป้าหมายรายวันที่แสดงในหน้าหลัก: เวลาที่ใช้ จำนวนข้อความที่ส่ง และจำนวนการ์ดคำศัพท์ที่ทบทวน</div>
+          </div>
+
+          <div class="card set-group">
+            <h3>✏️ วิธีสอนและแก้ภาษา</h3>
+            <label class="field"><span>การแก้คำผิด</span>
+              <select class="input" id="sFeedback" aria-describedby="hFeedback">
+                <option value="gentle">แก้เฉพาะข้อผิดชัดเจน (ไม่ขัดจังหวะ)</option>
+                <option value="detailed">ละเอียด — แก้ทั้งข้อผิดและสำนวนที่ไม่เป็นธรรมชาติ</option>
+              </select></label>
+            <div class="hint" id="hFeedback">แบบละเอียดได้เรียนรู้มากขึ้น แต่จะมีคำแก้เยอะกว่า</div>
+            <label class="field"><span>แสดงคำแก้เมื่อไร</span>
+              <select class="input" id="sTiming" aria-describedby="hTiming">
+                <option value="immediate">ทันที — เปิดคำอธิบายให้เลย</option>
+                <option value="after_turn">ย่อไว้ใต้ข้อความ (แตะดู)</option>
+                <option value="end">เก็บไว้ดูตอนท้าย — ไม่ขัดจังหวะการคุย</option>
+              </select></label>
+            <div class="hint" id="hTiming">ถ้าไม่อยากให้สะดุดระหว่างคุย เลือก "เก็บไว้ดูตอนท้าย"</div>
+            <label class="field"><span>ความยาวคำตอบของเพื่อน AI</span>
+              <select class="input" id="sLength" aria-describedby="hLength">
+                <option value="short">สั้น (1–2 ประโยค)</option>
+                <option value="normal">ปกติ</option>
+                <option value="long">ยาวขึ้น (ได้อ่านมากขึ้น)</option>
+              </select></label>
+            <div class="hint" id="hLength">คำตอบยาวขึ้นเหมาะกับฝึกอ่าน คำตอบสั้นเหมาะกับฝึกพูดโต้ตอบ</div>
+            <label class="field"><span>ความถี่ในการสอนแทรก</span>
+              <select class="input" id="sTeach" aria-describedby="hTeach">
+                <option value="low">น้อย — คุยล้วนๆ</option>
+                <option value="medium">กลาง</option>
+                <option value="high">มาก — สอดแทรกการสอนบ่อย</option>
+              </select></label>
+            <div class="hint" id="hTeach">โหมดการคุย (คุยธรรมชาติ / เรียนไปคุยไป / เน้นแก้ภาษา / ฝึก IELTS) เปลี่ยนได้ที่แถบใต้ชื่อตัวละครในหน้าแชต</div>
+          </div>
+
+          <div class="card set-group">
+            <h3>🤖 เพื่อนที่สร้างเอง</h3>
+            <div class="hint">มีตัวละครสำเร็จรูป 6 คน (Emma, James, Mika, David, Sofia, Alex) ให้เลือกที่หน้า <a href="#characters">ตัวละคร</a> · ช่องด้านล่างใช้กับ "เพื่อนที่สร้างเอง" เท่านั้น</div>
+            <label class="field"><span>ชื่อเพื่อน</span><input class="input" id="sName" type="text" maxlength="20" aria-describedby="hName"></label>
+            <div class="hint" id="hName">ชื่อที่จะแสดงในแชต</div>
+            <label class="field"><span>นิสัยและบุคลิก</span><textarea class="input" id="sPersona" maxlength="400" aria-describedby="hPersona"></textarea></label>
+            <div class="hint" id="hPersona">เขียนเป็นภาษาอังกฤษจะได้ผลดีที่สุด เช่น "a calm teacher who loves jokes"</div>
+          </div>
+
+          <div class="card set-group">
+            <h3>🧠 ความจำ</h3>
+            <div class="hint">ความจำเก็บเป็นประโยคสั้นๆ ในเครื่องนี้ (และในฐานข้อมูลของคุณถ้าเปิดซิงก์) ไม่เก็บรหัสผ่าน เลขบัตร เบอร์โทร หรืออีเมล</div>
+            <label class="check"><input id="sMemLearner" type="checkbox"> ความจำร่วม: ให้ตัวละครทุกตัวจำข้อมูลเกี่ยวกับคุณ (งานอดิเรก เป้าหมาย หัวข้อที่ชอบ)</label>
+            <label class="check"><input id="sMemChar" type="checkbox"> ความจำของตัวละคร: แต่ละตัวจำเรื่องที่เคยคุยกับคุณ (แยกกัน)</label>
+            <div class="hint">ดูและลบความจำได้ที่หน้า ฉัน (ความจำร่วม) และหน้า ตัวละคร → โปรไฟล์ (ความจำของแต่ละตัว) · การปิดจะหยุดทั้งการจำเพิ่มและการใช้ความจำเดิม</div>
+            <div class="row wrap-ok" style="margin-top:12px"><button class="btn danger" type="button" id="memClear">ลบความจำทั้งหมด</button></div>
+          </div>
+
+          <div class="card set-group">
             <h3>🎨 หน้าตา</h3>
             <label class="field"><span>ธีม</span>
-              <select class="input" id="sTheme">
+              <select class="input" id="sTheme" aria-describedby="hTheme">
                 <option value="dark">มืด</option>
                 <option value="light">สว่าง</option>
                 <option value="auto">ตามเครื่อง</option>
               </select></label>
-          </div>
-
-          <div class="card set-group">
-            <h3>☁️ การเชื่อมต่อ</h3>
-            <label class="field"><span>ลิงก์ Cloudflare Worker</span><input class="input" id="sWorker" type="url" placeholder="https://language-buddy.xxx.workers.dev" autocomplete="off" inputmode="url"></label>
-            <div class="hint">ตั้งไว้ให้แล้ว เปลี่ยนเฉพาะถ้าคุณมี Worker ของตัวเอง · เว้นว่าง = ใช้ลิงก์เริ่มต้น</div>
-            <label class="field"><span>รหัสเข้าใช้ Worker (ถ้าตั้งไว้)</span><input class="input" id="sAccess" type="password" autocomplete="off" maxlength="100"></label>
-            <div class="hint">ใส่เฉพาะเมื่อตั้ง ACCESS_CODE ไว้ที่ Worker — กันคนอื่นใช้โควตาของคุณ (ไม่รวมในไฟล์สำรอง)</div>
-            <label class="field"><span>โควตาฟรีของ Gemini ต่อวัน (จำนวนครั้ง)</span><input class="input" id="sLimit" type="number" min="0" step="1" inputmode="numeric" placeholder="เช่น 1000"></label>
-            <div class="hint" id="usageNow"></div>
-            <div class="hint">ดูตัวเลข RPD ได้ที่ aistudio.google.com/rate-limit · แอปนับเฉพาะในเครื่องนี้ · รีเซ็ตเที่ยงคืนเวลาแปซิฟิก</div>
-          </div>
-
-          <div class="card set-group">
-            <h3>🔄 ซิงก์ข้ามเครื่อง (ฐานข้อมูล SQL)</h3>
-            <div class="hint" id="syncStatus">ยังไม่ได้เปิด</div>
-            <div id="syncOff">
-              <div class="hint">เก็บแชต สมุดผิด คลังคำ สถิติ และการตั้งค่าไว้ในฐานข้อมูล SQL ฟรี (Cloudflare D1) ของคุณ เปลี่ยนเครื่องข้อมูลก็ไม่หาย ใช้ "รหัสซิงก์" แทนการสมัครสมาชิก</div>
-              <div class="row wrap-ok" style="margin-top:12px">
-                <button class="btn primary" type="button" id="syncNew">เปิดซิงก์ (สร้างรหัสใหม่)</button>
-              </div>
-              <label class="field"><span>มีรหัสจากเครื่องอื่นแล้ว? ใส่ที่นี่</span><input class="input" id="syncJoinCode" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="XXXX-XXXX-XXXX-XXXX-XXXX"></label>
-              <div class="row wrap-ok" style="margin-top:8px"><button class="btn" type="button" id="syncJoin">เชื่อมกับเครื่องอื่น</button></div>
-            </div>
-            <div id="syncOnBox" hidden>
-              <label class="field"><span>รหัสซิงก์ (ใช้บนเครื่องอื่น · เก็บเป็นความลับเหมือนรหัสผ่าน)</span><input class="input" id="syncCode" type="password" readonly autocomplete="off"></label>
-              <div class="row wrap-ok" style="margin-top:8px">
-                <button class="btn" type="button" id="syncShow">แสดงรหัส</button>
-                <button class="btn" type="button" id="syncCopy">คัดลอก</button>
-                <button class="btn primary" type="button" id="syncNow">ซิงก์ตอนนี้</button>
-              </div>
-              <div class="row wrap-ok" style="margin-top:8px">
-                <button class="btn" type="button" id="syncStop">ปิดซิงก์บนเครื่องนี้</button>
-                <button class="btn danger" type="button" id="syncDelete">ลบข้อมูลบนเซิร์ฟเวอร์</button>
-              </div>
-            </div>
+            <div class="hint" id="hTheme">"ตามเครื่อง" จะสลับสว่าง/มืดตามการตั้งค่าของมือถือหรือคอมพิวเตอร์</div>
           </div>
 
           <div class="card set-group">
@@ -258,6 +261,59 @@
               <input type="file" id="importInput" accept="application/json,.json" hidden>
             </div>
           </div>
+
+          <h2 class="set-part" id="partAdvanced">ขั้นสูง</h2>
+          <details class="card set-group set-advanced" id="advanced">
+            <summary><h3>⚙️ ตั้งค่าขั้นสูง</h3><span class="hint">สำหรับคนที่มีเซิร์ฟเวอร์เอง · ถ้าไม่แน่ใจ ไม่ต้องแก้อะไรก็ใช้งานได้ปกติ</span></summary>
+
+            <section class="adv-section" aria-labelledby="advServer">
+              <h4 id="advServer">☁️ เซิร์ฟเวอร์</h4>
+              <label class="field"><span>ที่อยู่เซิร์ฟเวอร์ (Worker URL)</span><input class="input" id="sWorker" type="url" placeholder="เว้นว่าง = ใช้เซิร์ฟเวอร์เริ่มต้น" autocomplete="off" inputmode="url" aria-describedby="workerState hWorker"></label>
+              <div class="hint" id="workerState" role="status"></div>
+              <div class="hint" id="hWorker">ที่อยู่ของเซิร์ฟเวอร์ที่ส่งข้อความไปหา AI เปลี่ยนเฉพาะถ้าคุณสร้าง Cloudflare Worker เอง (และเพิ่มโดเมนนั้นใน connect-src ของ index.html ด้วย)</div>
+              <label class="field"><span>รหัสผ่านเซิร์ฟเวอร์ (ACCESS_CODE)</span><input class="input" id="sAccess" type="password" autocomplete="off" maxlength="100" aria-describedby="hAccess"></label>
+              <div class="hint" id="hAccess">ใส่เฉพาะเมื่อตั้งรหัสไว้ที่เซิร์ฟเวอร์ เพื่อกันคนอื่นใช้โควตาของคุณ · จะไม่รวมอยู่ในไฟล์สำรองข้อมูล</div>
+              <label class="field"><span>AI ที่ใช้คุย</span>
+                <select class="input" id="sAi" aria-describedby="hAi">
+                  <option value="auto">อัตโนมัติ (แนะนำ) — Gemini ก่อน ถ้าไม่ได้สลับไป Groq</option>
+                  <option value="groq">Groq ก่อน (เร็วกว่า) — ถ้าไม่ได้สลับไป Gemini</option>
+                  <option value="gemini">Gemini อย่างเดียว</option>
+                </select></label>
+              <div class="hint" id="hAi">รูปภาพใช้ Gemini เสมอ (Groq ดูรูปไม่ได้) · ข้อความทักผ่านการแจ้งเตือนใช้ Groq ก่อนเพื่อประหยัดโควตา Gemini</div>
+            </section>
+
+            <section class="adv-section" aria-labelledby="advQuota">
+              <h4 id="advQuota">📊 โควตา AI ต่อวัน</h4>
+              <label class="field"><span>จำนวนครั้งฟรีต่อวันของ Gemini (RPD)</span><input class="input" id="sLimit" type="number" min="0" step="1" inputmode="numeric" placeholder="เช่น 1000" aria-describedby="usageNow hLimit"></label>
+              <div class="hint" id="usageNow"></div>
+              <div class="hint" id="hLimit">ใส่ตัวเลขที่ Google ให้คุณ (ดูที่ aistudio.google.com/rate-limit) แอปจะเตือนเมื่อใกล้เต็ม · นับเฉพาะในเครื่องนี้ · รีเซ็ตเที่ยงคืนเวลาแปซิฟิก · 0 = ไม่ทราบ</div>
+            </section>
+
+            <section class="adv-section" aria-labelledby="advSync">
+              <h4 id="advSync">🔄 ซิงก์ข้อมูลข้ามเครื่อง (ฐานข้อมูล D1)</h4>
+              <div class="hint" id="syncStatus" role="status">ยังไม่ได้เปิด</div>
+              <div id="syncOff">
+                <div class="hint">เก็บแชต สมุดผิด คลังคำ สถิติ และการตั้งค่าไว้ในฐานข้อมูล SQL ฟรี (Cloudflare D1) ของคุณ เปลี่ยนเครื่องข้อมูลก็ไม่หาย ใช้ "รหัสซิงก์" แทนการสมัครสมาชิก</div>
+                <div class="row wrap-ok" style="margin-top:12px">
+                  <button class="btn primary" type="button" id="syncNew">เปิดซิงก์ (สร้างรหัสใหม่)</button>
+                </div>
+                <label class="field"><span>มีรหัสจากเครื่องอื่นแล้ว? ใส่ที่นี่</span><input class="input" id="syncJoinCode" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="XXXX-XXXX-XXXX-XXXX-XXXX"></label>
+                <div class="row wrap-ok" style="margin-top:8px"><button class="btn" type="button" id="syncJoin">เชื่อมกับเครื่องอื่น</button></div>
+              </div>
+              <div id="syncOnBox" hidden>
+                <label class="field"><span>รหัสซิงก์ (ใช้บนเครื่องอื่น · เก็บเป็นความลับเหมือนรหัสผ่าน)</span><input class="input" id="syncCode" type="password" readonly autocomplete="off"></label>
+                <div class="row wrap-ok" style="margin-top:8px">
+                  <button class="btn" type="button" id="syncShow">แสดงรหัส</button>
+                  <button class="btn" type="button" id="syncCopy">คัดลอก</button>
+                  <button class="btn primary" type="button" id="syncNow">ซิงก์ตอนนี้</button>
+                </div>
+                <div class="row wrap-ok" style="margin-top:8px">
+                  <button class="btn" type="button" id="syncStop">ปิดซิงก์บนเครื่องนี้</button>
+                  <button class="btn danger" type="button" id="syncDelete">ลบข้อมูลบนเซิร์ฟเวอร์</button>
+                </div>
+              </div>
+            </section>
+          </details>
 
           <div class="save-bar">
             <button class="btn primary grow" type="submit">บันทึก</button>

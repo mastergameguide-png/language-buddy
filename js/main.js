@@ -14,6 +14,7 @@ import { renderVoice } from './views/voice.js';
 import { renderProgress } from './views/progress.js';
 import { renderLearn } from './views/learn.js';
 import { initSettings, fillSettings, applyTheme } from './views/settings.js';
+import { maybeOnboard } from './views/onboarding.js';
 
 // A bug in one view should not take the whole app down; tell the user and keep going.
 let lastErr = 0;
@@ -119,6 +120,7 @@ function boot() {
   initSettings();
   window.addEventListener('hashchange', route);
   route();
+  maybeOnboard();
   startTimeTracking();
   fetchInbox();
   syncPush(false);

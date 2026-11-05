@@ -2,7 +2,7 @@
 import { $, el, h, toast, ago } from '../util.js';
 import {
   settings, state, push, setSettings, saveSettings, replaceState, persist, emit, on,
-  LANGS, CEFR, IELTS, DEFAULT_SETTINGS, LIMITS, cefrOf, logActivity, storageReport,
+  LANGS, CEFR, IELTS, DEFAULT_SETTINGS, DEFAULT_WORKER, LIMITS, cefrOf, logActivity, storageReport,
 } from '../store.js';
 import { todayUsage } from '../ai.js';
 import { pushStatus, enablePush, testPush, disablePush, syncPush, hh } from '../push.js';
@@ -11,8 +11,8 @@ import { sync, runSync, startSync, stopSync, deleteServerCopy, newCode, cleanCod
 const f = (id) => $(id);
 
 // English offers IELTS bands as well as CEFR; other languages use CEFR only.
-function fillLevels(lang, current) {
-  const sel = f('sLevel');
+// Also used by the first-run guide (onboarding.js).
+export function fillLevelSelect(sel, lang, current) {
   sel.textContent = '';
   if (lang === 'English') {
     const g = el('optgroup'); g.label = 'IELTS';
@@ -24,7 +24,18 @@ function fillLevels(lang, current) {
   sel.append(g);
   sel.value = lang === 'English' || !/^IELTS /.test(current) ? current : cefrOf(current);
   if (!sel.value) sel.value = cefrOf(current) || 'B1';
+}
+function fillLevels(lang, current) {
+  fillLevelSelect(f('sLevel'), lang, current);
   f('variantBox').hidden = lang !== 'English';
+}
+
+// Says which server is in use. An empty field means the built-in one.
+function renderWorkerState() {
+  const url = f('sWorker').value.trim();
+  let host = '';
+  try { host = new URL(url).host; } catch {}
+  f('workerState').textContent = url && host ? `กำลังใช้เซิร์ฟเวอร์ของคุณ: ${host}` : url ? 'ที่อยู่นี้ยังไม่ถูกต้อง' : 'กำลังใช้เซิร์ฟเวอร์เริ่มต้น';
 }
 
 function showSchedule() {
@@ -60,7 +71,7 @@ function renderSync() {
   f('syncOff').hidden = on;
   f('syncOnBox').hidden = !on;
   if (on) f('syncCode').value = showCode(sync.code);
-  f('syncStatus').textContent = !settings.workerUrl ? 'ใส่ลิงก์ Worker ก่อน'
+  f('syncStatus').textContent = !settings.workerUrl ? 'ใส่ที่อยู่เซิร์ฟเวอร์ก่อน'
     : !on ? 'ยังไม่ได้เปิด — ข้อมูลอยู่ในเครื่องนี้เท่านั้น'
     : sync.error ? '⚠️ ' + sync.error
     : sync.last ? `✅ เปิดอยู่ · ซิงก์ล่าสุด ${ago(sync.last)}` : 'กำลังซิงก์ครั้งแรก…';
@@ -92,7 +103,8 @@ function renderStorage() {
 }
 
 export function fillSettings() {
-  f('sWorker').value = settings.workerUrl;
+  f('sWorker').value = settings.workerUrl === DEFAULT_WORKER ? '' : settings.workerUrl;
+  renderWorkerState();
   const u = todayUsage();
   f('usageNow').textContent = `ใช้วันนี้: Gemini ${u.requests} ครั้ง` + (u.groq ? ` · Groq ${u.groq}` : '') + (u.out ? ' · Gemini หมดแล้ววันนี้' : '');
   f('sAccess').value = settings.accessCode;
@@ -142,13 +154,30 @@ function buildJumpBar() {
   for (const card of form.querySelectorAll('.set-group')) {
     const title = card.querySelector('h3');
     if (!title) continue;
-    const b = el('button', 'chip', title.textContent.replace(/\s*\(.*\)\s*$/, ''));
+    const b = el('button', 'chip', title.textContent.replace(/\s*\(.*\)\s*$/, '').replace(/^⚙️ ตั้งค่า/, '⚙️ '));
     b.type = 'button';
-    b.addEventListener('click', () => { card.scrollIntoView({ behavior: 'smooth', block: 'start' }); title.setAttribute('tabindex', '-1'); title.focus({ preventScroll: true }); });
+    // The advanced section is a <details>: open it first so the person lands inside it.
+    const target = card.querySelector('summary') || title;
+    b.addEventListener('click', () => {
+      if (card.tagName === 'DETAILS') card.open = true;
+      card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      if (target === title) title.setAttribute('tabindex', '-1');
+      target.focus({ preventScroll: true });
+    });
     row.append(b);
   }
   bar.append(row);
   form.prepend(bar);
+}
+
+// The page's security policy only lets the app talk to the built-in server (and localhost for
+// development). Another https server works only after its domain is added to connect-src.
+function ownWorkerBlocked(url) {
+  if (!url) return false;
+  try {
+    const u = new URL(url);
+    return u.origin !== new URL(DEFAULT_WORKER).origin && !/^(localhost|127\.0\.0\.1)$/.test(u.hostname);
+  } catch { return false; }
 }
 
 export function initSettings() {
@@ -160,16 +189,17 @@ export function initSettings() {
   }
   f('sLang').addEventListener('change', () => fillLevels(f('sLang').value, f('sLevel').value));
   f('sTheme').addEventListener('change', () => applyTheme(f('sTheme').value));
+  f('sWorker').addEventListener('input', renderWorkerState);
 
   // Save on submit (fires right away in every browser).
   f('settingsForm').addEventListener('submit', (e) => {
     e.preventDefault();
     const url = f('sWorker').value.trim();
-    if (url && !/^https:\/\/[^\s]+$/i.test(url) && !/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?\//i.test(url)) { toast('ลิงก์ Worker ต้องขึ้นต้นด้วย https://', true); f('sWorker').focus(); return; }
+    if (url && !/^https:\/\/[^\s]+$/i.test(url) && !/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?\//i.test(url)) { toast('ที่อยู่เซิร์ฟเวอร์ต้องขึ้นต้นด้วย https://', true); f('sWorker').focus(); return; }
     const hadWorker = !!settings.workerUrl;
     setSettings({
       ...settings,
-      workerUrl: url,
+      workerUrl: url || DEFAULT_WORKER,   // empty = the built-in server
       accessCode: f('sAccess').value.trim().slice(0, 100),
       lang: f('sLang').value,
       level: f('sLevel').value,
@@ -196,7 +226,7 @@ export function initSettings() {
       memoryCharacter: f('sMemChar').checked,
     });
     syncPush(true);
-    toast('บันทึกแล้ว');
+    toast(ownWorkerBlocked(url) ? 'บันทึกแล้ว แต่ต้องเพิ่มโดเมนนี้ใน connect-src ของ index.html ก่อนจึงจะใช้ได้' : 'บันทึกแล้ว');
     location.hash = !hadWorker && settings.workerUrl ? '#chat' : '#me';
   });
   f('cancelSettings').addEventListener('click', () => { applyTheme(settings.theme); location.hash = '#me'; });
@@ -226,13 +256,13 @@ export function initSettings() {
   on('push', renderPush);
 
   f('syncNew').addEventListener('click', () => {
-    if (!settings.workerUrl) { toast('ใส่ลิงก์ Worker ก่อน', true); return; }
+    if (!settings.workerUrl) { toast('ใส่ที่อยู่เซิร์ฟเวอร์ก่อน', true); return; }
     syncAction(f('syncNew'), () => startSync(newCode()), 'เปิดซิงก์แล้ว — จดรหัสไว้ใช้บนเครื่องอื่น');
   });
   f('syncJoin').addEventListener('click', () => {
     const code = cleanCode(f('syncJoinCode').value);
     if (code.length < 16) { toast('รหัสซิงก์สั้นเกินไป', true); return; }
-    if (!settings.workerUrl) { toast('ใส่ลิงก์ Worker ก่อน', true); return; }
+    if (!settings.workerUrl) { toast('ใส่ที่อยู่เซิร์ฟเวอร์ก่อน', true); return; }
     if (!confirm('รวมข้อมูลในเครื่องนี้กับข้อมูลของรหัสนี้?\n(การตั้งค่าจะใช้ของรหัสนี้)')) return;
     syncAction(f('syncJoin'), () => startSync(code), 'เชื่อมแล้ว ข้อมูลรวมกันเรียบร้อย');
     f('syncJoinCode').value = '';
