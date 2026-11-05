@@ -166,6 +166,13 @@ export async function askIelts(system, answer) {
   return data.text;
 }
 
+// IELTS essay photo → text: one page per request, so each page counts once in usage.photos.
+// The photo is only in this request; nothing is stored. Photos always go to Gemini (the Worker routes them).
+export async function askTranscribe(system, photo) {
+  const data = await callWorker(system, [{ role: 'user', parts: [{ inlineData: { mimeType: photo.mimeType, data: photo.data } }, { text: 'Transcribe this page.' }] }]);
+  return data.text;
+}
+
 // "Say it in English": the learner's Thai text → up to 3 ways to say it. Nothing goes into the chat.
 export async function askHelper(thaiText) {
   const char = activeChar();

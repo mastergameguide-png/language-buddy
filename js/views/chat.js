@@ -1,7 +1,7 @@
 // Chat screen: messages, inline feedback, reply ideas and hints, the Thai→English helper, photos,
 // voice, and the role / mode / mood bar. Talking to the AI lives in ../conversation.js; this file
 // only draws and reacts to its events.
-import { $, el, h, icon, fmtTime, toast } from '../util.js';
+import { $, el, h, icon, fmtTime, toast, preparePhoto } from '../util.js';
 import { settings, state, persist, on, CATEGORIES, levelShort, flag, saveSettings, isEnglish, activeChar, activeCharId, sessionOf, threadOf } from '../store.js';
 import { ROLES } from '../engine/characters.js';
 import { EMOTION_UI } from '../engine/emotion.js';
@@ -17,7 +17,6 @@ import { announce } from './ui.js';
 
 export { maybeGreet };
 
-const PHOTO_MAX_SIDE = 1024;
 const SHOW_LAST = 150;
 const THAI = /[฀-๿]/;
 
@@ -419,24 +418,6 @@ function send() {
   run(text, null, photo, { voice, hint: hintLevel || 0, helper });
 }
 
-async function preparePhoto(file) {
-  const url = URL.createObjectURL(file);
-  try {
-    const img = await new Promise((resolve, reject) => {
-      const i = new Image();
-      i.onload = () => resolve(i);
-      i.onerror = () => reject(new Error('เปิดรูปนี้ไม่ได้'));
-      i.src = url;
-    });
-    const scale = Math.min(1, PHOTO_MAX_SIDE / Math.max(img.naturalWidth, img.naturalHeight));
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.round(img.naturalWidth * scale);
-    canvas.height = Math.round(img.naturalHeight * scale);
-    canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
-    return { dataUrl, mimeType: 'image/jpeg', data: dataUrl.split(',')[1] };
-  } finally { URL.revokeObjectURL(url); }
-}
 function clearPhoto() {
   pendingPhoto = null;
   $('preview').hidden = true;

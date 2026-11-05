@@ -106,7 +106,7 @@ export function fillSettings() {
   f('sWorker').value = settings.workerUrl === DEFAULT_WORKER ? '' : settings.workerUrl;
   renderWorkerState();
   const u = todayUsage();
-  f('usageNow').textContent = `ใช้วันนี้: Gemini ${u.requests} ครั้ง` + (u.groq ? ` · Groq ${u.groq}` : '') + (u.out ? ' · Gemini หมดแล้ววันนี้' : '');
+  f('usageNow').textContent = `ใช้วันนี้: Gemini ${u.requests} ครั้ง` + (u.groq ? ` · Groq ${u.groq}` : '') + (u.photos ? ` · รูป ${u.photos}` : '') + (u.out ? ' · Gemini หมดแล้ววันนี้' : '');
   f('sAccess').value = settings.accessCode;
   f('sLang').value = settings.lang;
   fillLevels(settings.lang, settings.level);

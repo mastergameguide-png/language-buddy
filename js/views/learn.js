@@ -2,14 +2,15 @@
 // (Parts 1–3, Part 2 timer, typed or spoken answers), Writing (Task 1 and 2 with instant checks)
 // and Listening (original scripts read by the device voice). AI feedback gives PRACTICE band
 // estimates only; listening shows a raw score, never a band.
-import { el, h, icon, toast, fmtDate } from '../util.js';
+import { el, h, icon, toast, fmtDate, preparePhoto } from '../util.js';
 import { settings, state, persist, emit, isEnglish, ieltsBand } from '../store.js';
 import {
   CUE_CARDS, TASK1, TASK2, LISTENING, IELTS_DISCLAIMER, SPEAKING_CRITERIA, WRITING_CRITERIA, MIN_SPEAKING_WORDS,
   analyseWriting, checkListening, buildSpeakingPrompt, buildWritingPrompt, parseIeltsFeedback, pickSpeaking, wordCount,
+  ESSAY_PHOTO_MAX, ESSAY_PHOTO_SIDE, TRANSCRIBE_PROMPT, TRANSCRIBE_NOTE, checkEssayFiles, parseTranscript, joinPages,
 } from '../engine/ielts.js';
 import { COURSES, courseProgress } from '../engine/courses.js';
-import { askIelts } from '../ai.js';
+import { askIelts, askTranscribe } from '../ai.js';
 import { speak, listen, stopListening, unlockSpeech, stopSpeaking } from '../speech.js';
 import { stt } from '../voice/stt.js';
 import { openScenario } from './roleplay.js';
@@ -282,10 +283,12 @@ function renderWriting(body, root) {
   };
   ta.addEventListener('input', () => { wr.answer = ta.value; saveDraft(ta.value); draw(); });
   draw();
-  card.append(ta, live, el('p', 'xs muted', 'ตัวเลขด้านบนคำนวณในเครื่องทันที (ไม่ใช้ AI)'));
+  card.append(essayPhotoRow(root), ta, live, el('p', 'xs muted', 'ตัวเลขด้านบนคำนวณในเครื่องทันที (ไม่ใช้ AI)'));
 
+  const ocrBusy = wr.ocr?.busy;
   const ask = h('button', { type: 'button', class: 'btn primary' }, wr.busy ? 'กำลังประเมิน…' : 'ขอคำติชม (AI)');
-  ask.disabled = wr.busy;
+  ask.disabled = wr.busy || ocrBusy;
+  ta.readOnly = !!ocrBusy;
   ask.addEventListener('click', async () => {
     const a = analyseWriting(wr.answer, wr.task);
     if (a.words < Math.round(a.min * 0.5)) { toast(`เขียนอีกหน่อย: มี ${a.words} คำ (ควรมีอย่างน้อย ${a.min})`, true); return; }
@@ -303,6 +306,74 @@ function renderWriting(body, root) {
   if (wr.result) body.append(feedbackCard(wr.result, 'writing'));
   const hist = historyList('writing');
   if (hist) body.append(hist);
+}
+
+// Essay photos: pick up to 3 pages, each is resized in memory and sent alone for transcription.
+// The photos are never stored; only the text goes into the essay box (and its local draft).
+function essayPhotoRow(root) {
+  const key = draftKey();
+  const ocr = wr.ocr?.key === key ? wr.ocr : null;
+  const input = h('input', { type: 'file', accept: 'image/*', multiple: true, hidden: true, 'aria-hidden': 'true', tabindex: '-1' });
+  input.addEventListener('change', () => { const files = Array.from(input.files || []); input.value = ''; attachEssayPhotos(files, root); });
+  const btn = h('button', { type: 'button', class: 'btn sm', 'aria-label': `แนบภาพเรียงความ (สูงสุด ${ESSAY_PHOTO_MAX} หน้า)` },
+    icon('camera'), ocr?.busy ? `${ocr.retry ? 'ลองหน้า' : 'กำลังถอดหน้า'} ${ocr.step}/${ocr.total}${ocr.retry ? ' อีกครั้ง' : ''}…` : 'แนบภาพเรียงความ');
+  btn.disabled = !!ocr?.busy || wr.busy;
+  btn.addEventListener('click', () => input.click());
+  const box = h('div', { class: 'essay-photo' }, h('div', { class: 'row wrap-ok' }, btn, el('span', 'xs muted grow', `ลายมือหรือภาพจากแอปจดบันทึก สูงสุด ${ESSAY_PHOTO_MAX} หน้า · ภาพไม่ถูกเก็บไว้`)), input);
+  if (ocr?.note) box.append(h('p', { class: 'small ocr-note', role: 'status' }, ocr.note));
+  if (ocr?.warn) box.append(h('p', { class: 'xs warn-text' }, '⚠️ ' + ocr.warn));
+  return box;
+}
+
+// The AI is sometimes slow on one request and fast on the next, so a page that timed out is
+// sent once more by itself. Other errors (quota, offline, too large) are not retried.
+const AI_TIMEOUT = /ช้าเกินไป|นานเกินไป/;
+async function transcribePage(photo, onRetry) {
+  try { return await askTranscribe(TRANSCRIBE_PROMPT, photo); }
+  catch (e) {
+    if (!AI_TIMEOUT.test(e.message || '')) throw e;
+    onRetry();
+    return await askTranscribe(TRANSCRIBE_PROMPT, photo);
+  }
+}
+
+async function attachEssayPhotos(picked, root) {
+  const chk = checkEssayFiles(picked);
+  if (chk.error !== undefined) { if (chk.error) toast(chk.error, true); return; }
+  if (navigator.onLine === false) { toast('ไม่มีอินเทอร์เน็ต — ต่อเน็ตแล้วลองใหม่', true); return; }
+  if (!settings.workerUrl) { toast('ยังไม่ได้ใส่ลิงก์ Worker', true); return; }
+  if (wr.answer.trim() && !confirm('ช่องเรียงความมีข้อความอยู่แล้ว แทนที่ด้วยข้อความจากภาพไหม?')) return;
+  const key = draftKey();
+  const before = wr.ocr;   // the note from an earlier attach stays if this one finds nothing
+  const ocr = wr.ocr = { key, busy: true, step: 0, total: chk.files.length };
+  const pages = [];
+  let error = '';
+  for (const file of chk.files) {
+    ocr.step++;
+    ocr.retry = false;
+    render(root);
+    try {
+      const photo = await preparePhoto(file, { maxSide: ESSAY_PHOTO_SIDE });
+      pages.push(parseTranscript(await transcribePage(photo, () => { ocr.retry = true; render(root); })));
+    } catch (e) { error = e.message; break; }
+  }
+  ocr.busy = false;
+  const text = joinPages(pages);
+  const emptyPages = pages.map((p, i) => (p.empty ? i + 1 : 0)).filter(Boolean);
+  if (!text) {
+    if (wr.ocr === ocr) wr.ocr = before;
+    toast(error || 'ไม่พบข้อความในภาพ ลองถ่ายให้เห็นตัวหนังสือชัดๆ และมีแสงพอ', true);
+  } else {
+    try { localStorage.setItem(key, text); } catch {}   // the draft of the question the photos were for
+    if (draftKey() === key) { wr.answer = text; wr.result = null; wr.ocr = ocr; }
+    const warns = [];
+    if (error) warns.push(`ถอดได้ ${pages.length}/${chk.files.length} หน้า: ${error}`);
+    if (emptyPages.length) warns.push(`ไม่พบข้อความในหน้า ${emptyPages.join(', ')}`);
+    if (pages.some((p) => p.blurry)) warns.push('ภาพอาจเบลอหรือเล็กเกินไป มีคำที่อ่านไม่ออกหลายคำ ลองถ่ายใหม่ให้ชัดและตรง');
+    ocr.note = TRANSCRIBE_NOTE;
+    ocr.warn = warns.join(' · ');
+  }
+  render(root);
 }
 
 // ---------- listening ----------

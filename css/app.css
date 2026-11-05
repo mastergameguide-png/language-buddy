@@ -452,7 +452,7 @@ h3.sub { font-size: var(--fs-sm); margin: 6px 0 0; }
 .scene-detail ol.steps { margin: 0; padding-left: 20px; }
 .seg { display: inline-flex; border: 1px solid var(--line); border-radius: var(--r-pill); overflow: hidden; width: fit-content; }
 .seg button { background: none; border: 0; color: var(--text-2); padding: 6px 14px; font-size: var(--fs-sm); min-height: 36px; }
-.seg button.on { background: var(--accent); color: #fff; }
+.seg button.on { background: var(--accent); color: var(--accent-text); }
 .attempt { padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--r-sm); }
 .scene-filters .chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; -webkit-overflow-scrolling: touch; }
 .scene-filters .chips::-webkit-scrollbar { display: none; }
@@ -556,3 +556,7 @@ dialog.onboarding { overflow-y: auto; }
 .ob-char:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
 .ob-char:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
 .ob-actions { display: flex; align-items: center; gap: var(--sp-2); margin-top: var(--sp-5); }
+
+/* IELTS Writing: essay photos */
+.essay-photo { display: grid; gap: 6px; margin: 4px 0 8px; }
+.ocr-note { margin: 0; padding: 8px 12px; border-radius: 10px; background: var(--surface-2, rgba(127,127,127,.12)); border-left: 3px solid var(--accent); }

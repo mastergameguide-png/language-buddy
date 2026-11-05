@@ -1,5 +1,48 @@
 # Changelog
 
+## IELTS Writing: attach essay photos (2026-11-05)
+
+- **"แนบภาพเรียงความ" button on the Writing page:**
+  - It takes `image/*`, up to 3 photos (one per page) of a handwritten or note-app essay.
+  - Each page is resized in memory to 1600 px on the longer side and sent alone, so it fits the Worker's photo limit and counts once in `usage.photos`.
+  - The text is put in the essay box with the note "ถอดจากภาพแล้ว กรุณาตรวจคำที่มี [?] และคำที่อ่านผิดก่อนส่งตรวจ".
+  - Nothing is scored until the learner presses "ขอคำติชม (AI)". The Writing scoring is unchanged.
+  - If the box already has text, the app asks before replacing it.
+  - **One automatic retry:** a page that timed out (the AI is sometimes slow once and fast the next time) is sent once more by itself, and the button says "ลองหน้า 1/3 อีกครั้ง…". Quota, offline and size errors are not retried. If the retry also times out, the usual Thai message is shown.
+- **Transcription prompt** (`TRANSCRIBE_PROMPT` in `engine/ielts.js`):
+  - copy only what is written: no grammar fixes, no added or removed words, no interpreting;
+  - `[?]` for each unreadable word;
+  - JSON `{"text", "no_text"}`, because the Worker asks Gemini for JSON.
+  - Photos always go to Gemini (existing Worker routing).
+- **Errors in Thai:**
+  - a PDF ("ตอนนี้รองรับเฉพาะภาพ ให้ส่งออกเป็นรูปภาพ (PNG/JPG) จาก Good Notes ก่อน");
+  - more than 3 photos, a non-image file, or a file over 30 MB;
+  - a photo that cannot be opened;
+  - offline;
+  - no text found;
+  - a page that is probably blurry (more than 20% `[?]`);
+  - some pages failed (the pages that worked are kept);
+  - Gemini quota used up, and the photo too large (existing messages).
+- **Photos are not stored:** they stay in local variables only. They are never put on app state, localStorage, sync or backups. Only the text is kept, as the usual local draft of that question.
+- **One resize helper:** `preparePhoto` moved from `views/chat.js` to `util.js` (with `maxSide`, and a lower JPEG quality if the image is still too large). The chat photo button uses it unchanged at 1024 px.
+- **New function in `ai.js`:** `askTranscribe(system, photo)`, approved by the owner. No other change to `ai.js`, and none to `engine/prompt.js`.
+- **Settings:** today's usage line also shows the photo count ("รูป N"), as the chat quota line does.
+- **Contrast fix:** the selected "Task 1 / Task 2" button was white on light purple (2.72:1) in the dark theme. It now uses the primary-button text colour.
+- **Tests:** `tests/transcribe.test.mjs` (9 checks):
+  - the prompt wording;
+  - the file checks (3 photos max, PDF, non-image);
+  - parsing (JSON, code fences, `no_text`, blurry);
+  - the request shape and the photo counter;
+  - no photo data in localStorage;
+  - one shared resize helper;
+  - transcription never triggers scoring;
+  - only timeouts are retried, exactly once.
+- **Real Gemini check (owner approved, 3 requests):** two computer-made pages in a handwriting-style font, with 8 deliberate mistakes. These were not real handwriting.
+  - Clear page: exact, all 8 mistakes kept, 9.2 s.
+  - Blurred and tilted page: the first try timed out at the Worker's 22 s limit; sent again, it came back in 4.7 s with all 8 mistakes kept, but it also included one crossed-out word. That is why the retry was added.
+
+No Worker change (no redeploy needed), no CSP change, no new JS file.
+
 ## Thai font, simpler Settings, first-run guide, auto cache version (2026-11-05)
 
 - **Thai font:** "Noto Sans Thai" (400/500/700, `display=swap`, with `preconnect`) from Google Fonts; the font stack is `"Noto Sans Thai", "Sarabun", system-ui, sans-serif`. The service worker keeps the font files in their own cache (`buddy-fonts-v1`, not removed on updates) and saves them at install, so Thai text keeps its font offline.

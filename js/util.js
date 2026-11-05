@@ -78,6 +78,33 @@ export const dayKey = (d = new Date()) => `${d.getFullYear()}-${String(d.getMont
 export const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2));
 export const clampStr = (v, n) => String(v ?? '').slice(0, n);
 
+// Resize a picked image file to JPEG in memory: { dataUrl, mimeType, data (base64) }.
+// Used by the chat photo button and the IELTS essay photos. Nothing here is saved anywhere.
+// If the JPEG is still longer than maxChars, it is re-encoded at a lower quality.
+export async function preparePhoto(file, { maxSide = 1024, maxChars = 1300000 } = {}) {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((resolve, reject) => {
+      const i = new Image();
+      i.onload = () => resolve(i);
+      i.onerror = () => reject(new Error('เปิดรูปนี้ไม่ได้'));
+      i.src = url;
+    });
+    const scale = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(img.naturalWidth * scale);
+    canvas.height = Math.round(img.naturalHeight * scale);
+    canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+    let dataUrl = '';
+    for (const q of [0.8, 0.65, 0.5]) {
+      dataUrl = canvas.toDataURL('image/jpeg', q);
+      if (dataUrl.length <= maxChars) break;
+    }
+    if (dataUrl.length > maxChars) throw new Error('รูปใหญ่เกินไป ลองรูปอื่น');
+    return { dataUrl, mimeType: 'image/jpeg', data: dataUrl.split(',')[1] };
+  } finally { URL.revokeObjectURL(url); }
+}
+
 let toastTimer;
 export function toast(text, bad = false) {
   let wrap = $('toasts');

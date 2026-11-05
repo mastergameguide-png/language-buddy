@@ -230,3 +230,57 @@ export function pickSpeaking(part, seed = Math.random()) {
 export const wordCount = (t) => String(t || '').trim().split(/\s+/).filter((w) => /[a-z0-9]/i.test(w)).length;
 // Too little to assess: no AI request is made.
 export const MIN_SPEAKING_WORDS = { 1: 15, 2: 60, 3: 25 };
+
+// ---------- Writing: essay photos → text ----------
+// The learner attaches photos of a handwritten (or note-app) essay. Each page is sent alone to
+// the AI, which copies the words exactly. The text goes into the essay box for the learner to
+// check; scoring is the normal Writing feedback, only when the learner asks for it.
+export const ESSAY_PHOTO_MAX = 3;
+export const ESSAY_PHOTO_SIDE = 1600;            // longer side in px: handwriting needs more detail than chat photos
+const ESSAY_FILE_MAX_BYTES = 30 * 1024 * 1024;   // a picked file larger than this is refused before resizing
+
+export const TRANSCRIBE_NOTE = 'ถอดจากภาพแล้ว กรุณาตรวจคำที่มี [?] และคำที่อ่านผิดก่อนส่งตรวจ';
+export const PDF_MESSAGE = 'ตอนนี้รองรับเฉพาะภาพ ให้ส่งออกเป็นรูปภาพ (PNG/JPG) จาก Good Notes ก่อน';
+
+export const TRANSCRIBE_PROMPT = `You copy text from a photo of a learner's English essay (handwritten, or exported from a note app).
+Transcribe ONLY what is written, exactly as written:
+- Do NOT fix grammar, spelling or punctuation. Keep every mistake.
+- Do NOT add, remove, reorder or summarise words. Do NOT interpret or explain.
+- Write [?] in place of each word you cannot read.
+- Keep paragraph breaks as one blank line. Join lines that were only wrapped by the page edge.
+- Skip crossed-out words, page numbers and anything that is not part of the essay.
+Reply with JSON only: {"text": "<the transcription>", "no_text": false}
+If the photo has no readable writing, reply {"text": "", "no_text": true}.`;
+
+// files: an array of File-like objects ({ name, type, size }). Returns { files } or { error } (Thai).
+export function checkEssayFiles(files) {
+  const list = Array.from(files || []);
+  if (!list.length) return { error: '' };
+  if (list.some((f) => f.type === 'application/pdf' || /\.pdf$/i.test(f.name || ''))) return { error: PDF_MESSAGE };
+  if (list.some((f) => !/^image\//.test(f.type || ''))) return { error: 'เลือกได้เฉพาะไฟล์ภาพ (PNG/JPG)' };
+  if (list.length > ESSAY_PHOTO_MAX) return { error: `เลือกได้สูงสุด ${ESSAY_PHOTO_MAX} ภาพ (${ESSAY_PHOTO_MAX} หน้า)` };
+  if (list.some((f) => f.size > ESSAY_FILE_MAX_BYTES)) return { error: 'ภาพใหญ่เกินไป (เกิน 30 MB) ลองถ่ายใหม่หรือย่อภาพก่อน' };
+  return { files: list };
+}
+
+// One page's AI reply → { text, unclear, words, blurry } or { empty: true }.
+// blurry: many words could not be read, so the photo should probably be retaken.
+export function parseTranscript(raw) {
+  let s = String(raw || '').trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
+  let text = s;
+  try {
+    const o = JSON.parse(s);
+    if (o && typeof o === 'object') {
+      if (o.no_text === true) return { empty: true };
+      text = typeof o.text === 'string' ? o.text : '';
+    }
+  } catch {}
+  text = text.replace(/\r\n?/g, '\n').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim().slice(0, 8000);
+  if (!text || /^no_text$/i.test(text)) return { empty: true };
+  const unclear = (text.match(/\[\?\]/g) || []).length;
+  const words = wordCount(text) + unclear;
+  return { text, unclear, words, blurry: words > 0 && (unclear / words > 0.2 || (words < 15 && unclear >= 3)) };
+}
+
+// Pages in order → one essay. Pages with no text are skipped.
+export const joinPages = (pages) => pages.filter((p) => p && !p.empty).map((p) => p.text).join('\n\n');
