@@ -1,5 +1,43 @@
 # Changelog
 
+## 🏅 Lv. system with gate tests (2026-11-06)
+
+The owner chose these options: game-style Lv. with a gate test every 5 Lv., tests checked offline, and English first.
+
+- **XP from measured practice only** (`js/engine/levels.js`). XP is worked out each time from the existing per-day stats and IELTS attempts, so it is never stored or guessed.
+  - Active time: 1 XP a minute, capped at 60 a day.
+  - Messages: 2 XP each, capped at 100 a day.
+  - Reviews: 1 XP each, capped at 50 a day.
+  - Shadowing or listening sentences: 1 XP each, capped at 30 a day.
+  - IELTS practice: 15 XP each, capped at 45 a day.
+  - A practice day earns +10 XP, plus 2 XP × days in a row, counting up to 10 days.
+- **Lv. curve:** Lv. n → n+1 needs 100 + 20 × (n−1) XP.
+- **Gates every 5 Lv. (English only):**
+  - The Lv. waits at the gate until the test is passed. XP earned meanwhile is kept, and the Lv. catches up as soon as the test is passed.
+  - For other languages there are no gates for now.
+- **Gate tests** (`js/engine/gates.js`, original questions, checked offline, no AI):
+  - Each test has 12 questions: 4 vocabulary, 4 grammar, 2 reading (one short text) and 2 listening.
+  - Listening uses the device voice and can be played twice. If the device has no voice, the sentence is shown instead.
+  - Pass mark is 10/12. Three tries a day.
+  - Each try draws a new set, and the options are shuffled.
+  - Levels: A2 (Lv. 5), B1 (Lv. 10), B2 (Lv. 15), C1 (Lv. 20 and later).
+- **Page `#levels` (🏅 Lv. ของฉัน)** shows:
+  - the Lv. badge and XP bar;
+  - real totals: time, messages, streak, best streak, practice days;
+  - where every XP came from, with the rules;
+  - the last 5 test results.
+- **Where to find it:** a Lv. strip on Home (taps through to the page) and a button on the Me page.
+- **Saving and sync:**
+  - `state.levels = { passed, tries }`, cleaned by `cleanLevels`.
+  - Synced as `x:levels`. Merging keeps every passed gate and every try from both devices.
+- **Tests:** `tests/levels.test.mjs`, 10 checks. They cover caps, streak bonus across a gap and a month end, the curve, gates, shuffled answers, scoring, merge and wiring.
+- **Checked in the browser** at 390×844:
+  - a failed try (0/12) and a passing try (11/12, Lv. 5 → 8);
+  - the tries-left count;
+  - ui-audit on the levels, home and me pages, in both themes: no low contrast, no unnamed controls, no sideways scroll;
+  - exam page contrast at least 5.4:1.
+- No change to the Worker, `js/ai.js` or `js/engine/prompt.js`. Three new files were added to `sw.js`.
+
 ## IELTS Speaking: sentence helper and random-question drill (2026-11-05)
 
 The owner said other speaking apps get stuck on accent and pronunciation, which costs time that should go into forming sentences.

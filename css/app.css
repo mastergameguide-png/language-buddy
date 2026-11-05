@@ -579,3 +579,14 @@ dialog.onboarding { overflow-y: auto; }
 .chip.starter { font: inherit; font-size: var(--fs-sm); line-height: 1.35; white-space: normal; max-width: 100%; height: auto; padding-top: 6px; padding-bottom: 6px; cursor: pointer; color: var(--text); background: var(--surface); text-align: left; }
 .chip.starter:hover { border-color: var(--accent); }
 .drill-head { font-weight: 600; }
+
+/* 🏅 Lv. */
+.lv-strip { display: flex; align-items: center; gap: 10px; margin-top: 14px; padding: 10px 12px; min-height: 44px; border-radius: var(--r-md); background: var(--surface-2); color: var(--text); text-decoration: none; }
+.lv-strip .bar { min-width: 60px; }
+.lv-strip:hover { outline: 1px solid var(--accent); }
+.lv-card .lv-badge { flex: none; width: 72px; height: 72px; border-radius: 50%; display: grid; place-items: center; align-content: center; background: var(--accent-soft); color: var(--text); border: 2px solid var(--accent); line-height: 1; }
+.lv-badge small { font-size: var(--fs-xs); }
+.lv-badge b { font-size: 28px; }
+.lv-card .row { gap: 14px; }
+.lv-row { padding: 8px 0; border-bottom: 1px solid var(--line); gap: 10px; }
+.lv-row:last-of-type { border-bottom: 0; }

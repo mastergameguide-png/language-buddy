@@ -8,6 +8,7 @@ import { todayTasks, runAction } from './progress.js';
 import { recommendations } from '../engine/analytics.js';
 import { CHARACTERS, customCharacter } from '../engine/characters.js';
 import { avatarEl } from './avatar.js';
+import { myLevel } from './levels.js';
 import { emptyState, sectionHeader } from './ui.js';
 
 function goal(label, value, target, unit) {
@@ -68,6 +69,13 @@ export function renderHome(root) {
       h('a', { class: 'btn primary', href: '#chat' }, icon('chat'), `คุยกับ ${activeChar().name}`),
       due ? h('a', { class: 'btn', href: '#review' }, icon('review'), `ทบทวน ${num(due)} ข้อ`) : null,
       h('a', { class: 'btn', href: '#learn' }, '🎓 คอร์สและ IELTS')));
+  // Lv. strip: links to the Lv. page; the bar is XP inside this Lv.
+  const me = myLevel();
+  const pct = me.ready ? 100 : Math.min(100, Math.round((me.into / me.need) * 100));
+  hero.append(h('a', { class: 'lv-strip', href: '#levels', 'aria-label': `เลเวล ${me.lv} ${me.ready ? 'พร้อมสอบด่าน' : `อีก ${me.need - me.into} XP ถึงเลเวลถัดไป`} ดูรายละเอียด` },
+    el('b', '', `🏅 Lv. ${me.lv}`),
+    h('div', { class: 'bar grow' + (me.ready ? ' good' : '') }, h('i', { style: `width:${pct}%` })),
+    el('span', 'xs', me.ready ? '🚪 พร้อมสอบด่าน' : `อีก ${num(me.need - me.into)} XP`)));
   root.append(hero);
 
   // Characters
