@@ -9,6 +9,7 @@ import {
   CUE_CARDS, TASK1, TASK2, LISTENING, IELTS_DISCLAIMER, SPEAKING_CRITERIA, WRITING_CRITERIA, MIN_SPEAKING_WORDS,
   analyseWriting, checkListening, buildSpeakingPrompt, buildWritingPrompt, parseIeltsFeedback, pickSpeaking, wordCount,
   ESSAY_PHOTO_MAX, ESSAY_PHOTO_SIDE, TRANSCRIBE_PROMPT, TRANSCRIBE_NOTE, checkEssayFiles, parseTranscript, joinPages, overallBand,
+  NO_ACCENT_NOTE, speakingHints, starterText, DRILL_THINK, DRILL_TALK, pickDrill,
 } from '../engine/ielts.js';
 import { READING, TFNG, checkReading, scoreReading, withinLimit, limitText, answerText } from '../engine/reading.js';
 import { COURSES, courseProgress } from '../engine/courses.js';
@@ -21,7 +22,7 @@ import { openVoice } from './voice.js';
 let tab = 'courses';
 let target = null;
 // Speaking
-let sp = { part: 1, item: null, answer: '', busy: false, result: null };
+let sp = { part: 1, item: null, answer: '', busy: false, result: null, hint: false };
 let timer = { phase: '', left: 0, id: 0 };
 let micOn = false;
 // Writing
@@ -44,7 +45,7 @@ function saveDraft(t) { try { localStorage.setItem(draftKey(), t); } catch {} }
 // Opens a tab (used by courses and other pages).
 export function openLearn(which = 'courses', opts = {}) {
   tab = which;
-  if (which === 'speaking' && opts.part) { sp = { ...sp, part: opts.part, item: null, result: null, answer: '' }; }
+  if (which === 'speaking' && opts.part) { sp = { ...sp, part: opts.part, item: null, result: null, answer: '', drill: false, hint: false }; }
   if (which === 'reading' && opts.id) { const i = READING.findIndex((r) => r.id === opts.id); if (i >= 0) rd = { ...rd, idx: i, answers: {}, checked: false }; }
   if (which === 'writing' && opts.task) { wr = { ...wr, task: opts.task, idx: 0, result: null }; wr.answer = loadDraft(); }
   if (location.hash === '#learn') render(document.getElementById('learnBody')); else location.hash = '#learn';
@@ -203,11 +204,32 @@ function startTimer(phase, secs, root) {
     if (timer.left <= 0) {
       const was = timer.phase;
       stopTimer();
-      if (was === 'prep') { toast('หมดเวลาเตรียม เริ่มพูดได้เลย'); startTimer('talk', 120, root); }
-      else { if (micOn) stopListening(); toast('ครบ 2 นาที'); }
+      if (was === 'prep') { toast(sp.drill && stt().available() ? 'หมดเวลาคิด เริ่มพูดได้เลย (กด พูดคำตอบ)' : 'หมดเวลาเตรียม เริ่มพูดได้เลย'); startTimer('talk', talkSecs(), root); }
+      else { if (micOn) { micOn = false; stopListening(); } toast(`ครบ ${talkSecs() / 60} นาที`); }
       render(root);
     }
   }, 1000) };
+}
+// Part 2 talks for up to 2 minutes; the random drill for up to 5.
+const talkSecs = () => (sp.drill ? DRILL_TALK : 120);
+function startDrill(root) {
+  stopTimer();
+  const item = pickDrill();
+  sp = { part: item.part, item, answer: '', busy: false, result: null, hint: false, drill: true };
+  startTimer('prep', DRILL_THINK, root);
+  render(root);
+}
+function timerRow(root) {
+  const tbox = h('div', { class: 'row' }, el('span', 'timer', timer.phase ? `${timer.phase === 'prep' ? (sp.drill ? 'คิด' : 'เตรียม') : 'พูด'} ` : ''), h('b', { id: 'spTimer', class: 'timer', role: 'timer' }, timer.phase ? clock(timer.left) : ''));
+  const idle = sp.drill ? '⏱️ เริ่มคิด 1 นาที' : '⏱️ เริ่มเตรียม 1 นาที';
+  const tb = h('button', { type: 'button', class: 'btn sm' }, timer.phase === 'prep' ? 'ข้ามไปพูด' : timer.phase === 'talk' ? (sp.drill ? 'พูดเสร็จแล้ว' : 'หยุดจับเวลา') : idle);
+  tb.addEventListener('click', () => {
+    if (timer.phase === 'prep') startTimer('talk', talkSecs(), root);
+    else if (timer.phase === 'talk') { stopTimer(); if (micOn) { micOn = false; stopListening(); } }
+    else startTimer('prep', 60, root);
+    render(root);
+  });
+  return h('div', { class: 'row wrap-ok' }, tb, tbox);
 }
 const clock = (s) => `${Math.floor(Math.max(0, s) / 60)}:${String(Math.max(0, s) % 60).padStart(2, '0')}`;
 
@@ -215,28 +237,33 @@ function renderSpeaking(body, root) {
   if (!sp.item || sp.item.part !== sp.part) sp.item = pickSpeaking(sp.part);
   const seg = h('div', { class: 'seg', role: 'radiogroup', 'aria-label': 'Part' });
   for (const p of [1, 2, 3]) {
-    const b = h('button', { type: 'button', role: 'radio', 'aria-checked': String(sp.part === p), class: sp.part === p ? 'on' : '' }, `Part ${p}`);
+    const on = sp.part === p && !sp.drill;
+    const b = h('button', { type: 'button', role: 'radio', 'aria-checked': String(on), class: on ? 'on' : '' }, `Part ${p}`);
     b.addEventListener('click', () => { stopTimer(); sp = { part: p, item: null, answer: '', busy: false, result: null }; render(root); });
     seg.append(b);
   }
-  body.append(h('div', { class: 'row wrap-ok' }, seg, h('div', { class: 'grow' }, targetPicker(root))));
+  const drillBtn = h('button', { type: 'button', class: 'btn sm' + (sp.drill ? ' on' : ''), 'aria-pressed': String(!!sp.drill) }, '🎲 สุ่มคำถาม');
+  drillBtn.addEventListener('click', () => startDrill(root));
+  body.append(h('div', { class: 'row wrap-ok' }, seg, drillBtn, h('div', { class: 'grow' }, targetPicker(root))));
+  body.append(h('p', { class: 'small muted no-accent' }, '🎧 ', NO_ACCENT_NOTE));
 
   const card = h('div', { class: 'card pad-lg shadow-card' });
   const it = sp.item;
   if (it.part === 2) {
-    card.append(el('div', 'xs muted', 'Part 2 · การ์ดหัวข้อ เตรียม 1 นาที แล้วพูด 1–2 นาที'), el('div', 'shadow-text', it.card.title), el('div', 'small', 'You should say:'), h('ul', { class: 'small' }, ...it.card.points.map((p) => el('li', '', p))));
-    const tbox = h('div', { class: 'row' }, el('span', 'timer', timer.phase ? `${timer.phase === 'prep' ? 'เตรียม' : 'พูด'} ` : ''), h('b', { id: 'spTimer', class: 'timer' }, timer.phase ? clock(timer.left) : ''));
-    const tb = h('button', { type: 'button', class: 'btn sm' }, timer.phase === 'prep' ? 'ข้ามไปพูด' : timer.phase === 'talk' ? 'หยุดจับเวลา' : '⏱️ เริ่มเตรียม 1 นาที');
-    tb.addEventListener('click', () => { if (timer.phase === 'prep') startTimer('talk', 120, root); else if (timer.phase === 'talk') stopTimer(); else startTimer('prep', 60, root); render(root); });
-    card.append(h('div', { class: 'row wrap-ok' }, tb, tbox));
+    if (sp.drill) card.append(drillHead());
+    card.append(el('div', 'xs muted', sp.drill ? 'Part 2 · การ์ดหัวข้อ' : 'Part 2 · การ์ดหัวข้อ เตรียม 1 นาที แล้วพูด 1–2 นาที'), el('div', 'shadow-text', it.card.title), el('div', 'small', 'You should say:'), h('ul', { class: 'small' }, ...it.card.points.map((p) => el('li', '', p))));
+    card.append(timerRow(root));
   } else {
+    if (sp.drill) card.append(drillHead());
     card.append(el('div', 'xs muted', it.part === 1 ? `Part 1 · ${it.topic.topic}` : `Part 3 · ต่อจากการ์ด "${it.card.title}"`), el('div', 'shadow-text', it.question));
+    if (sp.drill) card.append(timerRow(root));
   }
   const hear = h('button', { type: 'button', class: 'btn sm ghost' }, icon('speaker'), 'ฟังคำถาม');
   hear.addEventListener('click', () => { unlockSpeech(); speak(it.part === 2 ? `${it.card.title} You should say: ${it.card.points.join(', ')}.` : it.question, { plain: true }); });
   const other = h('button', { type: 'button', class: 'btn sm ghost' }, 'คำถามอื่น');
-  other.addEventListener('click', () => { stopTimer(); sp = { ...sp, item: pickSpeaking(sp.part), answer: '', result: null }; render(root); });
+  other.addEventListener('click', () => { if (sp.drill) { startDrill(root); return; } stopTimer(); sp = { ...sp, item: pickSpeaking(sp.part), answer: '', result: null, hint: false }; render(root); });
   card.append(h('div', { class: 'row wrap-ok' }, hear, other));
+  card.append(hintBox(it, root));
 
   const ta = h('textarea', { class: 'input', id: 'spAnswer', rows: it.part === 2 ? '8' : '4', lang: 'en', placeholder: stt().available() ? 'พิมพ์คำตอบ หรือกด 🎙️ แล้วพูด (ระบบจะถอดเป็นข้อความ)' : 'พิมพ์คำตอบเป็นภาษาอังกฤษ', 'aria-label': 'คำตอบ' });
   ta.value = sp.answer;
@@ -279,6 +306,31 @@ function renderSpeaking(body, root) {
   const hist = historyList('speaking');
   if (hist) body.append(hist);
 }
+// 💡 help for thinking of what to say: a short plan and sentence starters. Tapping a starter adds
+// it to the answer box, so the learner only has to finish the sentence. Works offline.
+function drillHead() {
+  return el('div', 'small drill-head', '🎲 โหมดสุ่ม · คิด 1 นาที แล้วพูดได้ถึง 5 นาที (พูดเสร็จก่อนก็กดหยุดได้)');
+}
+function hintBox(it, root) {
+  const btn = h('button', { type: 'button', class: 'btn sm ghost', 'aria-expanded': String(!!sp.hint) }, sp.hint ? '💡 ซ่อนตัวช่วย' : '💡 ตัวช่วยคิดประโยค');
+  btn.addEventListener('click', () => { sp.hint = !sp.hint; render(root); });
+  if (!sp.hint) return btn;
+  const { plan, starters } = speakingHints(it);
+  const chips = starters.map((s) => {
+    const b = h('button', { type: 'button', class: 'chip starter', lang: 'en', 'aria-label': `เพิ่มประโยคขึ้นต้น: ${s}` }, s);
+    b.addEventListener('click', () => {
+      const box = document.getElementById('spAnswer');
+      const now = (box ? box.value : sp.answer).trimEnd();
+      sp.answer = (now ? now + ' ' : '') + starterText(s);
+      if (box) { box.value = sp.answer; box.dispatchEvent(new Event('input')); box.focus(); box.setSelectionRange(box.value.length, box.value.length); }
+    });
+    return b;
+  });
+  return h('div', { class: 'hint-box' }, btn,
+    el('div', 'small', 'ลำดับการตอบ:'), h('ol', { class: 'small' }, ...plan.map((p) => el('li', '', p))),
+    el('div', 'small', 'แตะเพื่อเริ่มประโยค แล้วพูดหรือพิมพ์ต่อเอง:'), h('div', { class: 'chips' }, ...chips));
+}
+
 // Speech recognition stops after a pause. Each run appends to the answer; during the Part 2 talk
 // it starts again until the learner stops it or the 2 minutes are up. The text box is looked up
 // by id because the page may have been redrawn since.

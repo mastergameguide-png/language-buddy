@@ -1,5 +1,29 @@
 # Changelog
 
+## IELTS Speaking: sentence helper and random-question drill (2026-11-05)
+
+The owner said other speaking apps get stuck on accent and pronunciation, which costs time that should go into forming sentences.
+
+- **Note at the top of Speaking:** "แอปนี้ไม่ตรวจสำเนียงหรือการออกเสียง…". This was already true: the feedback prompt never judges pronunciation, and transcribed text can be edited before sending. The note just makes it visible.
+- **💡 ตัวช่วยคิดประโยค (works offline, no AI):**
+  - A short answer plan in Thai, one per part:
+    - Part 1: answer, reason, own example.
+    - Part 2: note 1–2 keywords per point, then go through the points in order.
+    - Part 3: opinion, reason, example or comparison, then the other side.
+  - Sentence starters that fit the question type: Do/Is…, Would you…, How often…, Why…, How…, What/Which…, Should….
+  - "Let me think…" lines give time to think.
+  - Tapping a starter adds its opening words to the answer box. The learner finishes the sentence by speaking or typing.
+  - `speakingHints`, `starterText` and `NO_ACCENT_NOTE` are in `js/engine/ielts.js`.
+- **🎲 สุ่มคำถาม (random drill):**
+  - Picks a random question from Part 1, 2 or 3.
+  - Starts a 1-minute thinking countdown, then up to 5 minutes of talking.
+  - "พูดเสร็จแล้ว" stops early and also stops the microphone. "คำถามอื่น" draws a new random question.
+  - Part 2 outside the drill keeps its 1 + 2 minutes.
+  - `pickDrill`, `DRILL_THINK` and `DRILL_TALK` are in `js/engine/ielts.js`.
+- **Tests:** `tests/speaking-help.test.mjs` (6 checks). Every Part 1/2/3 question gets a plan and starters with no repeats.
+- **Checked in the browser** at 390×844: starter chips wrap, no sideways scroll, and contrast is at least 5.4:1 in the light theme. The ui-audit found no low-contrast or unnamed controls.
+- No change to the Worker, `js/ai.js` or `js/engine/prompt.js`. No new file for `sw.js`.
+
 ## IELTS Reading, cadet course, exam timer and band calculator (2026-11-05)
 
 These come from the owner's IELTS Session 1 handout (police cadet IELTS club). The handout was only used to see what the real test needs. Its passages and its listening task were not copied.

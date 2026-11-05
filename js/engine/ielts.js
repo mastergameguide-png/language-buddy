@@ -45,6 +45,48 @@ export const CUE_CARDS = [
     part3: ['Why is it hard for people to change their habits?', 'Should governments make unhealthy food more expensive?', 'Are people today healthier than in the past?'], vocab: ['cut down on', 'a balanced diet', 'stick to it', 'energetic', 'make a habit of'] },
 ];
 
+// ---------- Speaking hints ----------
+// Offline help for thinking of what to say: a short plan in Thai and sentence starters that fit
+// the kind of question. Nothing here is about accent or pronunciation, which the app never judges.
+export const NO_ACCENT_NOTE = 'แอปนี้ไม่ตรวจสำเนียงหรือการออกเสียง ฝึกคิดประโยคได้เต็มที่ ถ้าระบบถอดเสียงผิด แก้ข้อความก่อนส่งได้';
+
+const STALL = ["That's an interesting question. Let me think…", "I've never really thought about that, but…"];
+const STARTERS = [
+  [/^would you\b/i, ["I'd love to, because…", 'Probably not, mainly because…', 'Maybe one day, if…']],
+  [/^how often\b/i, ['Quite often. I usually…', 'Not very often, to be honest, because…', 'Almost every day, especially when…']],
+  [/^why\b/i, ['I think the main reason is that…', 'There are a few reasons. First of all,…', 'One possible reason is that…']],
+  [/^how\b/i, ['I think the best way would be to…', 'One thing that could help is…', 'In my experience,…']],
+  [/^(what|which|where|when|who)\b/i, ["Well, I'd say…", 'My favourite is… because…', 'It has to be… because…']],
+  [/^(should|is it|are there)\b/i, ['Yes, I think so, because…', "I don't think so. In my view,…", 'It depends. On the one hand,… On the other hand,…']],
+  [/^(do|does|did|is|are|has|have|can|will)\b/i, ['Yes, I do, mainly because…', 'Not really. To be honest,…', 'It depends. Sometimes…, but…']],
+];
+const PART3_EXTRA = ['In my country,…', 'Compared to the past,…', 'For example,…'];
+const PART2_LINES = ["I'd like to talk about…", 'It was about… ago, when…', 'What I remember most is that…', "The reason this matters to me is that…"];
+
+export function speakingHints(item) {
+  if (item.part === 2) {
+    return {
+      plan: ['ใช้เวลาเตรียม 1 นาทีจดคำสำคัญ 1–2 คำต่อหัวข้อย่อย ไม่ต้องเขียนเป็นประโยค', 'พูดตามหัวข้อย่อยทีละข้อจากบนลงล่าง', 'ข้อสุดท้าย (explain…) พูดให้ยาวที่สุด เพราะเป็นส่วนที่ได้แสดงความคิด'],
+      starters: [...PART2_LINES, 'Overall,…'],
+    };
+  }
+  const q = String(item.question || '').trim();
+  const found = STARTERS.find(([re]) => re.test(q));
+  const base = found ? found[1] : ["Well, I'd say…", 'I think…', 'In my experience,…'];
+  if (item.part === 3) {
+    return {
+      plan: ['บอกความเห็นก่อน 1 ประโยค', 'อธิบายเหตุผล (because…)', 'ยกตัวอย่าง หรือเทียบกับอดีต/ประเทศอื่น', 'ถ้ายังมีเวลา พูดถึงอีกมุมหนึ่งสั้นๆ'],
+      starters: [...new Set([...base, ...PART3_EXTRA, ...STALL])],
+    };
+  }
+  return {
+    plan: ['ตอบตรงคำถามก่อน 1 ประโยค', 'บอกเหตุผล 1 ข้อ (because…)', 'เล่าตัวอย่างจากชีวิตตัวเอง 1 ประโยค (For example…)'],
+    starters: [...new Set([...base, 'For example,…', ...STALL])],
+  };
+}
+// The text put in the answer box when a starter is tapped: everything before the first "…".
+export const starterText = (s) => s.split('…')[0].trimEnd() + ' ';
+
 // ---------- Writing ----------
 export const TASK2 = [
   { id: 'remote', type: 'discussion', prompt: 'Some people believe that working from home benefits both employees and companies, while others think it causes more problems than it solves. Discuss both views and give your own opinion.' },
@@ -231,6 +273,12 @@ export function pickSpeaking(part, seed = Math.random()) {
   }
   const topic = PART1[Math.floor(seed * PART1.length) % PART1.length];
   return { part: 1, topic, question: topic.qs[Math.floor(seed * 89) % topic.qs.length] };
+}
+// 🎲 Random drill: any question from Part 1, 2 or 3, 1 minute to think, then up to 5 minutes to talk.
+export const DRILL_THINK = 60;
+export const DRILL_TALK = 300;
+export function pickDrill(seed = Math.random(), seed2 = Math.random()) {
+  return pickSpeaking(1 + (Math.floor(seed * 3) % 3), seed2);
 }
 export const wordCount = (t) => String(t || '').trim().split(/\s+/).filter((w) => /[a-z0-9]/i.test(w)).length;
 // Too little to assess: no AI request is made.

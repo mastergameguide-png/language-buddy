@@ -570,3 +570,12 @@ dialog.onboarding { overflow-y: auto; }
 .countdown { font-variant-numeric: tabular-nums; }
 .band-calc { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; }
 .band-calc label { display: grid; gap: 4px; }
+
+/* Speaking: no-accent note, 💡 sentence starters, 🎲 random drill */
+.no-accent { margin: 0; }
+.hint-box { display: grid; gap: 6px; padding: 10px; border: 1px dashed var(--line); border-radius: var(--r-md); }
+.hint-box ol { margin: 0; padding-left: 20px; }
+.hint-box > .btn { justify-self: start; }
+.chip.starter { font: inherit; font-size: var(--fs-sm); line-height: 1.35; white-space: normal; max-width: 100%; height: auto; padding-top: 6px; padding-bottom: 6px; cursor: pointer; color: var(--text); background: var(--surface); text-align: left; }
+.chip.starter:hover { border-color: var(--accent); }
+.drill-head { font-weight: 600; }
