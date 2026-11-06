@@ -126,7 +126,7 @@ export function renderHome(root) {
   root.append(plan);
 
   // Week
-  root.append(el('h2', 'sec', 'สัปดาห์นี้ (นาทีต่อวัน)'));
+  root.append(sectionHeader('สัปดาห์นี้ (นาทีต่อวัน)', h('a', { class: 'btn sm ghost', href: '#dashboard' }, '📊 Dashboard')));
   root.append(h('div', { class: 'card' }, weekChart()));
 
   // Activity

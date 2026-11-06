@@ -40,6 +40,7 @@ export function totalXp(days = {}, ielts = []) {
   const keys = [...new Set([...Object.keys(days), ...Object.keys(perDayIelts)])].filter((k) => /^\d{4}-\d{2}-\d{2}$/.test(k)).sort();
   const by = Object.fromEntries([...XP_RULES.map((r) => [r.key, 0]), ['bonus', 0]]);
   let xp = 0, inRow = 0, prev = null, best = 0, activeDays = 0;
+  const perDay = {};
   for (const k of keys) {
     const d = days[k] || {};
     const active = isActiveDay(d) || perDayIelts[k] > 0;
@@ -47,9 +48,10 @@ export function totalXp(days = {}, ielts = []) {
     if (active) { prev = k; activeDays += 1; best = Math.max(best, inRow); }
     const r = dayXp(d, perDayIelts[k] || 0, inRow);
     xp += r.total;
+    if (r.total) perDay[k] = r.total;
     for (const [p, v] of Object.entries(r.parts)) by[p] += v;
   }
-  return { xp, by, activeDays, bestRow: best };
+  return { xp, by, activeDays, bestRow: best, perDay };
 }
 
 // XP needed to go from Lv. n to n + 1.

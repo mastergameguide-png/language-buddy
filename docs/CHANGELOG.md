@@ -1,5 +1,34 @@
 # Changelog
 
+## 📊 Dashboard (2026-11-06)
+
+This is option 1 from the owner, a personal dashboard. It is one page (`#dashboard`) with long-term progress drawn from data already on this device. It makes no AI call and needs no Worker change. Existing pages are unchanged; Home ("สัปดาห์นี้" header) and Me link to it.
+
+- **Range filter** 7 / 30 / 90 days, set once above the charts. 90 days is shown as 13 full weeks.
+- **Tiles for the range:** time, practice days, XP and current Lv., messages and reviews.
+- **🔥 Calendar (always 12 weeks):**
+  - Monday-first, one blue ramp. The 4 steps are active minutes 1+, 10+, 20+ and 40+, and a legend explains them.
+  - Future days are dashed.
+- **🏅 XP:** per day for 7 and 30 days, per week for 90. It uses the same per-day XP as the Lv. system (`totalXp().perDay`, new).
+- **🎯 IELTS:** two charts, never one chart with two axes.
+  - Speaking/Writing practice band, on a 0–9 axis.
+  - Reading/Listening percent correct of the short sets. These are never turned into a band.
+- **📘 Word bank:** words held at the end of each day or week, plus how many are known and how many are still being learned.
+- **✏️ Mistakes:** the top categories in this range, with the count and the change from the same length of time before, written as text with ▲ ▼.
+- **Charts:**
+  - Plain SVG and HTML, no library.
+  - The two series colors are a validated pair, blue and orange, picked for each theme. The dataviz validator passes in both themes: CVD ΔE at least 24.7, and every mark at least 3:1 on the surface.
+  - Thin bars with rounded tops, 2px lines, and dots with a surface ring.
+  - Each series is named by a legend and a direct label.
+  - Hover, tap and keyboard focus show a tooltip, and every chart has "ดูเป็นตาราง" (table view).
+- **Files:** `js/engine/dashboard.js` (data, pure) and `js/views/dashboard.js` (page), both added to `sw.js`.
+- **Tests:** `tests/dashboard.test.mjs`, 9 checks. They cover calendar alignment, buckets, XP, vocabulary, IELTS, mistakes, totals, axis and wiring.
+- **Checked in the browser** at 390×844 with 80 days of test data:
+  - all ranges;
+  - tooltips;
+  - end labels stay inside the card;
+  - ui-audit is clean in both themes, and text is at least 5.6:1.
+
 ## 📘 Today's words (2026-11-06)
 
 The owner wrote a vocabulary prompt with Gemini. This feature is built on it, with these choices from the owner: the level follows the learner, and there are 5 words a day.

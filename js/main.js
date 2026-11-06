@@ -14,6 +14,7 @@ import { renderVoice } from './views/voice.js';
 import { renderProgress } from './views/progress.js';
 import { renderLearn } from './views/learn.js';
 import { renderLevels } from './views/levels.js';
+import { renderDashboard } from './views/dashboard.js';
 import { initSettings, fillSettings, applyTheme } from './views/settings.js';
 import { maybeOnboard } from './views/onboarding.js';
 
@@ -39,6 +40,7 @@ const VIEWS = {
   progress: { el: 'view-progress', render: () => renderProgress($('progressBody')), nav: 'me' },
   learn: { el: 'view-learn', render: () => renderLearn($('learnBody')), nav: 'practice' },
   levels: { el: 'view-levels', render: () => renderLevels($('levelsBody')), nav: 'me' },
+  dashboard: { el: 'view-dashboard', render: () => renderDashboard($('dashboardBody')), nav: 'me' },
   settings: { el: 'view-settings', render: () => fillSettings(), nav: 'me' },
 };
 let current = null;

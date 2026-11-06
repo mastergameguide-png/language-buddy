@@ -38,7 +38,7 @@ export function renderMe(root) {
         el('div', 'xs muted', `${settings.lang} ${flag()} · ${levelShort()} (${CEFR[cefrOf()] || ''})${settings.goalText ? ' · ' + settings.goalText : ''}`)),
       h('a', { class: 'btn sm', href: '#settings' }, icon('gear'), 'ตั้งค่า'))));
 
-  root.append(sectionHeader('ความก้าวหน้า', h('div', { class: 'row wrap-ok' }, h('a', { class: 'btn sm', href: '#levels' }, '🏅 Lv. ของฉัน'), h('a', { class: 'btn sm', href: '#learn' }, '🎓 คอร์สและ IELTS'), h('a', { class: 'btn sm primary', href: '#progress' }, '📈 รายงานและแผน 7 วัน'))));
+  root.append(sectionHeader('ความก้าวหน้า', h('div', { class: 'row wrap-ok' }, h('a', { class: 'btn sm', href: '#dashboard' }, '📊 Dashboard'), h('a', { class: 'btn sm', href: '#levels' }, '🏅 Lv. ของฉัน'), h('a', { class: 'btn sm', href: '#learn' }, '🎓 คอร์สและ IELTS'), h('a', { class: 'btn sm primary', href: '#progress' }, '📈 รายงานและแผน 7 วัน'))));
   root.append(h('div', { class: 'grid cols-4' },
     stat('เรียนต่อเนื่อง', `🔥 ${streak()} วัน`),
     stat('เวลาเรียน', fmtMinutes(tot.secs)),
