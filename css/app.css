@@ -590,3 +590,14 @@ dialog.onboarding { overflow-y: auto; }
 .lv-card .row { gap: 14px; }
 .lv-row { padding: 8px 0; border-bottom: 1px solid var(--line); gap: 10px; }
 .lv-row:last-of-type { border-bottom: 0; }
+
+/* 📘 today's words */
+.daily { display: grid; gap: 10px; margin-top: 14px; }
+.daily h2.sec { margin: 0; }
+.daily-word { padding: 2px 0; border-top: 1px solid var(--line); }
+.daily-word summary { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; min-height: 44px; padding: 10px 0; cursor: pointer; }
+.daily-word summary b { font-size: var(--fs-md); }
+.daily-th { flex-basis: 100%; }
+.daily-body { display: grid; gap: 6px; padding: 0 0 10px; }
+.linkish { background: none; border: 0; padding: 4px 0; min-height: 32px; font: inherit; color: var(--text); text-align: left; cursor: pointer; font-style: italic; }
+.linkish:hover { text-decoration: underline; }

@@ -9,6 +9,7 @@ import { recommendations } from '../engine/analytics.js';
 import { CHARACTERS, customCharacter } from '../engine/characters.js';
 import { avatarEl } from './avatar.js';
 import { myLevel } from './levels.js';
+import { dailyCard } from './daily.js';
 import { emptyState, sectionHeader } from './ui.js';
 
 function goal(label, value, target, unit) {
@@ -77,6 +78,8 @@ export function renderHome(root) {
     h('div', { class: 'bar grow' + (me.ready ? ' good' : '') }, h('i', { style: `width:${pct}%` })),
     el('span', 'xs', me.ready ? '🚪 พร้อมสอบด่าน' : `อีก ${num(me.need - me.into)} XP`)));
   root.append(hero);
+  const daily = dailyCard(() => renderHome(root));
+  if (daily) root.append(daily);
 
   // Characters
   root.append(sectionHeader('คุยกับใครดีวันนี้', h('a', { class: 'btn sm ghost', href: '#characters' }, 'ดูทั้งหมด')));

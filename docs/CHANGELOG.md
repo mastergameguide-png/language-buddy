@@ -1,5 +1,41 @@
 # Changelog
 
+## 📘 Today's words (2026-11-06)
+
+The owner wrote a vocabulary prompt with Gemini. This feature is built on it, with these choices from the owner: the level follows the learner, and there are 5 words a day.
+
+- **Card "📘 คำศัพท์วันนี้" on Home** (English only).
+  - The learner taps "✨ สร้างคำศัพท์วันนี้". That makes one AI request, which returns 5 words.
+  - The set is kept for the rest of the day, so reopening the app does not ask the AI again.
+- **Level:** words are one CEFR step above the learner's level, for example B1 → B2, and C2 stays C2. When an IELTS band is set, the prompt also names the band half a step up, for example 6.5 → 7.0.
+  - The owner's prompt fixed the level at C1–C2 (band 7.5–8.5+). That is too hard for most learners using the app.
+- **Each word shows** everything the owner's prompt asks for:
+  - part of speech, CEFR level and Thai meaning;
+  - synonyms and collocations;
+  - an IELTS Writing-style example (tap to hear it);
+  - a usage note in Thai.
+- Each word is folded to "word + Thai meaning" until it is tapped, so the card stays short.
+- **"+ คลังคำ" or "เพิ่มทั้งหมด"** puts words into the word bank, where they are reviewed with spaced repetition in "ทบทวน". Each added word counts as a new word in the stats.
+- **No repeats:** the learner's latest 150 known words go into the prompt as words to avoid, and the reply is filtered again on this device.
+- **Strict parsing** (`js/engine/daily.js`):
+  - accepts `{"words": [...]}`, a bare array (the owner's original format) or a ```json fence;
+  - drops items with no word or Thai meaning, non-English words, and repeats;
+  - trims long fields and keeps at most 5 words.
+- A note says the words and meanings are made by AI and may be wrong.
+- **AI path:** uses the existing `askIelts` request, so there is no change to `js/ai.js`, `js/engine/prompt.js` or the Worker.
+- **Storage:** `state.daily = { day, cefr, words, added }` is checked by `cleanDaily` and stays on this device (not synced). Words added to the word bank sync as before.
+- **Tests:** `tests/daily.test.mjs` (6 checks).
+- **Checked in the browser** at 390×844 with a fake AI reply:
+  - the card made 5 words, and adding one, then all, worked;
+  - after a reload the set was still there and no second request was made;
+  - the 5 words showed up as due in review;
+  - contrast is at least 5.84:1 in the light theme, and the dark-theme ui-audit was clean.
+- **Real Gemini test (1 request, owner approved):**
+  - HTTP 200 in 3.2 s, valid `{"words": [...]}`, every field filled, Thai notes were natural, and every example used its word.
+  - Levels matched (4 × B2 and 1 × C1 for a B1 learner).
+  - One problem: Gemini returned "detrimental" although it was on the "do not use" list. The parser dropped it, which left 4 words, so the prompt now asks for 7 and the app keeps the first 5 new ones (`ASK_COUNT`).
+  - The 7-word request has not been run live.
+
 ## 🏅 Lv. system with gate tests (2026-11-06)
 
 The owner chose these options: game-style Lv. with a gate test every 5 Lv., tests checked offline, and English first.
