@@ -10,7 +10,7 @@ export const XP_RULES = [
   { key: 'msgs', th: 'ข้อความที่คุย', per: 'ข้อความ', xp: 2, cap: 100 },
   { key: 'reviews', th: 'ทบทวน', per: 'ข้อ', xp: 1, cap: 50 },
   { key: 'voice', th: 'พูดตาม / ฟัง', per: 'ประโยค', xp: 1, cap: 30 },
-  { key: 'ielts', th: 'ฝึก IELTS', per: 'ครั้ง', xp: 15, cap: 45 },
+  { key: 'ielts', th: 'ฝึก IELTS / RPCA-TEP', per: 'ครั้ง', xp: 15, cap: 45 },
 ];
 export const DAY_BONUS = 10;                 // a day with real practice
 export const STREAK_XP = 2;                  // × days in a row, up to STREAK_CAP

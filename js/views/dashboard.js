@@ -4,7 +4,8 @@
 import { el, h, num, fmtMinutes, fmtDate } from '../util.js';
 import { state, CATEGORIES, isEnglish } from '../store.js';
 import { totalXp } from '../engine/levels.js';
-import { RANGES, heatmap, xpSeries, vocabGrowth, ieltsSeries, mistakeTrend, rangeTotals, niceMax } from '../engine/dashboard.js';
+import { RANGES, heatmap, xpSeries, vocabGrowth, ieltsSeries, tepSeries, mistakeTrend, rangeTotals, niceMax } from '../engine/dashboard.js';
+import { PARTS as TEP_PARTS } from '../engine/tep.js';
 import { status } from '../srs.js';
 import { myLevel } from './levels.js';
 
@@ -146,6 +147,7 @@ export function renderDashboard(root) {
   root.append(heatCard(now));
   root.append(xpCard(x.perDay, now));
   if (isEnglish() || state.ielts.length) root.append(...ieltsCards(now));
+  if (isEnglish() || state.ielts.some((a) => a.kind === 'tep')) root.append(tepCard(now));
   root.append(vocabCard(now));
   root.append(mistakeCard(now));
   root.append(el('p', 'xs muted', 'ทุกตัวเลขมาจากข้อมูลที่แอปบันทึกในเครื่องนี้ (และที่ซิงก์มา) ไม่มีการเดา band ของ Speaking/Writing เป็นค่าประมาณจากการฝึกโดย AI ส่วน Reading/Listening เป็น % ที่ตอบถูกของชุดสั้น ไม่ใช่คะแนนสอบจริง'));
@@ -202,6 +204,20 @@ function ieltsCards(now) {
     np ? legend([['Reading', 's1'], ['Listening', 's2']]) : null,
     np ? tableView(['วันที่', 'ทักษะ', 'ถูก'], [...s.reading.map((p) => [p.t, 'Reading', `${p.score}/${p.total}`]), ...s.listening.map((p) => [p.t, 'Listening', `${p.score}/${p.total}`])].sort((a, b) => b[0] - a[0]).map(([t, k, v]) => [fmtDate(t), k, v])) : null));
   return out;
+}
+
+function tepCard(now) {
+  const s = tepSeries(state.ielts, range, now);
+  const name = (id) => TEP_PARTS.find((p) => p.id === id)?.th || id;
+  if (!s.points.length) return card('👮 RPCA-TEP', '% ที่ตอบถูกต่อชุดฝึก', empty('ยังไม่ได้ฝึก RPCA-TEP ในช่วงนี้'));
+  const line = lineChart([{ name: '% ถูก', cls: 's1', points: s.points.map((p) => ({ ...p, tip: `${fmtDate(p.t)} · ${name(p.part)} ${p.score}/${p.total} (${p.value}%)` })) }], s.since, now, 100, (v) => `${v}%`, `RPCA-TEP ${s.points.length} ชุด`);
+  const parts = h('div', { class: 'hbars' }, ...TEP_PARTS.filter((p) => s.byPart[p.id]).map((p) => {
+    const b = s.byPart[p.id];
+    return h('div', { class: 'hbar' }, h('div', { class: 'row' }, el('span', 'small grow', `${p.icon} ${p.th}`), el('b', 'small', `${b.pct}%`)),
+      h('div', { class: 'hbar-track', 'aria-hidden': 'true' }, h('i', { class: 's1', style: `width:${Math.max(4, b.pct)}%` })), el('div', 'xs muted', `${b.sets} ชุด · ถูก ${b.score}/${b.total} ข้อ`));
+  }));
+  return card('👮 RPCA-TEP', `% ที่ตอบถูกต่อชุดฝึก (${s.points.length} ชุด) · ชุดสั้นไม่แปลงเป็นคะแนนเต็ม 120`, line, parts,
+    tableView(['วันที่', 'พาร์ท', 'ถูก'], s.points.slice().reverse().map((p) => [fmtDate(p.t), name(p.part), `${p.score}/${p.total}`])));
 }
 
 function vocabCard(now) {

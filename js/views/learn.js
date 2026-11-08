@@ -17,6 +17,7 @@ import { askIelts, askTranscribe } from '../ai.js';
 import { speak, listen, stopListening, unlockSpeech, stopSpeaking } from '../speech.js';
 import { stt } from '../voice/stt.js';
 import { openScenario } from './roleplay.js';
+import { openTep } from './tep.js';
 import { openVoice } from './voice.js';
 
 let tab = 'courses';
@@ -116,6 +117,7 @@ function stepAction(step) {
   else if (step.type === 'shadow') openVoice('shadow');
   else if (step.type === 'listen') openVoice('listen');
   else if (step.type === 'review') location.hash = '#review';
+  else if (step.type === 'ielts' && step.kind === 'tep') openTep(step.part);
   else if (step.type === 'ielts') openLearn(step.kind, { part: step.part, task: step.task, id: step.id });
 }
 function renderCourses(body, root) {

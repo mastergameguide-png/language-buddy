@@ -75,6 +75,17 @@ export function ieltsSeries(ielts = [], range = 30, now = Date.now()) {
   return { since, speaking: band('speaking'), writing: band('writing'), reading: pct('reading'), listening: pct('listening') };
 }
 
+// RPCA-TEP practice sets in the range: percent correct per set, and the average per part.
+export function tepSeries(ielts = [], range = 30, now = Date.now()) {
+  const since = addDays(startOfDay(now), -(range - 1));
+  const sets = ielts.filter((a) => a && a.kind === 'tep' && a.total > 0 && a.t >= since && a.t <= now).sort((a, b) => a.t - b.t);
+  const points = sets.map((a) => ({ t: a.t, part: a.part, score: a.score, total: a.total, value: Math.round((a.score / a.total) * 100) }));
+  const byPart = {};
+  for (const p of points) { const b = (byPart[p.part] ||= { sets: 0, score: 0, total: 0 }); b.sets += 1; b.score += p.score; b.total += p.total; }
+  for (const b of Object.values(byPart)) b.pct = Math.round((b.score / b.total) * 100);
+  return { since, points, byPart };
+}
+
 // Mistakes saved in this range against the same length just before it, per category.
 export function mistakeTrend(mistakes = [], range = 30, now = Date.now(), limit = 6) {
   const since = addDays(startOfDay(now), -(range - 1));

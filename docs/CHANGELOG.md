@@ -1,5 +1,36 @@
 # Changelog
 
+## 👮 RPCA-TEP practice (2026-11-08)
+
+This is a page of its own (`#tep`), opened from a new "👮 TEP" tab on every practice page. The owner chose: level B1–B2, about 40% policing contexts, and a separate page.
+
+- **Format sources:**
+  - The 2026 standard-setting study by the RPCA English department: 120 multiple-choice items (Listening 40, Grammar 20, Vocabulary 20, Reading 40), about 40% in policing contexts.
+  - The official site rpca-tep.rpca.ac.th: pass marks of 60/120 for the bachelor's degree and 65/120 for the master's.
+  - Item types come from the CU-TEP-style description the owner shared.
+  - The owner's text said there are 3 parts. The study, written by the test's own department, says 4, so the app uses 4.
+- **Original question bank** (`js/engine/tep.js`, 82 questions, every one with the answer and a Thai explanation):
+  - 🎧 Listening (18): short dialogues, long dialogues and monologues. They are read by the device voice, with the two speakers told apart by pitch. Each dialogue can be played twice; after checking, the script is shown.
+  - ✏️ Grammar (24): error identification with A–D underlined (subject-verb agreement, tense, passive, parallel structure, gerund or infinitive), plus sentence completion. The wrong part is spread over A–D, so there is no "always B" pattern.
+  - 📘 Vocabulary (22): meaning in context, and two cloze texts with 4 blanks each.
+  - 📖 Reading (18): short texts (a notice, an email, an advertisement) and two long academic passages that ask about main idea, detail, vocabulary in context, inference and tone.
+  - About 40–50% of the bank is in policing contexts. Each set aims for 4 police questions in 10.
+- **Practice sets:**
+  - Each set has 8–10 questions from one part, drawn at random with the options shuffled.
+  - Checking is offline, with no AI.
+  - The score is shown as raw marks and a percent, and is never turned into a score out of 120.
+- **Saving:** each set is saved as an attempt `{kind: 'tep', part, score, total}`. It:
+  - counts for XP (the rule is now "ฝึก IELTS / RPCA-TEP");
+  - shows on the Dashboard in a new card with percent correct per set and an average per part;
+  - counts toward 2 new steps in the cadet course (Listening and Grammar sets).
+- **Tests:** `tests/tep.test.mjs` (9 checks). They cover structure, bank coverage and police share, 4 options, Thai explanations, long-passage paragraph references, the A–D spread, set building, scoring, saving, the course and wiring.
+- **Checked in the browser** at 390×844:
+  - all four parts, two plays per dialogue, and the script shown after checking;
+  - attempts are saved;
+  - the four practice tabs fit without scrolling (tab padding reduced slightly);
+  - ui-audit is clean on the TEP, Dashboard and Learn pages in both themes.
+  - Note: in the preview pane, color transitions do not finish, which gave false low-contrast readings in the light theme. With transitions turned off, the audit is clean.
+
 ## 📊 Dashboard (2026-11-06)
 
 This is option 1 from the owner, a personal dashboard. It is one page (`#dashboard`) with long-term progress drawn from data already on this device. It makes no AI call and needs no Worker change. Existing pages are unchanged; Home ("สัปดาห์นี้" header) and Me link to it.

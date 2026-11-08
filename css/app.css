@@ -99,9 +99,9 @@ button { cursor: pointer; }
   padding: calc(env(safe-area-inset-top) + var(--sp-4)) var(--sp-4) calc(var(--nav-h) + env(safe-area-inset-bottom) + var(--sp-6));
 }
 .wrap { max-width: 880px; margin: 0 auto; width: 100%; }
-.ptabs { display: flex; gap: 6px; margin-bottom: var(--sp-4); overflow-x: auto; scrollbar-width: none; }
+.ptabs { display: flex; gap: 4px; margin-bottom: var(--sp-4); overflow-x: auto; scrollbar-width: none; }
 .ptabs::-webkit-scrollbar { display: none; }
-.ptabs a { flex: 1 1 0; min-width: max-content; display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 10px; border: 1px solid var(--line); border-radius: var(--r-pill); color: var(--muted); text-decoration: none; font-weight: 650; font-size: var(--fs-sm); white-space: nowrap; background: var(--surface); }
+.ptabs a { flex: 1 1 0; min-width: max-content; display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 8px; border: 1px solid var(--line); border-radius: var(--r-pill); color: var(--muted); text-decoration: none; font-weight: 650; font-size: var(--fs-sm); white-space: nowrap; background: var(--surface); }
 .ptabs a[aria-current="page"] { background: var(--accent-soft); border-color: var(--accent); color: var(--text); }
 
 @media (min-width: 900px) {
@@ -647,3 +647,15 @@ dialog.onboarding { overflow-y: auto; }
 .hbar-track { height: 8px; border-radius: var(--r-pill); background: var(--surface-3); overflow: hidden; }
 .hbar-track i { display: block; height: 100%; border-radius: 0 4px 4px 0; }
 .hbar-track i.s1 { background: var(--series-1); }
+
+/* 👮 RPCA-TEP */
+.tep-parts { display: grid; gap: 10px; }
+.tep-part { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; color: var(--text); font: inherit; cursor: pointer; }
+.tep-part .em { font-size: 26px; }
+.tep-part:hover { border-color: var(--accent); }
+.tep-group { display: grid; gap: 6px; margin-top: 12px; }
+.tep-listen { display: grid; gap: 8px; }
+.tep-error u { text-decoration-thickness: 2px; text-underline-offset: 3px; }
+.tep-error sub { color: var(--muted); margin: 0 3px 0 1px; font-weight: 700; }
+.tep-why { display: grid; gap: 2px; padding: 8px 10px; border-radius: var(--r-sm); background: var(--surface-2); color: var(--text); }
+.tep-score { margin-top: 12px; display: grid; gap: 8px; }
