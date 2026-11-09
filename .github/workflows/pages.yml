@@ -40,7 +40,7 @@ jobs:
       - name: Collect the site files
         run: |
           mkdir _site
-          cp -r index.html sw.js manifest.json og-image.png css js icons assets _site/
+          cp -r index.html sw.js manifest.json og-image.png css js icons assets vendor _site/
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
