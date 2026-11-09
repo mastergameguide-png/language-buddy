@@ -40,8 +40,7 @@ await test('every app script is in the offline shell', () => {
   assert.deepEqual(missing, []);
 });
 await test('deploy copies every folder the app loads files from (vendor: pdf.js for the book page)', () => {
-  const cp = flow.match(/cp -r ([^
-]+) _site\//)?.[1].split(/\s+/) || [];
+  const cp = flow.match(/cp -r ([^\n]+) _site\//)?.[1].split(/\s+/) || [];
   for (const d of ['css', 'js', 'icons', 'vendor']) assert.ok(cp.includes(d), d);
 });
 await test('service worker caches the fonts in a separate cache that survives updates', () => {
