@@ -40,7 +40,7 @@ await test('bank: enough questions, about 40% policing in every part, all item t
   const types = (part) => new Set(T.BANK[part].map((u) => u.type));
   assert.deepEqual([...types('listening')].sort(), ['long', 'short', 'talk']);
   assert.deepEqual([...types('grammar')].sort(), ['complete', 'error']);
-  assert.deepEqual([...types('vocab')].sort(), ['cloze', 'context']);
+  assert.deepEqual([...types('vocab')].sort(), ['cloze', 'context', 'gap']);
   assert.deepEqual([...types('reading')].sort(), ['long', 'short']);
 });
 
@@ -54,7 +54,7 @@ await test('every question: 4 different options, a valid answer and a Thai expla
     }
   }
   for (const u of T.BANK.grammar) {
-    if (u.type === 'complete') { assert.equal(u.options.length, 4); assert.ok(/[฀-๿]/.test(u.why)); continue; }
+    if (u.type === 'complete') { assert.equal(u.options.length, 4); assert.equal(new Set(u.options).size, 4, u.q); assert.ok(u.q.includes('___'), u.q); assert.ok(/[฀-๿]/.test(u.why)); continue; }
     const { marks, pieces } = T.errorParts(u.s);
     assert.equal(marks.length, 4, `error item needs 4 underlined parts: ${u.s}`);
     assert.equal(pieces.length, 5);
@@ -77,6 +77,23 @@ await test('error identification: the wrong part is spread over A–D (no "alway
   const at = [0, 0, 0, 0];
   for (const u of T.BANK.grammar) if (u.type === 'error') at[u.answer] += 1;
   assert.ok(at.every((n) => n >= 3), `A–D: ${at.join(' ')}`);
+});
+
+await test('mock-test style (July 2026): Structure and Vocabulary sets are mostly one-gap sentences', async () => {
+  // The mock uses only gap-fill for these two parts; other types are capped per set.
+  assert.ok(T.BANK.grammar.filter((u) => u.type === 'complete').length >= 28);
+  assert.ok(T.BANK.vocab.filter((u) => u.type === 'gap').length >= 20);
+  for (const u of T.BANK.vocab.filter((x) => x.type === 'gap')) assert.ok(u.q.includes('___') && u.options.length === 4, u.q);
+  for (let i = 0; i < 80; i++) {
+    const g = T.buildSet('grammar', i / 80 + 0.003), v = T.buildSet('vocab', i / 80 + 0.003);
+    const count = (set, type) => set.filter((x) => x.unit.type === type).reduce((s, x) => s + x.questions.length, 0);
+    assert.ok(count(g, 'error') <= T.TYPE_CAP.grammar.error, 'too many error items in a set');
+    assert.ok(count(v, 'context') <= T.TYPE_CAP.vocab.context && count(v, 'cloze') <= T.TYPE_CAP.vocab.cloze);
+    assert.ok(count(g, 'complete') >= 6 && count(v, 'gap') + count(v, 'cloze') >= 6);
+  }
+  // no item is a copy of the mock test: none of its answer sentences appear in the bank
+  const all = JSON.stringify(T.BANK);
+  for (const phrase of ['shortly after leaving the building', 'clear ______ of the emergency procedures', 'forensic team', 'remain calm and avoid spreading', 'detailed ______ of what happened', 'cannot release additional information']) assert.ok(!all.includes(phrase.replace(/_+/, '___')), phrase);
 });
 
 await test('error identification: pieces and marks rebuild the sentence', async () => {

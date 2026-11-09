@@ -27,7 +27,7 @@ function nextLabel(card) {
 export function renderReview(root) {
   root.textContent = '';
   const due = dueCards().length;
-  root.append(h('div', { class: 'page-head' }, h('div', {}, el('h1', '', 'ทบทวน'), el('p', '', 'ระบบทบทวนแบบเว้นระยะ — คำที่จำยากจะกลับมาบ่อยขึ้น'))));
+  root.append(h('div', { class: 'page-head' }, h('div', {}, el('h1', '', 'ทบทวน'), el('p', '', 'ระบบทบทวนแบบเว้นระยะ — คำที่จำยากจะกลับมาบ่อยขึ้น')), h('a', { class: 'btn sm', href: '#mywords' }, '📥 คำของฉัน')));
   const tabs = h('div', { class: 'tabs', role: 'tablist' });
   for (const [id, label] of [['review', `ทบทวน${due ? ` (${due})` : ''}`], ['vocab', `คลังคำ (${state.vocab.length})`], ['mistakes', `สมุดผิด (${state.mistakes.length})`]]) {
     const b = h('button', { type: 'button', role: 'tab', 'aria-selected': String(tab === id) }, label);

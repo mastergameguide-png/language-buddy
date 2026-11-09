@@ -16,6 +16,7 @@ import { renderLearn } from './views/learn.js';
 import { renderLevels } from './views/levels.js';
 import { renderDashboard } from './views/dashboard.js';
 import { renderTep } from './views/tep.js';
+import { renderMyWords } from './views/mywords.js';
 import { initSettings, fillSettings, applyTheme } from './views/settings.js';
 import { maybeOnboard } from './views/onboarding.js';
 
@@ -41,6 +42,7 @@ const VIEWS = {
   progress: { el: 'view-progress', render: () => renderProgress($('progressBody')), nav: 'me' },
   learn: { el: 'view-learn', render: () => renderLearn($('learnBody')), nav: 'practice' },
   levels: { el: 'view-levels', render: () => renderLevels($('levelsBody')), nav: 'me' },
+  mywords: { el: 'view-mywords', render: () => renderMyWords($('mywordsBody')), nav: 'review' },
   tep: { el: 'view-tep', render: () => renderTep($('tepBody')), nav: 'practice' },
   dashboard: { el: 'view-dashboard', render: () => renderDashboard($('dashboardBody')), nav: 'me' },
   settings: { el: 'view-settings', render: () => fillSettings(), nav: 'me' },

@@ -659,3 +659,16 @@ dialog.onboarding { overflow-y: auto; }
 .tep-error sub { color: var(--muted); margin: 0 3px 0 1px; font-weight: 700; }
 .tep-why { display: grid; gap: 2px; padding: 8px 10px; border-radius: var(--r-sm); background: var(--surface-2); color: var(--text); }
 .tep-score { margin-top: 12px; display: grid; gap: 8px; }
+
+/* 📥 my words */
+.mw-today, .mw-add { display: grid; gap: 10px; margin-top: 14px; }
+.mw-today h2.sec, .mw-add h2.sec { margin: 0; }
+.mw-word .chip { height: 22px; font-size: 11px; }
+.chip.mw-orange { border-color: #c2410c; }
+.chip.mw-pink { border-color: #be185d; }
+.chip.mw-orange::before, .chip.mw-pink::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: #f59e0b; }
+.chip.mw-pink::before { background: #ec4899; }
+.mw-found { display: grid; gap: 8px; padding: 10px; border: 1px dashed var(--line); border-radius: var(--r-md); }
+.mw-found .chip, .mw-queue .chip { white-space: normal; height: auto; min-height: 32px; padding: 4px 10px; font: inherit; font-size: var(--fs-xs); color: var(--text); background: var(--surface); cursor: pointer; }
+.mw-queue { margin-top: 14px; }
+.mw-queue summary { cursor: pointer; min-height: 32px; display: flex; align-items: center; }

@@ -82,6 +82,10 @@ export const clampStr = (v, n) => String(v ?? '').slice(0, n);
 // Used by the chat photo button and the IELTS essay photos. Nothing here is saved anywhere.
 // If the JPEG is still longer than maxChars, it is re-encoded at a lower quality.
 export async function preparePhoto(file, { maxSide = 1024, maxChars = 1300000 } = {}) {
+  return canvasPhoto(await loadImageCanvas(file, maxSide), maxChars);
+}
+// A picked image file drawn on a canvas, at most maxSide pixels on its long side.
+export async function loadImageCanvas(file, maxSide = 2000) {
   const url = URL.createObjectURL(file);
   try {
     const img = await new Promise((resolve, reject) => {
@@ -95,14 +99,18 @@ export async function preparePhoto(file, { maxSide = 1024, maxChars = 1300000 } 
     canvas.width = Math.round(img.naturalWidth * scale);
     canvas.height = Math.round(img.naturalHeight * scale);
     canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-    let dataUrl = '';
-    for (const q of [0.8, 0.65, 0.5]) {
-      dataUrl = canvas.toDataURL('image/jpeg', q);
-      if (dataUrl.length <= maxChars) break;
-    }
-    if (dataUrl.length > maxChars) throw new Error('รูปใหญ่เกินไป ลองรูปอื่น');
-    return { dataUrl, mimeType: 'image/jpeg', data: dataUrl.split(',')[1] };
+    return canvas;
   } finally { URL.revokeObjectURL(url); }
+}
+// A canvas as a JPEG for the AI: lower quality until it fits, or a Thai error.
+export function canvasPhoto(canvas, maxChars = 1300000) {
+  let dataUrl = '';
+  for (const q of [0.8, 0.65, 0.5]) {
+    dataUrl = canvas.toDataURL('image/jpeg', q);
+    if (dataUrl.length <= maxChars) break;
+  }
+  if (dataUrl.length > maxChars) throw new Error('รูปใหญ่เกินไป ลองรูปอื่น');
+  return { dataUrl, mimeType: 'image/jpeg', data: dataUrl.split(',')[1] };
 }
 
 let toastTimer;

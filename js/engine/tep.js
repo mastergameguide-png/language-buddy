@@ -6,11 +6,14 @@
 
 export const PARTS = [
   { id: 'listening', th: 'การฟัง', icon: '🎧', real: 40, desc: 'บทสนทนาสั้น บทสนทนายาว และการพูดคนเดียว' },
-  { id: 'grammar', th: 'ไวยากรณ์', icon: '✏️', real: 20, desc: 'หาจุดผิด (Error Identification) และเติมประโยค' },
-  { id: 'vocab', th: 'คำศัพท์', icon: '📘', real: 20, desc: 'ความหมายจากบริบท และ Cloze เติมคำในเนื้อเรื่อง' },
+  { id: 'grammar', th: 'ไวยากรณ์', icon: '✏️', real: 20, desc: 'Structure เติมประโยค (แบบ mock test) และหาจุดผิด' },
+  { id: 'vocab', th: 'คำศัพท์', icon: '📘', real: 20, desc: 'เติมคำให้เข้ากับประโยค (แบบ mock test) ความหมายจากบริบท และ Cloze' },
   { id: 'reading', th: 'การอ่าน', icon: '📖', real: 40, desc: 'บทอ่านสั้น (ประกาศ จดหมาย) และบทอ่านยาวเชิงวิชาการ' },
 ];
 export const SET_SIZE = 10;
+// The RPCA-TEP mock test (July 2026) uses gap-fill only for Structure and Vocabulary, so other
+// item types are kept to a few per set.
+export const TYPE_CAP = { grammar: { error: 2 }, vocab: { context: 2, cloze: 4 } };
 export const POLICE_SHARE = 0.4;
 export const PASS_BACHELOR = 60;    // out of 120
 export const PASS_MASTER = 65;
@@ -98,6 +101,27 @@ export const BANK = {
     { type: 'complete', police: false, ...mc('If I ___ more time, I would join the volunteer programme.', ['had', 'have', 'will have', 'would have'], 0, 'Second conditional (สมมติ): If + past simple, would + V') },
     { type: 'complete', police: false, ...mc('Not only ___ the exam, but she also received the highest score in her class.', ['did she pass', 'she passed', 'she did pass', 'passed she'], 0, 'ขึ้นต้นด้วย Not only ต้องสลับเป็นรูปคำถาม (inversion): did she pass') },
     { type: 'complete', police: false, ...mc('The bridge ___ since last March, so drivers must use the other road.', ['has been closed', 'is closed', 'was closing', 'closes'], 0, 'มี since + ยังมีผลถึงตอนนี้ ใช้ present perfect (passive): has been closed') },
+    // Structure items in the style of the RPCA-TEP mock test (July 2026): one gap, four forms.
+    { type: 'complete', police: true, ...mc('The stolen car ___ in a shopping centre car park two days later.', ['was found', 'found', 'has found', 'is finding'], 0, 'รถ "ถูกพบ" และเป็นอดีต = passive past: was found') },
+    { type: 'complete', police: true, ...mc('The officers need more ___ before they can make an arrest.', ['evidence', 'evident', 'evidently', 'evidential'], 0, 'หลัง more ต้องเป็นคำนาม: evidence (หลักฐาน)') },
+    { type: 'complete', police: true, ...mc('Unless the driver ___ his licence, the officer will issue a fine.', ['shows', 'showed', 'will show', 'would show'], 0, 'Unless = If … not ใช้ present simple เหมือน first conditional') },
+    { type: 'complete', police: true, ...mc('By next March, the new recruits ___ their basic training.', ['will have completed', 'will complete', 'complete', 'are completing'], 0, 'By + เวลาในอนาคต = จะเสร็จก่อนถึงเวลานั้น ใช้ future perfect: will have completed') },
+    { type: 'complete', police: false, ...mc('The teacher reminded the students ___ their names on the answer sheet.', ['to write', 'write', 'writing', 'to writing'], 0, 'remind + คน + to + V (เตือนให้ทำ)') },
+    { type: 'complete', police: true, ...mc('The station had its security cameras ___ last month.', ['replaced', 'replace', 'replacing', 'to replace'], 0, 'Causative: have + สิ่งของ + V3 = ให้คนอื่นทำให้ (had cameras replaced)') },
+    { type: 'complete', police: true, ...mc('Neither the driver nor his passengers ___ wearing seat belts.', ['were', 'was', 'is', 'has been'], 0, 'Neither … nor … กริยาตามประธานตัวที่ใกล้ที่สุด (passengers = พหูพจน์) → were') },
+    { type: 'complete', police: true, ...mc('The officer spoke ___ to calm the frightened child.', ['gently', 'gentle', 'gentleness', 'more gentle'], 0, 'ขยายกริยา spoke ต้องใช้ adverb: gently') },
+    { type: 'complete', police: false, ...mc('She is used to ___ long hours at the hospital.', ['working', 'work', 'worked', 'works'], 0, 'be used to (เคยชินกับ) + V-ing') },
+    { type: 'complete', police: true, ...mc('The man ___ wallet was stolen has come to make a statement.', ['whose', 'who', 'which', 'whom'], 0, 'แสดงความเป็นเจ้าของ (กระเป๋าสตางค์ของผู้ชาย) ใช้ whose') },
+    { type: 'complete', police: false, ...mc('Please wait in this room ___ your name is called.', ['until', 'because', 'although', 'so that'], 0, 'until = จนกว่า (รอจนกว่าจะถูกเรียกชื่อ)') },
+    { type: 'complete', police: false, ...mc('The new bridge is ___ than the old one.', ['much wider', 'more wide', 'widest', 'the wider'], 0, 'คำสั้นพยางค์เดียวใช้ -er + than; much ช่วยเน้น') },
+    { type: 'complete', police: true, ...mc('The witness could not remember ___ the suspect ran after the robbery.', ['where', 'where did', 'where does', 'that where'], 0, 'คำถามซ้อน (indirect question) ไม่สลับกริยาช่วย: remember where the suspect ran') },
+    { type: 'complete', police: false, ...mc('I would have called you if I ___ your phone number.', ['had known', 'knew', 'have known', 'would know'], 0, 'สมมติย้อนอดีต (Third conditional): if + had + V3, would have + V3') },
+    { type: 'complete', police: false, ...mc('The application form must ___ before Friday.', ['be submitted', 'submit', 'submitting', 'be submitting'], 0, 'แบบฟอร์ม "ถูกส่ง" = passive หลัง modal: must be submitted') },
+    { type: 'complete', police: true, ...mc('The suspect denied ___ the shop on the night of the robbery.', ['entering', 'to enter', 'enter', 'entered'], 0, 'deny (ปฏิเสธว่าไม่ได้ทำ) ตามด้วย V-ing') },
+    { type: 'complete', police: false, ...mc('There ___ a lot of traffic on the main road this morning.', ['was', 'were', 'have been', 'are being'], 0, 'traffic เป็นคำนามนับไม่ได้ และเป็นเช้านี้ (อดีต) → was') },
+    { type: 'complete', police: true, ...mc('Visitors were asked to stay behind the barrier for ___ own safety.', ['their', 'its', 'there', "they're"], 0, 'Visitors (พหูพจน์) → their own safety') },
+    { type: 'complete', police: false, ...mc('The train was delayed, ___ we missed the start of the concert.', ['so', 'because', 'although', 'unless'], 0, 'บอกผลลัพธ์ (รถไฟช้า จึงพลาด) ใช้ so') },
+    { type: 'complete', police: true, ...mc('The patrol car ___ when the officers received the emergency call.', ['was being repaired', 'repaired', 'is repairing', 'has repaired'], 0, 'กำลังถูกซ่อมอยู่ตอนที่มีเหตุอื่นแทรกในอดีต = past continuous passive') },
   ],
 
   vocab: [
@@ -129,6 +153,27 @@ export const BANK = {
         mc('(2)', ['motivated', 'motivation', 'motivate', 'motivating'], 0, 'stay + adjective: stay motivated = มีแรงจูงใจอยู่เสมอ'),
         mc('(3)', ['follow', 'follows', 'following', 'to follow'], 0, 'students who … ประธานพหูพจน์ ใช้ follow'),
         mc('(4)', ['In short', 'On the other hand', 'Instead', 'Otherwise'], 0, 'ประโยคสุดท้ายสรุปเนื้อหา ใช้ In short')] },
+    // Gap-fill vocabulary in the style of the RPCA-TEP mock test (July 2026).
+    { type: 'gap', police: true, ...mc('Officers must ___ the identity of every visitor before letting them into the building.', ['verify', 'decorate', 'borrow', 'predict'], 0, 'verify = ตรวจสอบยืนยัน (verify the identity)') },
+    { type: 'gap', police: true, ...mc('The police ___ a warning about fake websites that ask for bank details.', ['issued', 'invested', 'attended', 'repaired'], 0, 'issue a warning = ออกคำเตือน') },
+    { type: 'gap', police: true, ...mc('The driver was fined for ___ the speed limit on the highway.', ['exceeding', 'obeying', 'measuring', 'reducing'], 0, 'exceed the speed limit = ขับเร็วเกินกำหนด (จึงถูกปรับ)') },
+    { type: 'gap', police: true, ...mc('The victim was too ___ to describe the attacker clearly.', ['shaken', 'polite', 'wealthy', 'curious'], 0, 'shaken = ตกใจ ขวัญเสีย (จึงเล่าไม่ชัด)') },
+    { type: 'gap', police: true, ...mc('Officers put a ___ around the area to keep the public away from the scene.', ['cordon', 'budget', 'ceremony', 'schedule'], 0, 'cordon = แนวกั้นพื้นที่ (เทปกั้นที่เกิดเหตุ)') },
+    { type: 'gap', police: true, ...mc('The suspect was released because the police could not ___ that he was involved.', ['prove', 'wonder', 'allow', 'suggest'], 0, 'prove = พิสูจน์ (พิสูจน์ไม่ได้จึงต้องปล่อยตัว)') },
+    { type: 'gap', police: true, ...mc('Tourists should ___ a lost passport to the nearest police station.', ['report', 'deliver', 'obtain', 'explain'], 0, 'report a lost passport = แจ้งพาสปอร์ตหาย') },
+    { type: 'gap', police: true, ...mc('The officer remained ___ even when the man started shouting at him.', ['calm', 'empty', 'loose', 'rare'], 0, 'remain calm = ยังคงสงบ') },
+    { type: 'gap', police: true, ...mc('Police are ___ the cause of the fire at the warehouse.', ['investigating', 'entertaining', 'celebrating', 'decorating'], 0, 'investigate = สืบสวน หาสาเหตุ') },
+    { type: 'gap', police: true, ...mc('The new law ___ drivers from using mobile phones while driving.', ['prohibits', 'permits', 'encourages', 'requires'], 0, 'prohibit … from V-ing = ห้าม (permit/encourage/require ไม่ใช้กับ from)') },
+    { type: 'gap', police: true, ...mc('The two officers worked closely together and ___ information throughout the investigation.', ['shared', 'wasted', 'hid', 'lost'], 0, 'ทำงานใกล้ชิดกัน = แบ่งปันข้อมูล (shared)') },
+    { type: 'gap', police: true, ...mc('The bank alarm was ___ by mistake, so no officers were needed.', ['triggered', 'arrested', 'charged', 'convicted'], 0, 'trigger an alarm = ทำให้สัญญาณเตือนดัง') },
+    { type: 'gap', police: false, ...mc('The company plans to ___ its services to other provinces next year.', ['expand', 'shrink', 'delay', 'cancel'], 0, 'expand … to = ขยาย (บริการ) ไปยัง') },
+    { type: 'gap', police: false, ...mc('Please read the instructions ___ before you start the test.', ['carefully', 'heavily', 'nearly', 'widely'], 0, 'read carefully = อ่านอย่างละเอียด') },
+    { type: 'gap', police: false, ...mc('The museum is ___ to visitors every day except Monday.', ['open', 'absent', 'equal', 'aware'], 0, 'be open to visitors = เปิดให้เข้าชม') },
+    { type: 'gap', police: false, ...mc('She has a strong ___ for helping people, so she wants to become a nurse.', ['passion', 'pressure', 'habit', 'fashion'], 0, 'a passion for = ความหลงใหล ความรัก (ในการช่วยคน)') },
+    { type: 'gap', police: false, ...mc('The heavy traffic caused a long ___ on the motorway.', ['delay', 'distance', 'height', 'purpose'], 0, 'cause a delay = ทำให้ล่าช้า') },
+    { type: 'gap', police: false, ...mc('The government will ___ new measures to reduce air pollution.', ['introduce', 'arrive', 'happen', 'belong'], 0, 'introduce measures = นำมาตรการใหม่มาใช้ (ตัวเลือกอื่นเป็นกริยาที่ไม่มีกรรม)') },
+    { type: 'gap', police: false, ...mc('Students must ___ their assignments by Friday at noon.', ['submit', 'attend', 'remain', 'occur'], 0, 'submit an assignment = ส่งงาน') },
+    { type: 'gap', police: false, ...mc('Doctors say regular exercise can ___ the risk of heart disease, so they recommend it.', ['reduce', 'increase', 'behave', 'consist'], 0, 'แพทย์แนะนำ = ช่วยลดความเสี่ยง (reduce the risk)') },
   ],
 
   reading: [
@@ -212,15 +257,18 @@ export function buildSet(part, seed = Math.random(), size = SET_SIZE) {
   const wantPolice = Math.round(size * POLICE_SHARE);
   const picked = [];
   let total = 0, police = 0;
-  const take = (u) => { picked.push(u); total += unitQs(u).length; if (u.police) police += unitQs(u).length; };
+  const caps = TYPE_CAP[part] || {}, used = {};
+  const capped = (u) => caps[u.type] != null && (used[u.type] || 0) + unitQs(u).length > caps[u.type];
+  const take = (u) => { picked.push(u); total += unitQs(u).length; used[u.type] = (used[u.type] || 0) + unitQs(u).length; if (u.police) police += unitQs(u).length; };
   // First pass keeps the police share; the second fills what is left.
   for (const u of units) {
     const n = unitQs(u).length;
-    if (total + n > size) continue;
-    if (u.police ? police + n > wantPolice + 1 : (total - police) + n > size - wantPolice + 1) continue;
+    if (total + n > size || capped(u)) continue;
+    const slack = n > 1 ? 1 : 0;   // a dialogue or passage may go one question over
+    if (u.police ? police + n > wantPolice + slack : (total - police) + n > size - wantPolice + slack) continue;
     take(u);
   }
-  for (const u of units) if (!picked.includes(u) && total + unitQs(u).length <= size) take(u);
+  for (const u of units) if (!picked.includes(u) && total + unitQs(u).length <= size && !capped(u)) take(u);
   let n = 0;
   return picked.map((u) => ({
     unit: u,

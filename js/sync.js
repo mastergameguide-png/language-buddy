@@ -1,13 +1,14 @@
 // Backup + sync across devices through the Worker's D1 (SQL) database.
 // Every learner item becomes one row ("c:" chat message, "m:" mistake, "w:" word, "f:" fact,
 // "r:" role-play result, "a:" activity, "d:" day stats, "s:" settings, "k:" character memory,
-// "x:" skills/topics/plan/courses/levels, "i:" IELTS practice attempts, "v:" shadowing/listening progress per sentence). This device remembers a
+// "x:" skills/topics/plan/courses/levels/mywords, "i:" IELTS practice attempts, "v:" shadowing/listening progress per sentence). This device remembers a
 // short hash of each row it last sent or received, so a sync only uploads what changed here
 // (a missing row = deleted) and downloads what other devices changed since `cursor`.
 import { settings, state, load, save, persist, emit, setSettings, DEFAULT_SETTINGS, normalizeState } from './store.js';
 import { workerBase, authHeaders } from './ai.js';
 import { uid } from './util.js';
 import { mergeLevels } from './engine/levels.js';
+import { mergeMyWords } from './engine/mywords.js';
 
 const KEY = 'lb_sync';
 const BATCH = 250;                 // rows per upload (the Worker accepts up to 300)
@@ -57,6 +58,7 @@ function localRows() {
   if (state.plan) add('x:plan', state.plan);
   if (Object.keys(state.courses || {}).length) add('x:courses', state.courses);
   if (state.levels?.passed?.length || state.levels?.tries?.length) add('x:levels', state.levels);
+  if (state.mywords?.queue?.length || state.mywords?.done?.length) add('x:mywords', state.mywords);
   for (const a of state.ielts || []) add(`i:${a.t}`, a);
   // One row per practised sentence: the whole map could pass the Worker's 20,000-character row limit.
   for (const [key, r] of Object.entries(state.voice || {})) add('v:' + key, r);
@@ -95,6 +97,7 @@ function applyRow(k, d) {
     else if (name === 'plan') state.plan = v;   // validated by normalizeState after the sync
     else if (name === 'courses') state.courses = { ...(v || {}), ...state.courses };
     else if (name === 'levels') state.levels = mergeLevels(state.levels, v);   // a passed gate is never lost
+    else if (name === 'mywords') state.mywords = mergeMyWords(state.mywords, v);
   } else if (kind === 'v') {
     // Practice progress for one sentence; two devices: keep the better record.
     const key = k.slice(2);

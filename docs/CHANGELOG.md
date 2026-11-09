@@ -1,5 +1,76 @@
 # Changelog
 
+## 📥 My words (2026-11-09)
+
+The owner shared their Oxford 5000 (B2–C1) list, about 2,000 words over 8 pages, with handwritten Thai meanings. They highlighted words they could not remember: **pink** means "studied, still forgot", and **orange** means "studied again after pink, still forgot". This page is for exactly those words. It is on its own route `#mywords`, linked from the Review page header and from the Home "📘 คำศัพท์วันนี้" card.
+
+- **Adding words:**
+  - **Typing or pasting:** one word per line. "word – Thai", "word = Thai", tab-separated, and the list's own "n. C1" marks all work, and Thai meanings keep their commas.
+  - **Photographing or exporting highlighted pages:** up to 3 per time. The highlights are found **on the device, by colour** (`js/engine/highlights.js`).
+    - It looks for orange and pink word-sized boxes. Thin red handwriting is ignored, and a highlight cut by a blue pen line is joined back together.
+    - The pieces are laid out as numbered strips (up to 40 per image), and the AI only reads the printed words (`MOSAIC_PROMPT`). The colour therefore never depends on the AI.
+    - If fewer than 3 highlights are found (another pen colour, or a dark camera photo), the whole page goes to the AI instead (`EXTRACT_PROMPT`).
+    - The learner checks the chips and removes any wrong ones before adding.
+  - Photos are resized to 2000 px and never stored.
+- **Queue:**
+  - Orange words come before pink, older first.
+  - Words already queued, released or in the word bank are skipped.
+  - Words can be removed from the queue.
+- **Daily release:** 5, 10 (default) or 15 words a day. One AI request returns, for the day's batch:
+  - a corrected Thai meaning;
+  - the part of speech;
+  - one example of at most 18 words in a police, law or public-safety context, which must contain the word;
+  - the usual phrase and the related forms;
+  - a look-alike word to avoid (for example adhere ≠ adjacent);
+  - a short Thai memory tip.
+
+  The words then go into the word bank, so the existing spaced review brings them back. If the AI cannot be reached, the batch can still be added with the learner's own Thai.
+- **🧩 Gap-fill practice:** 5 questions built from the released words' examples (RPCA-TEP Vocabulary style), with four options taken from the learner's own words of the same part of speech. Checked offline.
+- **Storage and sync:** `state.mywords = { perDay, queue, done }`, checked by `cleanMyWords`. It is synced as `x:mywords`; merging keeps every released word once and drops queued words the other device already released.
+- No change to the Worker, `js/ai.js` or `js/engine/prompt.js`: the page uses `askTranscribe` for photos and `askIelts` for the batch.
+- **Tests:** `tests/mywords.test.mjs`, 8 checks. They cover pasted lists, queue order and repeats, the daily limit, both prompts and parsers, gap-fill, merge and wiring.
+- **Checked in the browser** at 390×844 with a fake AI: paste, photo, the duplicate check, orange first, today's release, the word bank and the quiz all worked. ui-audit is clean on mywords, review and home in both themes.
+- **Real Gemini test of the first approach (1 request, owner approved):** the whole of page 1 was sent and asked for the highlighted words (HTTP 200, 4.7 s).
+  - The result was **not usable**. 23 words came back, all marked orange.
+  - Many of them were words in blue pen boxes rather than highlighted words (accountant, accusation, assert, amend…).
+  - It missed most of the pink words (abstract, accent, accordance, acquisition…).
+  - This is why colour detection moved onto the device.
+- **On-device colour detection** on the owner's 8 pages found about 940 highlights: orange 372 and pink 566.
+  - On page 1 the crops match the page: absent, accommodate, additionally… are orange; abstract, accent, accordance, accused, acquisition… are pink.
+  - Leftover problems: a word cut by a box's top line can come out as two pieces (alleg + legation), and a few strips show only handwriting. The prompt joins clear pieces and skips the rest.
+  - In the browser, page 1 became 3 strip images: orange 38 in 1, and pink 66 in 2.
+- **Real Gemini test of the strip reading (3 requests, owner approved):** each strip image took 2.0–2.5 s.
+  - **Orange: 38 of 38 words correct.**
+  - **Pink: 62 words came back for 63 highlighted words on the page.**
+    - The cut-up allegation was joined correctly.
+    - Strips with only handwriting were skipped.
+    - Missed: advocate (only "vocat" was visible).
+    - Doubtful: "broad", which is probably a piece of a longer word. The learner can remove it before adding.
+  - Overall about 97% correct, against the unusable whole-page result.
+
+## RPCA-TEP: Structure and Vocabulary in the mock-test style (2026-11-09)
+
+The owner shared the RPCA-TEP Mock Test (7 July 2026). It shows that **Structure** (grammar) and **Vocabulary** items are all one-gap sentences with four options, mostly in policing contexts. The mock has no error-identification items. Its questions were used as a guide to format and level only, and none of them were copied: a test checks that the mock's sentences do not appear in the bank.
+
+- **+20 Structure items** (grammar 24 → 44). They test the same kinds of points as the mock:
+  - passive in different tenses;
+  - word form (noun, adverb);
+  - conditionals (unless, third conditional);
+  - future perfect;
+  - verb + to-V or V-ing (remind, deny, be used to);
+  - causative have + V3;
+  - agreement (neither … nor);
+  - relative pronouns (whose), indirect questions and linkers.
+- **+20 Vocabulary items** (vocabulary 22 → 42) of the new type `gap`: choose the word that fits the sentence, for example verify, issue a warning, exceed the speed limit, cordon, prohibit … from, trigger an alarm.
+- Every new item has a Thai explanation.
+- **Sets now follow the mock:**
+  - `TYPE_CAP` keeps at most 2 error-identification items in a grammar set, and at most 2 "meaning in context" items plus 1 cloze text in a vocabulary set. The rest are gap-fill.
+  - The police share is now held to 40% (it was 45–50%): a single item may no longer go over the target.
+- The part descriptions on the TEP page now mention the mock-test style.
+- **Not done yet:** the mock's Listening section starts with "Question and response" items (one spoken question, three spoken replies A–C, with nothing printed). The app has no item type like this yet.
+- **Tests:** `tests/tep.test.mjs` now has 10 checks. New ones cover the share of each type in a set, four different options, a gap in every Structure item, Thai explanations, and that no mock sentence was copied.
+- **Checked in the browser** at 390×844: grammar and vocabulary sets render the new items, and nothing is saved until the learner checks the set.
+
 ## 👮 RPCA-TEP practice (2026-11-08)
 
 This is a page of its own (`#tep`), opened from a new "👮 TEP" tab on every practice page. The owner chose: level B1–B2, about 40% policing contexts, and a separate page.

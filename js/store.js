@@ -13,6 +13,7 @@ import { cleanCourses } from './engine/courses.js';
 import { cleanBand } from './engine/ielts.js';
 import { cleanLevels } from './engine/levels.js';
 import { cleanDaily } from './engine/daily.js';
+import { cleanMyWords } from './engine/mywords.js';
 const TEP_PARTS = ['listening', 'grammar', 'vocab', 'reading'];
 
 export const LANGS = {
@@ -88,7 +89,7 @@ const EMPTY_STATE = () => ({
   v: STATE_VERSION, messages: [], facts: [], mistakes: [], vocab: [], scene: null, lastSeen: 0,
   days: {}, activity: [], results: [],
   charMemory: {}, sessions: {}, skills: {}, topics: {},
-  trimmed: {}, quality: {}, voice: {}, plan: null, ielts: [], courses: {}, levels: { passed: [], tries: [] }, daily: null,
+  trimmed: {}, quality: {}, voice: {}, plan: null, ielts: [], courses: {}, levels: { passed: [], tries: [] }, daily: null, mywords: { perDay: 10, queue: [], done: [] },
 });
 // How much is kept on this device. Learning records (words, mistakes) are only trimmed at a
 // very high safety cap, and anything trimmed is counted in state.trimmed and shown in Settings,
@@ -242,6 +243,7 @@ export function normalizeState(raw) {
   s.ielts = (Array.isArray(s.ielts) ? s.ielts : []).map(cleanIeltsAttempt).filter(Boolean).sort((a, b) => a.t - b.t).slice(-LIMITS.ielts);
   s.courses = cleanCourses(s.courses);
   s.levels = cleanLevels(s.levels);
+  s.mywords = cleanMyWords(s.mywords);   // the learner's own hard words (engine/mywords.js)
   s.daily = cleanDaily(s.daily);      // today's AI words (engine/daily.js); this device only   // Lv. gate tests passed and tried (engine/levels.js)
   s.lastSeen = Number(s.lastSeen) || 0;
   s.v = STATE_VERSION;

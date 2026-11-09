@@ -17,6 +17,7 @@ export function dailyCard(rerender) {
   const set = state.daily?.day === dayKey() ? state.daily : null;
   const card = h('div', { class: 'card daily' });
   card.append(h('div', { class: 'row' }, el('h2', 'sec grow', '📘 คำศัพท์วันนี้'), el('span', 'chip', `ระดับ ${set?.cefr || targetCefr(cefrOf())}`)));
+  card.append(h('a', { class: 'btn sm ghost', href: '#mywords' }, '📥 คำของฉัน (คำที่ท่องแล้วจำไม่ได้)'));
 
   if (!set) {
     card.append(el('p', 'small muted', `AI จะเลือกคำ ${DAILY_COUNT} คำที่สูงกว่าระดับของคุณหนึ่งขั้น พร้อมความหมาย คำพ้อง คำที่มักใช้คู่กัน และประโยคตัวอย่างแบบ IELTS`));
