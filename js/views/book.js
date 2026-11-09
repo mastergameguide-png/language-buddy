@@ -3,16 +3,18 @@
 // page at a time, tap a word for its Thai meaning in that sentence (AI, one short request, saved
 // so the same word never asks again), add it to the word bank, mark the page read (counts for XP)
 // and, if wanted, answer 3 AI questions about the page. Progress syncs; the book's text does not.
-import { el, h, icon, toast, num } from '../util.js';
+// Scanned books (pictures of pages, no text): the PDF file is kept on the device too, and each page
+// is drawn and read by the AI (one request) only when the learner opens it to read, then saved.
+import { el, h, icon, toast, num, canvasPhoto } from '../util.js';
 import { settings, state, persist, emit, addWord, logActivity, cefrOf } from '../store.js';
 import { today, recordWord } from '../stats.js';
-import { askIelts } from '../ai.js';
+import { askIelts, askTranscribe } from '../ai.js';
 import { speak, unlockSpeech, stopSpeaking } from '../speech.js';
-import { putBook, getBook, deleteBook, keepStorage } from '../bookdb.js';
+import { putBook, getBook, deleteBook, putFile, getFile, keepStorage } from '../bookdb.js';
 import {
   GOAL_CHOICES, MIN_PAGE_CHARS, pageParagraphs, pageChars, bookId, titleFromFile, wordAt, sentenceAround,
   cleanLibrary, addBook, percentRead, daysLeft, nextUnread, buildLookupPrompt, lookupInput, parseLookup,
-  buildQuizPrompt, pageForQuiz, parseQuiz,
+  buildQuizPrompt, pageForQuiz, parseQuiz, isScanned, markForScan, pendingPages, bytesId, OCR_PROMPT, parseOcr,
 } from '../engine/book.js';
 
 let busy = '';          // '' | 'import' | 'open' | 'quiz'
@@ -22,6 +24,9 @@ let reading = false;    // reader on screen (false = the shelf)
 let look = null;        // { word, sentence, busy, res, err }
 let quiz = null;        // { page, qs, answers, checked }
 let missing = '';       // id of a book whose text is not on this device
+let ocr = null;         // { at: page index being read by the AI, left } while scanned pages are converted
+let pdf = null;         // { id, doc } the open scanned book's PDF, for drawing pages
+let original = null;    // { id, page, src } picture of the current scanned page, when asked for
 
 // Cleaned once per render; handlers change this same object, so no change is lost to a fresh copy.
 const lib = () => state.library;
@@ -59,7 +64,7 @@ function shelf(l, root) {
     const del = h('button', { type: 'button', class: 'btn ghost sm', 'aria-label': `ลบ ${b.title} ออกจากชั้น` }, icon('trash'));
     del.addEventListener('click', () => removeBook(id, root));
     const item = h('div', { class: 'book-item' },
-      h('div', { class: 'row' }, h('b', { class: 'grow', lang: 'en' }, b.title), del),
+      h('div', { class: 'row' }, h('b', { class: 'grow', lang: 'en' }, b.title), b.scan ? el('span', 'chip', '📷 สแกน') : null, del),
       h('div', { class: 'bar', role: 'progressbar', 'aria-label': `อ่านแล้ว ${pct}%`, 'aria-valuenow': String(pct), 'aria-valuemin': '0', 'aria-valuemax': '100' }, h('i', { style: `width:${pct}%` })),
       el('div', 'xs muted', `อ่านแล้ว ${num(b.read.length)}/${num(b.pages)} หน้า (${pct}%)${b.read.length < b.pages ? ` · อีกราว ${num(daysLeft(b, l.goal))} วันที่ ${l.goal} หน้า/วัน` : ' · อ่านจบแล้ว 🎉'} · ค้นคำไป ${num(b.words.length)} คำ`),
       missing === id ? el('p', 'small warn-text', 'ในเครื่องนี้ยังไม่มีไฟล์ของเล่มนี้ เลือกไฟล์ PDF เล่มเดิมอีกครั้งด้านล่าง ความคืบหน้าจะต่อจากเดิม') : null,
@@ -76,7 +81,7 @@ function importCard(root) {
   const pick = h('button', { type: 'button', class: 'btn' }, busy === 'import' ? 'กำลังอ่านไฟล์…' : '📄 เลือกไฟล์ PDF');
   pick.disabled = !!busy;
   pick.addEventListener('click', () => file.click());
-  card.append(el('p', 'small muted', 'ใช้ได้กับ PDF ที่ลากคลุมเลือกข้อความได้ (ไม่ใช่ภาพสแกน) อ่านครั้งเดียวตอนเพิ่ม ไม่ใช้ AI'), h('div', { class: 'row wrap-ok' }, pick), file);
+  card.append(el('p', 'small muted', 'PDF ที่มีตัวอักษร: อ่านทั้งเล่มตอนเพิ่ม ไม่ใช้ AI · PDF ที่เป็นภาพสแกน: AI แปลงเป็นข้อความทีละหน้าตอนที่คุณเปิดอ่าน (1 ครั้งต่อหน้า) แล้วเก็บไว้ในเครื่อง'), h('div', { class: 'row wrap-ok' }, pick), file);
   if (busy === 'import') card.append(h('p', { class: 'small', id: 'bookProgress', role: 'status' }, progress));
   return card;
 }
@@ -88,9 +93,9 @@ async function importPdf(f, root) {
   busy = 'import'; progress = 'กำลังเปิดไฟล์…'; renderBook(root);
   let doc = null;
   try {
-    const pdfjs = await import('../../vendor/pdfjs/pdf.min.mjs');
-    pdfjs.GlobalWorkerOptions.workerSrc = new URL('../../vendor/pdfjs/pdf.worker.min.mjs', import.meta.url).href;
-    doc = await pdfjs.getDocument({ data: new Uint8Array(await f.arrayBuffer()), isEvalSupported: false, disableFontFace: true }).promise;
+    const bytes = new Uint8Array(await f.arrayBuffer());
+    // pdf.js takes over the buffer it is given, so it gets a copy; a scanned book keeps the original.
+    doc = await (await loadPdfjs()).getDocument({ data: bytes.slice(), isEvalSupported: false, disableFontFace: true }).promise;
     if (doc.numPages > 2000) throw new Error('หนังสือยาวเกิน 2,000 หน้า');
     const pages = [];
     for (let i = 1; i <= doc.numPages; i++) {
@@ -100,21 +105,33 @@ async function importPdf(f, root) {
       if (i % 4 === 0 || i === doc.numPages) { progress = `กำลังอ่านหน้า ${i}/${doc.numPages}…`; const p = root.querySelector('#bookProgress'); if (p) p.textContent = progress; }
     }
     const withText = pages.filter((p) => pageChars(p) >= MIN_PAGE_CHARS).length;
-    if (withText < Math.max(1, pages.length * 0.2)) throw new Error('PDF นี้แทบไม่มีข้อความ น่าจะเป็นภาพสแกน ตอนนี้ยังอ่านไม่ได้');
+    const scan = isScanned(pages);
     const info = await doc.getMetadata().catch(() => null);
     const metaTitle = String(info?.info?.Title || '').trim();
-    const id = bookId(pages);
+    const id = scan ? bytesId(bytes, pages.length) : bookId(pages);
     const title = state.library?.books?.[id]?.title || (metaTitle.length >= 3 && !/^untitled|\.(?:docx?|indd)$/i.test(metaTitle) ? metaTitle.slice(0, 80) : titleFromFile(f.name));
-    await putBook({ id, title, pages, added: Date.now() });
+    // Pages the AI already turned into text on this device are kept when the same file is picked again.
+    const old = scan ? await getBook(id) : null;
+    const stored = scan ? markForScan(pages).map((pg, i) => (pg === null && Array.isArray(old?.pages?.[i]) ? old.pages[i] : pg)) : pages;
+    const added = old?.added || Date.now();
+    try {
+      await putBook({ id, title, pages: stored, scan, added });
+      if (scan) await putFile(id, bytes.buffer);
+    } catch (e) {
+      try { await deleteBook(id); } catch {}
+      throw new Error(/quota/i.test(`${e?.name} ${e?.message}`) ? 'พื้นที่ในเครื่องไม่พอเก็บไฟล์นี้' : 'บันทึกหนังสือในเครื่องไม่สำเร็จ');
+    }
     keepStorage();
     const had = !!state.library?.books?.[id];
-    state.library = addBook(state.library, id, title, pages.length);
+    state.library = addBook(state.library, id, title, pages.length, Date.now(), scan);
     if (!had) logActivity('book', `เพิ่มหนังสือ ${title} (${pages.length} หน้า)`);
     missing = '';
     save();
-    text = { id, title, pages };
-    reading = true;
-    toast(had ? 'เปิดเล่มเดิม ความคืบหน้าต่อจากเดิม' : `เพิ่มแล้ว ${pages.length} หน้า (มีข้อความ ${withText} หน้า)`);
+    closePdf();
+    text = { id, title, pages: stored, scan, added };
+    reading = true; look = null; quiz = null; original = null;
+    toast(had ? 'เปิดเล่มเดิม ความคืบหน้าต่อจากเดิม' : scan ? `เพิ่มแล้ว ${pages.length} หน้า · เป็นภาพสแกน AI จะแปลงทีละหน้าตอนเปิดอ่าน` : `เพิ่มแล้ว ${pages.length} หน้า (มีข้อความ ${withText} หน้า)`);
+    if (scan) setTimeout(() => readCurrent(root), 0);
   } catch (e) {
     const name = e?.name || '';
     toast(name === 'PasswordException' ? 'PDF นี้มีรหัสผ่าน เปิดไม่ได้' : name === 'InvalidPDFException' ? 'ไฟล์นี้ไม่ใช่ PDF ที่เปิดได้' : (e?.message || 'อ่านไฟล์ไม่สำเร็จ'), true);
@@ -132,10 +149,12 @@ async function openBook(id, root) {
   const rec = await getBook(id);
   busy = '';
   if (!rec?.pages?.length) { missing = id; toast('ในเครื่องนี้ยังไม่มีไฟล์ของเล่มนี้', true); renderBook(root); return; }
-  text = { id, title: rec.title, pages: rec.pages };
+  closePdf();
+  text = { id, title: rec.title, pages: rec.pages, scan: !!rec.scan, added: rec.added };
   state.library.current = id;
-  reading = true; look = null; quiz = null;
+  reading = true; look = null; quiz = null; original = null;
   renderBook(root);
+  readCurrent(root);
 }
 
 async function removeBook(id, root) {
@@ -143,7 +162,7 @@ async function removeBook(id, root) {
   if (!b || !confirm(`ลบ "${b.title}" ออกจากชั้น? ความคืบหน้าและคำที่ค้นในเล่มนี้จะหายไปด้วย (ไฟล์ PDF ต้นฉบับในเครื่องไม่ถูกลบ)`)) return;
   try { await deleteBook(id); } catch {}
   delete state.library.books[id];
-  if (text?.id === id) text = null;
+  if (text?.id === id) { text = null; closePdf(); }
   state.library = cleanLibrary(state.library);
   save();
   renderBook(root);
@@ -153,16 +172,17 @@ async function removeBook(id, root) {
 function reader(l, root) {
   const b = l.books[text.id];
   const p = b.page;
+  const waiting = text.pages[p] === null;   // a scanned page not turned into text yet
   const paras = text.pages[p] || [];
   const wrap = h('div', { class: 'book-reader' });
   const back = h('button', { type: 'button', class: 'btn ghost sm' }, icon('back'), 'ชั้นหนังสือ');
-  back.addEventListener('click', () => { reading = false; look = null; quiz = null; stopSpeaking(); renderBook(root); });
+  back.addEventListener('click', () => { reading = false; look = null; quiz = null; original = null; stopSpeaking(); renderBook(root); });
   const isRead = b.read.includes(p);
   wrap.append(h('div', { class: 'row wrap-ok book-top' }, back, h('b', { class: 'grow small', lang: 'en' }, b.title),
     el('span', 'chip', `วันนี้ ${pagesToday()}/${l.goal} หน้า`)));
 
   // Page navigation
-  const go = (n) => { b.page = Math.max(0, Math.min(b.pages - 1, n)); b.t = Date.now(); look = null; quiz = null; stopSpeaking(); save(); };
+  const go = (n) => { b.page = Math.max(0, Math.min(b.pages - 1, n)); b.t = Date.now(); look = null; quiz = null; original = null; stopSpeaking(); save(); };
   const prev = h('button', { type: 'button', class: 'btn sm', 'aria-label': 'หน้าก่อนหน้า' }, '◀');
   prev.disabled = p === 0;
   prev.addEventListener('click', () => go(p - 1));
@@ -176,7 +196,16 @@ function reader(l, root) {
 
   // The page
   const page = h('div', { class: 'card pad-lg book-page', lang: 'en' });
-  if (pageChars(paras) < MIN_PAGE_CHARS) {
+  if (waiting) {
+    const doing = ocr?.at === p;
+    page.append(el('p', 'small', doing ? 'กำลังให้ AI อ่านหน้านี้… (ราว 3–6 วินาที)' : 'หน้านี้เป็นภาพสแกน ยังไม่ได้แปลงเป็นข้อความ'));
+    if (!doing) {
+      const conv = h('button', { type: 'button', class: 'btn primary' }, '🪄 แปลงหน้านี้เป็นข้อความ');
+      conv.disabled = !!ocr;
+      conv.addEventListener('click', () => convertPages([p], root));
+      page.append(h('div', { class: 'row wrap-ok' }, conv, el('span', 'xs muted', 'ใช้ AI 1 ครั้ง แปลงแล้วเก็บไว้ ไม่ต้องแปลงซ้ำ')));
+    }
+  } else if (pageChars(paras) < MIN_PAGE_CHARS) {
     page.append(el('p', 'small muted', 'หน้านี้แทบไม่มีข้อความ (อาจเป็นรูป ปก หรือหน้าว่าง) ข้ามไปหน้าถัดไปได้เลย'));
     if (paras.length) page.append(el('p', 'book-p', paras.join(' ')));
   } else {
@@ -190,6 +219,7 @@ function reader(l, root) {
     }
   }
   wrap.append(page);
+  if (text.scan) wrap.append(scanTools(b, p, root));
 
   // Look up by typing (keyboard users, or a word that is hard to tap)
   const typed = h('input', { type: 'text', class: 'input', lang: 'en', autocomplete: 'off', autocapitalize: 'none', spellcheck: 'false', placeholder: 'หรือพิมพ์คำที่อยากรู้', 'aria-label': 'พิมพ์คำภาษาอังกฤษที่อยากรู้ความหมาย' });
@@ -236,8 +266,103 @@ function finishPage(b, p, root) {
   stopSpeaking();
   if (n < 0) { reading = false; save(); return; }
   b.page = n;
+  original = null;
   save();
   root.closest('.scroll')?.scrollTo?.(0, 0);
+  readCurrent(root);
+}
+
+// ---------- scanned pages ----------
+async function loadPdfjs() {
+  const pdfjs = await import('../../vendor/pdfjs/pdf.min.mjs');
+  pdfjs.GlobalWorkerOptions.workerSrc = new URL('../../vendor/pdfjs/pdf.worker.min.mjs', import.meta.url).href;
+  return pdfjs;
+}
+function closePdf() { try { pdf?.doc.destroy(); } catch {} pdf = null; }
+async function pdfFor(id) {
+  if (pdf?.id === id) return pdf.doc;
+  const data = await getFile(id);
+  if (!data) throw new Error('ไม่พบไฟล์ PDF ของเล่มนี้ในเครื่อง เลือกไฟล์เดิมอีกครั้ง');
+  closePdf();
+  const doc = await (await loadPdfjs()).getDocument({ data: new Uint8Array(data), isEvalSupported: false, disableFontFace: true }).promise;
+  pdf = { id, doc };
+  return doc;
+}
+// One page drawn on a white canvas, at most maxSide pixels on its long side.
+async function drawPage(doc, i, maxSide) {
+  const page = await doc.getPage(i + 1);
+  const one = page.getViewport({ scale: 1 });
+  const viewport = page.getViewport({ scale: Math.min(4, maxSide / Math.max(one.width, one.height)) });
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(viewport.width); canvas.height = Math.round(viewport.height);
+  const g = canvas.getContext('2d');
+  g.fillStyle = '#fff'; g.fillRect(0, 0, canvas.width, canvas.height);
+  // intent 'print' draws straight away; the screen intent waits for animation frames, which stop
+  // when the app is in the background, so a conversion would hang until the learner came back.
+  await page.render({ canvasContext: g, viewport, intent: 'print' }).promise;
+  page.cleanup();
+  return canvas;
+}
+
+// The page the learner is about to read: convert it if it is a scanned page (online only, quietly).
+function readCurrent(root) {
+  const b = text && lib().books[text.id];
+  if (!b || !text.scan || text.pages[b.page] !== null || ocr || !settings.workerUrl || !navigator.onLine) return;
+  convertPages([b.page], root);
+}
+
+async function convertPages(list, root) {
+  if (ocr || !text) return;
+  if (!settings.workerUrl) { toast('ยังไม่ได้ใส่ลิงก์ Worker', true); return; }
+  if (!navigator.onLine) { toast('ไม่มีอินเทอร์เน็ต — ต่อเน็ตแล้วค่อยแปลงหน้า', true); return; }
+  const id = text.id;
+  ocr = { at: list[0], left: list.length };
+  renderBook(root);
+  let done = 0;
+  try {
+    const doc = await pdfFor(id);
+    for (const i of list) {
+      if (text?.id !== id) break;
+      if (text.pages[i] !== null) continue;
+      ocr = { at: i, left: list.length - done };
+      renderBook(root);
+      const paras = parseOcr(await askTranscribe(OCR_PROMPT, canvasPhoto(await drawPage(doc, i, 2000))));
+      if (!paras) throw new Error(`AI อ่านหน้า ${i + 1} ไม่สำเร็จ ลองกดแปลงอีกครั้ง`);
+      if (text?.id !== id) break;
+      text.pages[i] = paras;
+      await putBook({ id, title: text.title, pages: text.pages, scan: true, added: text.added || Date.now() });
+      done += 1;
+    }
+    if (list.length > 1 && done) toast(`แปลงแล้ว ${done} หน้า อ่านได้แม้ไม่มีเน็ต`);
+  } catch (e) { toast(e?.message || 'แปลงหน้าไม่สำเร็จ', true); }
+  ocr = null;
+  renderBook(root);
+}
+
+// Scanned books: get the next pages ready while online, and see the original picture of a page.
+function scanTools(b, p, root) {
+  const box = h('div', { class: 'row wrap-ok book-scan' });
+  const ahead = pendingPages(text.pages, p + 1, 5);
+  if (ahead.length) {
+    const prep = h('button', { type: 'button', class: 'btn sm' }, ocr && ocr.at !== p ? `กำลังแปลงหน้า ${ocr.at + 1}… (เหลือ ${ocr.left})` : `⬇️ เตรียม ${ahead.length} หน้าถัดไป`);
+    prep.disabled = !!ocr;
+    prep.addEventListener('click', () => convertPages(ahead, root));
+    box.append(prep, el('span', 'xs muted', `ใช้ AI ${ahead.length} ครั้ง แล้วอ่านตอนไม่มีเน็ตได้`));
+  }
+  const show = original?.id === text.id && original.page === p;
+  const pic = h('button', { type: 'button', class: 'btn sm ghost', 'aria-expanded': String(show) }, show ? 'ซ่อนภาพต้นฉบับ' : '🖼️ ดูภาพต้นฉบับ');
+  pic.addEventListener('click', async () => {
+    if (show) { original = null; renderBook(root); return; }
+    try {
+      const canvas = await drawPage(await pdfFor(text.id), p, 1400);
+      original = { id: text.id, page: p, src: canvas.toDataURL('image/jpeg', 0.8) };
+    } catch (e) { toast(e?.message || 'เปิดภาพไม่สำเร็จ', true); }
+    renderBook(root);
+  });
+  box.append(pic);
+  const wrap = h('div', { class: 'book-scan-wrap' }, box);
+  if (show) wrap.append(h('img', { class: 'book-original', src: original.src, alt: `ภาพต้นฉบับหน้า ${p + 1}` }));
+  return wrap;
 }
 
 // The word under the finger: the browser tells where in the text the tap landed.

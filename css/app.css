@@ -694,3 +694,6 @@ dialog.onboarding { overflow-y: auto; }
 .book-words .chip { height: auto; min-height: 28px; white-space: normal; padding: 4px 10px; }
 .book-strip { margin-top: 14px; }
 .book-strip span[lang] { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.book-scan-wrap { display: grid; gap: 8px; }
+.book-scan { gap: 8px; }
+.book-original { width: 100%; height: auto; border-radius: var(--r-md); border: 1px solid var(--line); background: #fff; }

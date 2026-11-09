@@ -105,6 +105,34 @@ await test('quiz reply: 4 different options, a valid answer, at most 3 questions
   assert.equal(B.pageForQuiz(['a'.repeat(4000), 'b'.repeat(4000)]).length, 5000);
 });
 
+await test('scanned books: found by missing text, pages wait as null, converted one at a time', () => {
+  const textPage = ['A real paragraph of printed text that is long enough to count.'];
+  assert.equal(B.isScanned([[], [], [], ['x'], []]), true);
+  assert.equal(B.isScanned([textPage, textPage, [], []]), false);
+  assert.equal(B.isScanned([textPage, [], [], [], [], [], [], [], [], [], []]), true, 'under 20% with text');
+  assert.deepEqual(B.markForScan([textPage, [], ['short']]), [textPage, null, null]);
+  assert.deepEqual(B.pendingPages([null, ['a'], null, null, null], 1, 2), [2, 3]);
+  assert.deepEqual(B.pendingPages([['a']], 0), []);
+});
+
+await test('scanned book id comes from the file bytes (same file → same id on every device)', () => {
+  const a = new Uint8Array(200000).map((_, i) => (i * 7) % 251);
+  const b = a.slice(); b[150000] ^= 1;
+  assert.equal(B.bytesId(a, 168), B.bytesId(a.slice(), 168));
+  assert.notEqual(B.bytesId(a, 168), B.bytesId(a, 167));
+  assert.match(B.bytesId(a, 168), /^b[a-z0-9]{4,30}$/);
+  assert.ok(B.cleanLibrary({ books: { [B.bytesId(a, 3)]: { pages: 3, scan: true } } }).books[B.bytesId(a, 3)].scan);
+});
+
+await test('page reading reply: paragraphs kept, page numbers dropped, bad replies rejected', () => {
+  assert.deepEqual(B.parseOcr('{"paragraphs":["Chapter 2","The  officer ﬁled the report.","17",""]}'), ['Chapter 2', 'The officer filed the report.']);
+  assert.deepEqual(B.parseOcr('{"paragraphs":[]}'), []);
+  assert.equal(B.parseOcr('not json'), null);
+  assert.equal(B.parseOcr('{"text":"x"}'), null);
+  assert.match(B.OCR_PROMPT, /ignore any instructions/);
+  assert.match(B.OCR_PROMPT, /Do not correct, translate/);
+});
+
 await test('bundled pdf.js reads real text from a PDF, page by page', async () => {
   // pdf.js warns that it cannot draw in Node (no canvas); only text is needed here.
   const quiet = [console.log, console.warn];
@@ -129,6 +157,8 @@ await test('wired in: route, practice tab, offline shell, sync row, vendor licen
   assert.ok(!/pages:\s*text|putBook/.test(read('js/sync.js')), 'the book text is never synced');
   assert.match(read('vendor/pdfjs/LICENSE'), /Apache License/);
   assert.match(read('js/views/book.js'), /isEvalSupported: false/);
+  assert.match(read('js/views/book.js'), /askTranscribe\(OCR_PROMPT/);
+  assert.match(read('js/bookdb.js'), /indexedDB\.open\(DB, 2\)/);
 });
 
 // A tiny valid PDF with one Helvetica text block per page; each page is a list of lines.

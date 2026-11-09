@@ -1,5 +1,28 @@
 # Changelog
 
+## 📖 Book reading: scanned PDFs (2026-11-09)
+
+The owner's 168-page book turned out to be a scanned PDF (pictures of pages, no text), and the first version refused it. The owner chose to have the AI read the pages.
+
+- **Import:** a PDF where fewer than 20% of pages have text is treated as scanned.
+  - The file itself is also kept on the device, in a separate IndexedDB store (`files`), so saving a page's text never rewrites the big file.
+  - Scanned pages start as `null`. Pages that do have text are used as they are.
+  - The id comes from the file's bytes, so the same file gives the same id on another device and progress continues.
+  - Picking the same file again keeps pages already converted.
+- **Converting, one page at a time:**
+  - The page is drawn with pdf.js (2000 px on the long side, JPEG, about 70 KB) and sent with `OCR_PROMPT`: printed main text only, one string per paragraph, hyphen joins, no page numbers, headers or handwriting, `[?]` for unreadable words, and no corrections.
+  - This happens automatically for the page being read (when opening the book or after "อ่านหน้านี้จบ"). Flipping pages with ◀ ▶ only shows a "🪄 แปลงหน้านี้" button, so browsing does not spend AI requests.
+  - "⬇️ เตรียม N หน้าถัดไป" converts up to 5 pages ahead, so they can be read offline.
+  - "🖼️ ดูภาพต้นฉบับ" shows the original picture of the page.
+  - Converted text is saved on this device only.
+- **Fix found while testing:** pdf.js normally waits for screen frames before drawing, and those stop while the app is in the background. Pages are now drawn with `intent: 'print'`, which does not wait.
+- **Tests:** `book.test.mjs` 14, covering scan detection, pending pages, the bytes id and the OCR parser. All 22 test files pass.
+  - **Browser check, mock Worker:** a 4-page image-only PDF made in the browser was imported and marked 📷 สแกน. Page 1 was converted on opening, and "เตรียม 3 หน้าถัดไป" converted the rest. The server received 4 JPEG images (about 71 KB each). The original image showed, "อ่านหน้านี้จบ" moved on, and picking the file again kept the same book with all 4 pages still converted.
+  - **Real AI test (Gemini through the live Worker):** one realistic scanned page made for the test (Times text, a slight tilt, grey paper, noise, blur, JPEG, with a running header and page number).
+    - The first try got a temporary 503 ("high demand"); the retry 30 s later worked.
+    - 2.8 s, 1,495 tokens. All 169 words came back in order (100%), in 3 correct paragraphs plus the heading, and the page number was left out.
+    - The running header "POLICING IN PRACTICE" was kept, against the prompt. It shows as one short extra line at the top of the page.
+
 ## 📖 Book reading (2026-11-09)
 
 The owner wants to read a 168-page English book (a PDF whose text can be selected) inside the app. The page is `#book`, the fifth practice tab "📖 หนังสือ", and Home shows a "📖 อ่านต่อ" strip while a book is unfinished.
