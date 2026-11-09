@@ -17,6 +17,7 @@ import { renderLevels } from './views/levels.js';
 import { renderDashboard } from './views/dashboard.js';
 import { renderTep } from './views/tep.js';
 import { renderMyWords } from './views/mywords.js';
+import { renderBook } from './views/book.js';
 import { initSettings, fillSettings, applyTheme } from './views/settings.js';
 import { maybeOnboard } from './views/onboarding.js';
 
@@ -44,6 +45,7 @@ const VIEWS = {
   levels: { el: 'view-levels', render: () => renderLevels($('levelsBody')), nav: 'me' },
   mywords: { el: 'view-mywords', render: () => renderMyWords($('mywordsBody')), nav: 'review' },
   tep: { el: 'view-tep', render: () => renderTep($('tepBody')), nav: 'practice' },
+  book: { el: 'view-book', render: () => renderBook($('bookBody')), nav: 'practice' },
   dashboard: { el: 'view-dashboard', render: () => renderDashboard($('dashboardBody')), nav: 'me' },
   settings: { el: 'view-settings', render: () => fillSettings(), nav: 'me' },
 };

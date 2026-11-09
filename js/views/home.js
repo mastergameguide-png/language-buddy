@@ -40,7 +40,7 @@ function weekChart() {
   return chart;
 }
 
-const ACT_ICON = { chat: '💬', review: '🧠', word: '📘', roleplay: '🎭', import: '💾' };
+const ACT_ICON = { chat: '💬', review: '🧠', word: '📘', roleplay: '🎭', import: '💾', book: '📖' };
 
 export function renderHome(root) {
   root.textContent = '';
@@ -80,6 +80,14 @@ export function renderHome(root) {
   root.append(hero);
   const daily = dailyCard(() => renderHome(root));
   if (daily) root.append(daily);
+  // The book being read: one tap back to the page.
+  const lib = state.library, bk = lib?.books?.[lib.current];
+  if (bk && bk.read.length < bk.pages) {
+    const left = Math.max(0, lib.goal - (t.pages || 0));
+    root.append(h('a', { class: 'lv-strip book-strip', href: '#book', 'aria-label': `อ่านหนังสือต่อ ${bk.title} หน้า ${bk.page + 1} จาก ${bk.pages}` },
+      el('b', '', '📖 อ่านต่อ'), h('span', { class: 'grow small', lang: 'en' }, `${bk.title} · p. ${bk.page + 1}/${bk.pages}`),
+      el('span', 'xs', left ? `วันนี้อีก ${left} หน้า` : '✅ ครบเป้าวันนี้')));
+  }
 
   // Characters
   root.append(sectionHeader('คุยกับใครดีวันนี้', h('a', { class: 'btn sm ghost', href: '#characters' }, 'ดูทั้งหมด')));

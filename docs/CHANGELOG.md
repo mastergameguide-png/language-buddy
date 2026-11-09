@@ -1,5 +1,29 @@
 # Changelog
 
+## 📖 Book reading (2026-11-09)
+
+The owner wants to read a 168-page English book (a PDF whose text can be selected) inside the app. The page is `#book`, the fifth practice tab "📖 หนังสือ", and Home shows a "📖 อ่านต่อ" strip while a book is unfinished.
+
+- **The book stays on the device:**
+  - The learner picks the PDF once. Its text is read on the phone with pdf.js 4.10.38 (`vendor/pdfjs`, Apache-2.0, legacy build, `isEvalSupported: false`). It is loaded only when a PDF is picked, so it is not in the offline shell and the CSP is unchanged.
+  - The text (paragraphs per page) is saved in IndexedDB (`js/bookdb.js`), never in the repo, never uploaded and never synced. Nothing is published, so there is no copyright problem.
+  - Synced: only progress (`x:library` row: pages read, current page, looked-up words). On another device, picking the same PDF finds its progress, because the book id comes from the text.
+  - Scanned PDFs (almost no text), password-protected and broken files get a clear Thai message.
+- **Reading:** one page at a time, with page jump, a 🔊 button per paragraph, and a daily goal of 1, 2 (default), 3 or 5 pages. Blank or picture pages say so.
+- **Tap a word:**
+  - The word under the finger is found from the tap position (`caretPositionFromPoint` / `caretRangeFromPoint`). There is also a box to type a word.
+  - Words already looked up in this book, or already in the word bank, are shown without AI.
+  - Otherwise one short AI request sends only the word and its sentence. It returns the dictionary form, part of speech and Thai meaning for this sentence. A short Thai note was dropped after the real test (see below).
+  - "+ คลังคำ" adds it to the word bank with the book sentence as the example, so normal spaced review picks it up.
+- **End-of-page questions (optional):** one AI request sends that page only (up to 5,000 characters) and gets 3 multiple-choice questions (main idea, detail, word in context) with Thai explanations. They are checked on the device. Pages under 300 characters have no questions.
+- **XP:** a new rule "อ่านหนังสือ" gives 5 XP per page read, up to 40 a day. A day with a page read counts as an active day for the streak.
+- **Tests:** `tests/book.test.mjs` (11), including real text extraction from a generated PDF with the bundled pdf.js.
+  - **Browser check, mock Worker, 375 px:** a 5-page sample PDF was imported. Paragraphs, hyphen joins and page-number removal were correct, and a blank page was handled. Tapping "supervisor", "neighbours → neighbour" and "radio" found the right words. A second tap used no AI. "+ คลังคำ" saved the sentence. The book reopened from IndexedDB after a reload. Marking pages read moved to the next page, and the goal toast, home strip and Lv. XP (10 XP for 2 pages) all appeared.
+  - **Real AI test (Gemini through the live Worker, 2 requests):**
+    - **Lookup:** "details" in a sample sentence came back in 1.9 s as base "detail", n, "รายละเอียด", which is correct. The Thai note was garbled ("พหูวจฎ", "กลาหิง", "ยิยอย"), so the owner chose to remove the note; only the meaning is asked for and shown.
+    - **Quiz:** 2.0 s, 3 valid questions (main idea, detail, "lost property"), all answerable from the page, with sensible Thai explanations.
+  - A bug found in the browser check was fixed: the reader did not move to the next page after "อ่านหน้านี้จบ", because of a stale copy of the progress.
+
 ## 📥 My words (2026-11-09)
 
 The owner shared their Oxford 5000 (B2–C1) list, about 2,000 words over 8 pages, with handwritten Thai meanings. They highlighted words they could not remember: **pink** means "studied, still forgot", and **orange** means "studied again after pink, still forgot". This page is for exactly those words. It is on its own route `#mywords`, linked from the Review page header and from the Home "📘 คำศัพท์วันนี้" card.

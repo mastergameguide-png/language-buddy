@@ -151,7 +151,7 @@ await test('wiring: own page with practice tabs, offline files, no AI', async ()
   const main = src('js/main.js'), html = src('index.html'), sw = src('sw.js'), view = src('js/views/tep.js');
   assert.match(main, /tep: \{ el: 'view-tep', render: \(\) => renderTep\(\$\('tepBody'\)\), nav: 'practice' \}/);
   assert.match(html, /id="view-tep"[\s\S]*?id="tepBody"/);
-  assert.equal((html.match(/<a href="#tep" data-p="tep">👮 TEP<\/a>/g) || []).length, 4, 'TEP tab on every practice page');
+  assert.equal((html.match(/<a href="#tep" data-p="tep">👮 TEP<\/a>/g) || []).length, 5, 'TEP tab on every practice page (book page included)');
   for (const f of ['js/engine/tep.js', 'js/views/tep.js']) assert.ok(sw.includes(`'${f}'`), f);
   assert.ok(!/from '\.\.\/ai\.js'/.test(view));
   assert.match(src('js/views/learn.js'), /step\.kind === 'tep'\) openTep\(step\.part\)/);

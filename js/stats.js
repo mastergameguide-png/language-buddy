@@ -13,7 +13,7 @@ export function today() {
   const k = dayKey();
   const d = (state.days[k] ||= { msgs: 0, checked: 0, corrected: 0, secs: 0, reviews: 0, words: 0, voice: 0 });
   // Fields added later start at 0 on older days.
-  for (const f of ['hints', 'hintFull', 'helper', 'shadow', 'shadowWords', 'shadowHeard', 'listen', 'listenOk', 'reviewsGraded', 'reviewForgot']) d[f] ||= 0;
+  for (const f of ['hints', 'hintFull', 'helper', 'shadow', 'shadowWords', 'shadowHeard', 'listen', 'listenOk', 'reviewsGraded', 'reviewForgot', 'pages']) d[f] ||= 0;
   return d;
 }
 function prune() {
@@ -62,7 +62,7 @@ export function startTimeTracking() {
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && pendingSecs) { pendingSecs = 0; persist(); } });
 }
 
-const isActiveDay = (d) => d && (d.msgs > 0 || d.reviews > 0 || d.secs >= 120);
+const isActiveDay = (d) => d && (d.msgs > 0 || d.reviews > 0 || d.pages > 0 || d.secs >= 120);
 
 // Days in a row with learning, ending today (or yesterday, so the streak survives until tonight).
 export function streak() {

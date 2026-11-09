@@ -1,5 +1,5 @@
 // Lv. system: XP is worked out from what this device already measured (active time, messages,
-// reviews, voice practice, IELTS practice, days in a row). Nothing is guessed or added by AI.
+// reviews, voice practice, IELTS practice, book pages read, days in a row). Nothing is guessed or added by AI.
 // Every 5 Lv. there is a gate test (English only for now), checked offline; the Lv. stops at the
 // gate until the test is passed, while XP keeps adding up. Pure: no DOM, no storage.
 import { dayKeyOf } from './analytics.js';
@@ -11,6 +11,7 @@ export const XP_RULES = [
   { key: 'reviews', th: 'ทบทวน', per: 'ข้อ', xp: 1, cap: 50 },
   { key: 'voice', th: 'พูดตาม / ฟัง', per: 'ประโยค', xp: 1, cap: 30 },
   { key: 'ielts', th: 'ฝึก IELTS / RPCA-TEP', per: 'ครั้ง', xp: 15, cap: 45 },
+  { key: 'pages', th: 'อ่านหนังสือ', per: 'หน้า', xp: 5, cap: 40 },
 ];
 export const DAY_BONUS = 10;                 // a day with real practice
 export const STREAK_XP = 2;                  // × days in a row, up to STREAK_CAP
@@ -19,10 +20,10 @@ export const GATE_EVERY = 5;
 export const PASS = 10;                       // out of 12
 export const TRIES_PER_DAY = 3;
 
-export const isActiveDay = (d) => !!d && ((d.msgs || 0) > 0 || (d.reviews || 0) > 0 || (d.secs || 0) >= 120);
+export const isActiveDay = (d) => !!d && ((d.msgs || 0) > 0 || (d.reviews || 0) > 0 || (d.pages || 0) > 0 || (d.secs || 0) >= 120);
 
 function dayXp(d, ieltsCount, inRow) {
-  const amount = { mins: Math.floor((d.secs || 0) / 60), msgs: d.msgs || 0, reviews: d.reviews || 0, voice: (d.shadow || 0) + (d.listen || 0), ielts: ieltsCount };
+  const amount = { mins: Math.floor((d.secs || 0) / 60), msgs: d.msgs || 0, reviews: d.reviews || 0, voice: (d.shadow || 0) + (d.listen || 0), ielts: ieltsCount, pages: d.pages || 0 };
   const parts = {};
   let total = 0;
   for (const r of XP_RULES) { parts[r.key] = Math.min(r.cap, amount[r.key] * r.xp); total += parts[r.key]; }

@@ -672,3 +672,25 @@ dialog.onboarding { overflow-y: auto; }
 .mw-found .chip, .mw-queue .chip { white-space: normal; height: auto; min-height: 32px; padding: 4px 10px; font: inherit; font-size: var(--fs-xs); color: var(--text); background: var(--surface); cursor: pointer; }
 .mw-queue { margin-top: 14px; }
 .mw-queue summary { cursor: pointer; min-height: 32px; display: flex; align-items: center; }
+
+/* 📖 book reading */
+.book-item { display: grid; gap: 6px; padding: 10px 0; border-top: 1px solid var(--line); }
+.book-reader { display: grid; gap: 12px; }
+.book-top b { overflow-wrap: anywhere; }
+.book-nav { flex-wrap: wrap; gap: 8px; }
+.book-jump { width: 76px; min-height: 40px; text-align: center; }
+.book-page { display: grid; gap: 4px; }
+.book-hint { margin: 0 0 6px; }
+.book-para { display: grid; grid-template-columns: 1fr auto; gap: 4px; align-items: start; }
+.book-p { margin: 0 0 10px; font-size: 17px; line-height: 1.75; cursor: pointer; overflow-wrap: break-word; -webkit-tap-highlight-color: transparent; }
+.book-say { opacity: .7; }
+.book-type .input { flex: 1; min-width: 0; }
+.book-look { position: sticky; bottom: 8px; z-index: 3; display: grid; gap: 6px; border-color: var(--accent); box-shadow: 0 6px 24px rgba(0,0,0,.18); }
+.book-look p { margin: 0; }
+.book-look-word { font-size: var(--fs-lg); }
+.book-look-sent { font-style: italic; }
+.book-words { padding: 10px 14px; }
+.book-words summary { cursor: pointer; min-height: 32px; display: flex; align-items: center; }
+.book-words .chip { height: auto; min-height: 28px; white-space: normal; padding: 4px 10px; }
+.book-strip { margin-top: 14px; }
+.book-strip span[lang] { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
