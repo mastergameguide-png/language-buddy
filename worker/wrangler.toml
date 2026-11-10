@@ -39,6 +39,11 @@ binding = "DB"
 database_name = "language-buddy-db"
 database_id = "adc345a5-50ca-4292-a1b2-8883a81b4dae"
 
+# Workers AI: the third AI, used only when Gemini and Groq both fail. No key needed; it runs on
+# Cloudflare's free daily allocation (10,000 Neurons, reset 00:00 UTC). Free plan: no charges.
+[ai]
+binding = "AI"
+
 [triggers]
 crons = ["*/10 * * * *"]   # keep in sync with CRON_MINUTES in worker.js
 

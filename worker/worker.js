@@ -12,12 +12,15 @@
 //   GEMINI_MODEL      (Text, optional)    defaults to gemini-3.5-flash-lite
 //   GROQ_API_KEY      (Secret, optional)  key from console.groq.com; used as the second AI
 //   GROQ_MODEL        (Text, optional)    defaults to openai/gpt-oss-120b
+//   AI                (Workers AI binding, optional) the third AI, only when Gemini and Groq both
+//                     fail; free daily allocation, no key needed (see [ai] in wrangler.toml)
+//   CF_AI_MODEL       (Text, optional)    defaults to @cf/google/gemma-4-26b-a4b-it
 //   ACCESS_CODE       (Secret, optional)  if set, the app must send it as X-Buddy-Key
 //   BUDDY             (KV binding, for push)
 //   DB                (D1 binding, for sync) free SQL database, tables in schema.sql
 //   LIMITER           (rate-limit binding) requests per IP per minute, see wrangler.toml
 
-const WORKER_VERSION = 12;         // shown when you open the worker link; bump on every change
+const WORKER_VERSION = 13;         // shown when you open the worker link; bump on every change
 const MAX_TURNS = 60;
 const MAX_BODY_CHARS = 1500000;   // room for one resized photo
 const MAX_IMAGE_CHARS = 1400000;  // base64 length of a single photo
@@ -61,6 +64,7 @@ function cleanParts(parts) {
 // (the app itself waits up to 45 s).
 const GEMINI_TIMEOUT = 22000;
 const GROQ_TIMEOUT = 18000;
+const CF_TIMEOUT = 20000;
 async function timed(url, init, ms) {
   try {
     return await fetch(url, { ...init, signal: AbortSignal.timeout(ms) });
@@ -121,11 +125,46 @@ async function callGroq(env, system, contents) {
   return { ok: true, text, usage: { prompt: u.prompt_tokens || 0, output: u.completion_tokens || 0, total: u.total_tokens || 0 } };
 }
 
-const PROVIDERS = { gemini: callGemini, groq: callGroq };
-const hasProvider = (env, name) => (name === 'gemini' ? !!env.GEMINI_API_KEY : !!env.GROQ_API_KEY);
+// Cloudflare Workers AI through the AI binding: no key, a free daily allocation (10,000 Neurons).
+// Text only here, like Groq. Errors are thrown, not returned, so they are turned into statuses.
+async function callCloudflare(env, system, contents) {
+  const model = env.CF_AI_MODEL || '@cf/google/gemma-4-26b-a4b-it';
+  const messages = [{ role: 'system', content: system }, ...contents.map((c) => ({
+    role: c.role === 'model' ? 'assistant' : 'user',
+    content: c.parts.filter((p) => typeof p.text === 'string').map((p) => p.text).join('\n') +
+      (c.parts.some((p) => p.inlineData) ? ' [sent a photo]' : ''),
+  }))];
+  const input = { messages, temperature: 0.9, max_completion_tokens: 2048, response_format: { type: 'json_object' } };
+  const run = (inp) => Promise.race([
+    env.AI.run(model, inp),
+    new Promise((_, reject) => setTimeout(() => reject(Object.assign(new Error('The AI took too long to answer'), { timeout: true })), CF_TIMEOUT)),
+  ]);
+  let out;
+  try {
+    try { out = await run(input); } catch (e) {
+      // Some models reject JSON mode; the app copes with plain text.
+      if (e?.timeout || !/response_format|json/i.test(String(e?.message))) throw e;
+      delete input.response_format;
+      out = await run(input);
+    }
+  } catch (e) {
+    const msg = String(e?.message || e || 'Workers AI error');
+    const status = e?.timeout ? 504 : /4006|allocation|quota|limit/i.test(msg) ? 429 : /capacity|overload|3040|unavailable/i.test(msg) ? 503 : 502;
+    return { ok: false, status, error: `Workers AI: ${msg.slice(0, 200)}` };
+  }
+  let text = out?.response ?? out?.choices?.[0]?.message?.content ?? '';
+  if (text && typeof text === 'object') text = JSON.stringify(text);
+  if (!text) return { ok: false, status: 502, error: 'Workers AI returned an empty answer' };
+  const u = out.usage || {};
+  return { ok: true, text: String(text), usage: { prompt: u.prompt_tokens || 0, output: u.completion_tokens || 0, total: u.total_tokens || 0 } };
+}
+
+const PROVIDERS = { gemini: callGemini, groq: callGroq, cloudflare: callCloudflare };
+const hasProvider = (env, name) => (name === 'gemini' ? !!env.GEMINI_API_KEY : name === 'groq' ? !!env.GROQ_API_KEY : !!env.AI?.run);
 
 // Try each AI in order and move on when one is out of quota, overloaded or blocked.
-// Photos only go to Gemini, since Groq cannot see them.
+// Photos only go to Gemini, since Groq and the Workers AI fallback here cannot see them.
+// Workers AI is always last: it is the spare for when both others fail.
 async function callAI(env, system, contents, order) {
   const tried = [];
   let last = { ok: false, status: 500, error: 'No AI is configured on the worker' };
@@ -141,9 +180,9 @@ async function callAI(env, system, contents, order) {
 
 function routeFor(contents, mode) {
   if (contents.some((c) => c.parts.some((p) => p.inlineData))) return ['gemini'];
-  if (mode === 'groq') return ['groq', 'gemini'];
+  if (mode === 'groq') return ['groq', 'gemini', 'cloudflare'];
   if (mode === 'gemini') return ['gemini'];
-  return ['gemini', 'groq'];
+  return ['gemini', 'groq', 'cloudflare'];
 }
 
 // ---------- base64url ----------
@@ -239,7 +278,7 @@ async function writeNudge(env, rec) {
   contents.push({ role: 'user', parts: [{ text: `[App note, not from the user: it is ${t.weekday} ${String(t.hour).padStart(2, '0')}:${String(t.minute).padStart(2, '0')} for the user and they have not opened the chat for a while. Send ONE short message first, like a friend texting out of the blue (1–2 sentences): ask about their day, follow up on something you remember, or share a small thing about "your" day with a question. Do not mention this note. Only refer to things in the memory list or the recent messages; never invent shared history.]` }] });
   if (contents[0].role !== 'user') contents.unshift({ role: 'user', parts: [{ text: '(opened the chat)' }] });
   // Short texts go to Groq first so the chat keeps more of the Gemini quota.
-  const r = await callAI(env, nudgePrompt(p), contents, ['groq', 'gemini']);
+  const r = await callAI(env, nudgePrompt(p), contents, ['groq', 'gemini', 'cloudflare']);
   if (!r.ok) return r;
   let reply = r.text.trim();
   try { reply = JSON.parse(reply.replace(/^```(?:json)?\s*/i, '').replace(/```$/, '')).reply || reply; } catch {}
@@ -490,7 +529,7 @@ export default {
       return json({ results: await runDue(env) });
     }
     if (path === '/' && request.method === 'GET') {
-      return json({ ok: true, version: WORKER_VERSION, push: !!(env.BUDDY && env.VAPID_PRIVATE_JWK), sync: !!env.DB, ai: ['gemini', 'groq'].filter((n) => hasProvider(env, n)), message: 'Language Buddy worker is running' });
+      return json({ ok: true, version: WORKER_VERSION, push: !!(env.BUDDY && env.VAPID_PRIVATE_JWK), sync: !!env.DB, ai: ['gemini', 'groq', 'cloudflare'].filter((n) => hasProvider(env, n)), message: 'Language Buddy worker is running' });
     }
     if (!originOk) return json({ error: 'This website is not allowed to use the worker (check ALLOWED_ORIGIN)' }, 403);
     // The Origin header can be faked outside a browser, so add a per-IP limit and an optional
@@ -506,7 +545,7 @@ export default {
     if (path.startsWith('/push/')) return handlePush(path, request, env, json);
     if (path === '/sync' || path.startsWith('/sync/')) return handleSync(path, request, env, json);
     if (request.method !== 'POST') return json({ error: 'POST only' }, 405);
-    if (!env.GEMINI_API_KEY && !env.GROQ_API_KEY) return json({ error: 'No AI key is set on the worker' }, 500);
+    if (!['gemini', 'groq', 'cloudflare'].some((n) => hasProvider(env, n))) return json({ error: 'No AI key is set on the worker' }, 500);
 
     const raw = await request.text();
     if (raw.length > MAX_BODY_CHARS) return json({ error: 'Request too large' }, 413);

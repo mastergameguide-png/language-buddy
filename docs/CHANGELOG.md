@@ -1,5 +1,58 @@
 # Changelog
 
+## 📘 Today's words: B2–C1, never repeated, and an article to write (2026-11-10)
+
+The owner asked for:
+- today's words at B2–C1, never repeated;
+- example sentences, as before;
+- an article on any topic that uses the day's words, scored for grammar, order and more;
+- the correct, complete article after scoring.
+
+- **Level:** every learner now gets B2–C1. The prompt asks for B2 and C1 only, and words the AI labels A1–B1 or C2 are dropped. `ASK_COUNT` is 8, so 5 still remain after filtering.
+- **Never repeated:**
+  - `state.dailySeen` keeps every word given (up to 3,000). It syncs as the `x:dailyseen` row, merged as a union.
+  - Words in the word bank and in this list are never kept. The latest 300 are also named in the prompt.
+- **✍️ Article:** inside the card, a "แต่งบทความด้วยคำวันนี้" section.
+  - Write 80–400 words. Chips show which of today's words are already used (regular forms such as -s, -ed, -ing and -ment count, and phrases too).
+  - The draft is saved on the device as you type. Sending with a word missing asks first.
+  - One AI request (`buildEssayPrompt`) scores 0–10 in half points on four criteria: use of today's words, grammar, order of ideas, and content. The overall score is their average.
+  - The result also gives a note per word, up to 10 corrections with a Thai reason, what was done well, the next step, and **the whole article corrected**, keeping the learner's ideas and all of today's words.
+  - Results show score bars, the corrections, and the corrected article with today's words in bold, plus "ฟัง" (listen) and "คัดลอก" (copy). "เขียนใหม่" starts again from the old text.
+  - The article and result are kept with the day's set, on this device only. Sending counts one message in the day's stats.
+- **Tests:** `daily.test.mjs` 12 (+6).
+  - **Browser check, mock Worker:**
+    - A word given on an earlier day was dropped.
+    - The level chip shows B2–C1, and the word chips updated while typing.
+    - The draft was saved, the scores, corrections and corrected article showed, and the result stayed after a reload.
+    - The layout fits a 375 px screen.
+  - **Real AI test (live Worker, which answered with Groq both times):**
+    - **Words:** 5.0 s. The AI gave 8 words, all labelled B2 or C1. It repeated "prevalent" from the exclude list, and the app dropped it. 5 words were kept: exacerbate, sustainable, disparity, implement, mitigation. All have correct Thai meanings and examples that contain the word.
+    - **Article:** a 97-word test article that misused every word on purpose, plus typical grammar mistakes. 10.6 s. Scores were vocab 1, grammar 2, organisation 3, content 2 (overall 2), with a fair note for every word.
+      - 9 corrections were all right, but one Thai reason contained Japanese ("副詞形"). The prompt now says Thai only, never Chinese or Japanese.
+      - The corrected article kept the ideas and the four paragraphs and fixed every error.
+      - It wrote "sustainably", which the app's word check missed, so -able → -ably now counts.
+
+## Worker v13: Cloudflare Workers AI as the third AI (2026-11-09)
+
+The owner asked for a third, free spare AI. Workers AI won over OpenRouter, AIMLAPI, Mistral, Z.ai, Cohere and NVIDIA, because the Worker already runs on Cloudflare: no new account, no key, and data stays with Cloudflare.
+
+- **Binding:** `[ai] binding = "AI"` in `worker/wrangler.toml`. The model is `@cf/google/gemma-4-26b-a4b-it` (on the free allocation per Cloudflare's 2026-07-28 changelog), and `CF_AI_MODEL` can change it.
+- **Order:**
+  - Auto: Gemini → Groq → Workers AI.
+  - Groq mode: Groq → Gemini → Workers AI.
+  - "Gemini only" stays Gemini only.
+  - Photos (scanned pages, handwriting) still go only to Gemini.
+  - The cron buddy message is Groq → Gemini → Workers AI.
+- **Handling:**
+  - JSON mode is used, with a retry without it if the model rejects it.
+  - Both the `choices[0].message.content` and the older `response` shapes are read.
+  - There is a 20 s timeout.
+  - "Daily free allocation used up" becomes 429, and capacity errors become 503.
+- **Health:** `GET /` lists `cloudflare` in `ai` when bound. `WORKER_VERSION` is 13.
+- **Tests:** `worker-route.test.mjs` has 25 checks (+11).
+- **App unchanged:** a reply from Workers AI shows no provider label, and today's usage counts it under Gemini. Labelling it needs a change in `js/ai.js`, which was not asked for.
+- **Not deployed yet:** the deploy from this session was blocked by the permission check, so the owner runs `npx wrangler@4 deploy` in `worker/`.
+
 ## 📖 Book reading: scanned PDFs (2026-11-09)
 
 The owner's 168-page book turned out to be a scanned PDF (pictures of pages, no text), and the first version refused it. The owner chose to have the AI read the pages.

@@ -81,6 +81,47 @@ const g = await W.fetch(new Request('https://w/'), env());
 const gj = await g.json();
 check('GET / lists AIs and version', gj.ok && gj.ai.join() === 'gemini,groq' && Number.isInteger(gj.version));
 
+// ---------- Workers AI (binding "AI"): the third AI, only after Gemini and Groq ----------
+let cfCalls = [];
+const fakeAI = (reply) => ({ run: async (model, input) => { cfCalls.push({ model, input }); return reply(input); } });
+const cfOk = () => ({ choices: [{ message: { content: '{"reply":"from cloudflare"}' } }], usage: { total_tokens: 5 } });
+
+script = { gemini: gemOk, groq: groqOk }; cfCalls = [];
+r = await ask(env({ AI: fakeAI(cfOk) }));
+check('Workers AI not used while Gemini works', r.json.provider === 'gemini' && cfCalls.length === 0);
+
+script = { gemini: err(503, 'high demand'), groq: err(429, 'rate limit') }; cfCalls = [];
+r = await ask(env({ AI: fakeAI(cfOk) }), { contents: [{ role: 'user', parts: [{ text: 'a' }] }, { role: 'model', parts: [{ text: 'b' }] }] });
+check('Gemini + Groq down → Workers AI', r.status === 200 && r.json.provider === 'cloudflare' && r.json.text === '{"reply":"from cloudflare"}' && r.json.fellBack.length === 2);
+check('Workers AI: default free model, chat format, JSON mode', cfCalls[0].model === '@cf/google/gemma-4-26b-a4b-it' && cfCalls[0].input.messages[0].role === 'system' && cfCalls[0].input.messages[2].role === 'assistant' && cfCalls[0].input.response_format?.type === 'json_object');
+
+cfCalls = [];
+r = await ask(env({ AI: fakeAI(() => ({ response: { reply: 'obj' } })) }));
+check('Workers AI: older "response" field and parsed JSON both work', r.json.text === '{"reply":"obj"}');
+
+cfCalls = [];
+r = await ask(env({ AI: { run: async (m, input) => { cfCalls.push(input); if (input.response_format) throw new Error('response_format not supported'); return { response: 'plain' }; } } }));
+check('Workers AI: JSON mode rejected → retried without it', r.json.text === 'plain' && cfCalls.length === 2 && !cfCalls[1].response_format);
+
+r = await ask(env({ AI: { run: async () => { throw new Error('4006: you have used up your daily free allocation of 10,000 neurons'); } } }));
+check('Workers AI out of free allocation → 429 with all three tried', r.status === 429 && r.json.fellBack.map((f) => f.provider).join() === 'gemini,groq,cloudflare');
+
+script = { gemini: err(429, 'quota'), groq: groqOk }; cfCalls = [];
+r = await ask(env({ AI: fakeAI(cfOk) }), photo);
+check('photo never goes to Workers AI', r.status === 429 && cfCalls.length === 0);
+
+script = { gemini: err(503, 'x'), groq: err(503, 'x') }; cfCalls = [];
+r = await ask(env({ AI: fakeAI(cfOk) }), { ai: 'gemini' });
+check('"Gemini only" setting is respected', r.status === 503 && cfCalls.length === 0);
+
+script = {}; cfCalls = [];
+r = await ask(env({ GEMINI_API_KEY: undefined, GROQ_API_KEY: undefined, AI: fakeAI(cfOk) }));
+check('only the AI binding set → still answers', r.json.provider === 'cloudflare');
+
+const g2 = await (await W.fetch(new Request('https://w/'), env({ AI: fakeAI(cfOk) }))).json();
+check('GET / lists Workers AI when bound', g2.ai.join() === 'gemini,groq,cloudflare');
+check('wrangler.toml binds Workers AI as AI', /\[ai\]\s*\nbinding = "AI"/.test(fs.readFileSync(new URL('../worker/wrangler.toml', import.meta.url), 'utf8')));
+
 // Version in the file matches what GET / reports (bump reminder).
 const ver = Number(fs.readFileSync(WORKER_PATH, 'utf8').match(/WORKER_VERSION = (\d+)/)[1]);
 check('WORKER_VERSION reported', gj.version === ver);

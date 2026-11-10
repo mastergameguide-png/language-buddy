@@ -12,7 +12,7 @@ import { cleanPlan } from './engine/plan.js';
 import { cleanCourses } from './engine/courses.js';
 import { cleanBand } from './engine/ielts.js';
 import { cleanLevels } from './engine/levels.js';
-import { cleanDaily } from './engine/daily.js';
+import { cleanDaily, cleanSeen } from './engine/daily.js';
 import { cleanMyWords } from './engine/mywords.js';
 import { cleanLibrary } from './engine/book.js';
 const TEP_PARTS = ['listening', 'grammar', 'vocab', 'reading'];
@@ -246,6 +246,7 @@ export function normalizeState(raw) {
   s.levels = cleanLevels(s.levels);
   s.mywords = cleanMyWords(s.mywords);   // the learner's own hard words (engine/mywords.js)
   s.library = cleanLibrary(s.library);   // books: reading progress and looked-up words (engine/book.js); the text stays in IndexedDB
+  s.dailySeen = cleanSeen(s.dailySeen);   // every daily word ever given, so none repeats
   s.daily = cleanDaily(s.daily);      // today's AI words (engine/daily.js); this device only   // Lv. gate tests passed and tried (engine/levels.js)
   s.lastSeen = Number(s.lastSeen) || 0;
   s.v = STATE_VERSION;

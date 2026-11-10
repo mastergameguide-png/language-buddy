@@ -9,6 +9,7 @@ import { workerBase, authHeaders } from './ai.js';
 import { uid } from './util.js';
 import { mergeLevels } from './engine/levels.js';
 import { mergeMyWords } from './engine/mywords.js';
+import { mergeSeen } from './engine/daily.js';
 import { mergeLibrary } from './engine/book.js';
 
 const KEY = 'lb_sync';
@@ -60,6 +61,7 @@ function localRows() {
   if (Object.keys(state.courses || {}).length) add('x:courses', state.courses);
   if (state.levels?.passed?.length || state.levels?.tries?.length) add('x:levels', state.levels);
   if (state.mywords?.queue?.length || state.mywords?.done?.length) add('x:mywords', state.mywords);
+  if (state.dailySeen?.length) add('x:dailyseen', state.dailySeen);   // words already given, so a word never comes back
   if (Object.keys(state.library?.books || {}).length) add('x:library', state.library);   // progress only, never the book's text
   for (const a of state.ielts || []) add(`i:${a.t}`, a);
   // One row per practised sentence: the whole map could pass the Worker's 20,000-character row limit.
@@ -100,6 +102,7 @@ function applyRow(k, d) {
     else if (name === 'courses') state.courses = { ...(v || {}), ...state.courses };
     else if (name === 'levels') state.levels = mergeLevels(state.levels, v);   // a passed gate is never lost
     else if (name === 'mywords') state.mywords = mergeMyWords(state.mywords, v);
+    else if (name === 'dailyseen') state.dailySeen = mergeSeen(state.dailySeen, v);
     else if (name === 'library') state.library = mergeLibrary(state.library, v);
   } else if (kind === 'v') {
     // Practice progress for one sentence; two devices: keep the better record.

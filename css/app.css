@@ -697,3 +697,21 @@ dialog.onboarding { overflow-y: auto; }
 .book-scan-wrap { display: grid; gap: 8px; }
 .book-scan { gap: 8px; }
 .book-original { width: 100%; height: auto; border-radius: var(--r-md); border: 1px solid var(--line); background: #fff; }
+
+/* ✍️ article with today's words */
+.daily-write { border-top: 1px solid var(--line); }
+.daily-write > summary { display: flex; align-items: center; gap: 8px; min-height: 44px; cursor: pointer; flex-wrap: wrap; }
+.daily-write textarea { width: 100%; min-height: 200px; line-height: 1.6; }
+.daily-write .chips .chip { height: auto; min-height: 26px; }
+.daily-result { display: grid; gap: 10px; }
+.daily-result p { margin: 0; }
+.daily-scores { display: grid; gap: 8px; }
+.daily-score { display: grid; gap: 4px; }
+.daily-overall { font-size: var(--fs-lg); }
+.daily-wnotes, .daily-errors { display: grid; gap: 6px; }
+.daily-errors > div { padding: 6px 8px; border-radius: var(--r-sm); background: var(--surface-2); }
+.daily-errors s { color: var(--bad); }
+.daily-corrected { padding: 12px 14px; border-radius: var(--r-md); background: var(--surface-2); line-height: 1.7; }
+.daily-corrected p { margin: 0 0 10px; }
+.daily-corrected p:last-child { margin-bottom: 0; }
+.daily-mine summary { cursor: pointer; min-height: 32px; display: flex; align-items: center; }
