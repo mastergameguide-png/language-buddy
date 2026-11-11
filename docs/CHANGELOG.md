@@ -1,5 +1,25 @@
 # Changelog
 
+## 📘 Word bank: Thai meaning filled in by AI (2026-11-11)
+
+The owner asked for words added to the word bank to come with a translation, so they do not have to look the meaning up.
+
+- **ทบทวน → คลังคำ → เพิ่มคำเอง:** type an English word and leave the meaning empty. The AI (1 request) fills in:
+  - the Thai meaning (up to 2 common meanings) and part of speech;
+  - one example sentence;
+  - the corrected spelling of an obvious typo.
+- Typing a meaning yourself still works and uses no AI. Enter also adds the word.
+- The new code is `js/engine/define.js` (prompt and strict parsing: Thai required, Chinese or Japanese rejected, a Thai "example" dropped).
+  - If the AI fails or the word is not real, nothing is added and a message asks to try again or type the meaning.
+  - Thai text in the word box is not sent.
+- Tests: `tests/define.test.mjs` (7). Checked in the browser with the local mock Worker.
+- Real AI test (Gemini, live Worker), 4 words, all correct:
+  - mitigate → บรรเทา, ทำให้รุนแรงน้อยลง (v);
+  - recieve → fixed to receive, ได้รับ, รับ (v);
+  - carry out → ดำเนินการ, ปฏิบัติให้สำเร็จ (phrase);
+  - zzqxv → empty, so it was not added.
+  - Each had a natural example sentence. Times were 1.3–15.8 s, about 260 tokens each.
+
 ## 📖 Book: page view like a note app (2026-11-11)
 
 The owner found the book page slow, because every scanned page waited for the AI to turn it into text. They asked for something like GoodNotes.

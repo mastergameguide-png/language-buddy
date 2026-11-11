@@ -1,8 +1,10 @@
 // Review hub: spaced-repetition session, vocabulary bank, and the Mistake Book.
 import { el, h, icon, num, fmtDate, toast } from '../util.js';
-import { state, persist, emit, addWord, logActivity, CATEGORIES } from '../store.js';
+import { state, persist, emit, addWord, logActivity, cefrOf, CATEGORIES } from '../store.js';
 import { schedule, preview, status, STATUS_TH, isDue } from '../srs.js';
-import { dueCards, recordReview } from '../stats.js';
+import { dueCards, recordReview, recordWord } from '../stats.js';
+import { askIelts } from '../ai.js';
+import { isEnglishWord, buildDefinePrompt, defineInput, parseDefine } from '../engine/define.js';
 import { speak } from '../speech.js';
 import { quiz } from '../conversation.js';
 import { emptyState, sectionHeader } from './ui.js';
@@ -130,16 +132,41 @@ function grade(g, root) {
 
 // ---------- vocabulary ----------
 function renderVocab(body, root) {
-  const word = h('input', { class: 'input', type: 'text', placeholder: 'คำ / วลี', maxlength: '80' });
-  const meaning = h('input', { class: 'input', type: 'text', placeholder: 'ความหมาย (ไทย)', maxlength: '200' });
+  const word = h('input', { class: 'input', type: 'text', placeholder: 'คำ / วลี ภาษาอังกฤษ', maxlength: '80', autocapitalize: 'off', autocomplete: 'off', spellcheck: 'false' });
+  const meaning = h('input', { class: 'input', type: 'text', placeholder: 'ความหมาย (เว้นว่างได้ AI แปลให้)', maxlength: '200' });
   const add = h('button', { type: 'button', class: 'btn primary' }, 'เพิ่ม');
-  add.addEventListener('click', () => {
-    if (!word.value.trim()) { word.focus(); return; }
-    if (!addWord({ word: word.value, meaning: meaning.value })) { toast('มีคำนี้ในคลังแล้ว'); return; }
-    logActivity('word', `เพิ่มคำ: ${word.value.trim()}`);
+  const note = el('div', 'xs muted', 'เว้นช่องความหมายไว้ได้ AI จะแปลไทยและให้ประโยคตัวอย่าง (ใช้ AI 1 ครั้ง)');
+  let busy = false;
+  const exists = (w) => state.vocab.some((v) => v.word.toLowerCase() === w.trim().toLowerCase());
+  async function submit() {
+    if (busy) return;
+    const w = word.value.trim();
+    if (!w) { word.focus(); return; }
+    if (exists(w)) { toast('มีคำนี้ในคลังแล้ว'); return; }
+    let entry = { word: w, meaning: meaning.value.trim(), example: '' };
+    if (!entry.meaning) {
+      if (!isEnglishWord(w)) { toast('พิมพ์คำภาษาอังกฤษ หรือใส่ความหมายเอง'); word.focus(); return; }
+      busy = true; add.disabled = true; add.textContent = 'กำลังแปล…';
+      try {
+        const d = parseDefine(await askIelts(buildDefinePrompt(cefrOf()), defineInput(w)), w);
+        if (!d) throw new Error('bad');
+        entry = { word: d.word, meaning: d.meaning, example: d.example };
+      } catch {
+        toast('แปลไม่สำเร็จ ลองอีกครั้ง หรือพิมพ์ความหมายเอง');
+        busy = false; add.disabled = false; add.textContent = 'เพิ่ม';
+        return;
+      }
+    }
+    const v = addWord(entry);
+    if (!v) { toast('มีคำนี้ในคลังแล้ว'); busy = false; add.disabled = false; add.textContent = 'เพิ่ม'; return; }
+    recordWord();
+    logActivity('word', `เพิ่มคำ: ${v.word}`);
+    toast(`เพิ่ม ${v.word} แล้ว${v.meaning ? ' — ' + v.meaning : ''}`);
     persist(); emit('state'); renderReview(root);
-  });
-  body.append(h('div', { class: 'card' }, el('h3', '', 'เพิ่มคำเอง'), h('div', { class: 'grid md-2', style: 'margin-top:8px' }, word, meaning), h('div', { style: 'margin-top:8px' }, add)));
+  }
+  add.addEventListener('click', submit);
+  word.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); submit(); } });
+  body.append(h('div', { class: 'card' }, el('h3', '', 'เพิ่มคำเอง'), h('div', { class: 'grid md-2', style: 'margin-top:8px' }, word, meaning), note, h('div', { style: 'margin-top:8px' }, add)));
 
   const search = h('input', { class: 'input', type: 'search', placeholder: 'ค้นหาคำศัพท์', value: vQuery });
   search.addEventListener('input', () => { vQuery = search.value; draw(); });
