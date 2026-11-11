@@ -3,18 +3,21 @@
 // page at a time, tap a word for its Thai meaning in that sentence (AI, one short request, saved
 // so the same word never asks again), add it to the word bank, mark the page read (counts for XP)
 // and, if wanted, answer 3 AI questions about the page. Progress syncs; the book's text does not.
-// Scanned books (pictures of pages, no text): the PDF file is kept on the device too, and each page
-// is drawn and read by the AI (one request) only when the learner opens it to read, then saved.
+// The PDF file is kept on the device too, so a page can be shown as its picture straight away (📄
+// page view, js/views/booksheet.js: zoom, swipe, pen, highlighter, box a word). The 📝 text view
+// shows the page's text; for scanned books the AI turns a page into text (one request) only when
+// that view or the page questions need it.
 import { el, h, icon, toast, num, canvasPhoto } from '../util.js';
 import { settings, state, persist, emit, addWord, logActivity, cefrOf } from '../store.js';
 import { today, recordWord } from '../stats.js';
 import { askIelts, askTranscribe } from '../ai.js';
 import { speak, unlockSpeech, stopSpeaking } from '../speech.js';
-import { putBook, getBook, deleteBook, putFile, getFile, keepStorage } from '../bookdb.js';
+import { putBook, getBook, deleteBook, putFile, fileExists, keepStorage } from '../bookdb.js';
+import { sheetView, pdfFor, closePdf, drawPage, loadPdfjs } from './booksheet.js';
 import {
   GOAL_CHOICES, MIN_PAGE_CHARS, pageParagraphs, pageChars, bookId, titleFromFile, wordAt, sentenceAround,
   cleanLibrary, addBook, percentRead, daysLeft, nextUnread, buildLookupPrompt, lookupInput, parseLookup,
-  buildQuizPrompt, pageForQuiz, parseQuiz, isScanned, markForScan, pendingPages, bytesId, OCR_PROMPT, parseOcr,
+  buildQuizPrompt, pageForQuiz, parseQuiz, isScanned, markForScan, pendingPages, bytesId, OCR_PROMPT, parseOcr, REGION_PROMPT, parseRegion,
 } from '../engine/book.js';
 
 let busy = '';          // '' | 'import' | 'open' | 'quiz'
@@ -25,13 +28,21 @@ let look = null;        // { word, sentence, busy, res, err }
 let quiz = null;        // { page, qs, answers, checked }
 let missing = '';       // id of a book whose text is not on this device
 let ocr = null;         // { at: page index being read by the AI, left } while scanned pages are converted
-let pdf = null;         // { id, doc } the open scanned book's PDF, for drawing pages
-let original = null;    // { id, page, src } picture of the current scanned page, when asked for
 
 // Cleaned once per render; handlers change this same object, so no change is lost to a fresh copy.
 const lib = () => state.library;
 const save = () => { persist(); emit('state'); };
 const pagesToday = () => today().pages || 0;
+
+// 📄 page picture or 📝 text, remembered per book on this device (a convenience only).
+const VIEW_KEY = 'lb_bookview';
+function viewOf() {
+  if (!text?.hasFile) return 'text';
+  try { return JSON.parse(localStorage.getItem(VIEW_KEY) || '{}')[text.id] === 'text' ? 'text' : 'page'; } catch { return 'page'; }
+}
+function setView(v) {
+  try { const m = JSON.parse(localStorage.getItem(VIEW_KEY) || '{}'); m[text.id] = v; localStorage.setItem(VIEW_KEY, JSON.stringify(m)); } catch {}
+}
 
 export function renderBook(root) {
   root.textContent = '';
@@ -116,7 +127,7 @@ async function importPdf(f, root) {
     const added = old?.added || Date.now();
     try {
       await putBook({ id, title, pages: stored, scan, added });
-      if (scan) await putFile(id, bytes.buffer);
+      await putFile(id, bytes.buffer);   // every book: the 📄 page view draws from the file
     } catch (e) {
       try { await deleteBook(id); } catch {}
       throw new Error(/quota/i.test(`${e?.name} ${e?.message}`) ? 'พื้นที่ในเครื่องไม่พอเก็บไฟล์นี้' : 'บันทึกหนังสือในเครื่องไม่สำเร็จ');
@@ -128,10 +139,9 @@ async function importPdf(f, root) {
     missing = '';
     save();
     closePdf();
-    text = { id, title, pages: stored, scan, added };
-    reading = true; look = null; quiz = null; original = null;
-    toast(had ? 'เปิดเล่มเดิม ความคืบหน้าต่อจากเดิม' : scan ? `เพิ่มแล้ว ${pages.length} หน้า · เป็นภาพสแกน AI จะแปลงทีละหน้าตอนเปิดอ่าน` : `เพิ่มแล้ว ${pages.length} หน้า (มีข้อความ ${withText} หน้า)`);
-    if (scan) setTimeout(() => readCurrent(root), 0);
+    text = { id, title, pages: stored, scan, added, hasFile: true };
+    reading = true; look = null; quiz = null;
+    toast(had ? 'เปิดเล่มเดิม ความคืบหน้าต่อจากเดิม' : scan ? `เพิ่มแล้ว ${pages.length} หน้า · เปิดอ่านแบบหน้าจริงได้ทันที` : `เพิ่มแล้ว ${pages.length} หน้า (มีข้อความ ${withText} หน้า)`);
   } catch (e) {
     const name = e?.name || '';
     toast(name === 'PasswordException' ? 'PDF นี้มีรหัสผ่าน เปิดไม่ได้' : name === 'InvalidPDFException' ? 'ไฟล์นี้ไม่ใช่ PDF ที่เปิดได้' : (e?.message || 'อ่านไฟล์ไม่สำเร็จ'), true);
@@ -150,9 +160,9 @@ async function openBook(id, root) {
   busy = '';
   if (!rec?.pages?.length) { missing = id; toast('ในเครื่องนี้ยังไม่มีไฟล์ของเล่มนี้', true); renderBook(root); return; }
   closePdf();
-  text = { id, title: rec.title, pages: rec.pages, scan: !!rec.scan, added: rec.added };
+  text = { id, title: rec.title, pages: rec.pages, scan: !!rec.scan, added: rec.added, hasFile: await fileExists(id) };
   state.library.current = id;
-  reading = true; look = null; quiz = null; original = null;
+  reading = true; look = null; quiz = null;
   renderBook(root);
   readCurrent(root);
 }
@@ -176,13 +186,13 @@ function reader(l, root) {
   const paras = text.pages[p] || [];
   const wrap = h('div', { class: 'book-reader' });
   const back = h('button', { type: 'button', class: 'btn ghost sm' }, icon('back'), 'ชั้นหนังสือ');
-  back.addEventListener('click', () => { reading = false; look = null; quiz = null; original = null; stopSpeaking(); renderBook(root); });
+  back.addEventListener('click', () => { reading = false; look = null; quiz = null; stopSpeaking(); renderBook(root); });
   const isRead = b.read.includes(p);
   wrap.append(h('div', { class: 'row wrap-ok book-top' }, back, h('b', { class: 'grow small', lang: 'en' }, b.title),
     el('span', 'chip', `วันนี้ ${pagesToday()}/${l.goal} หน้า`)));
 
   // Page navigation
-  const go = (n) => { b.page = Math.max(0, Math.min(b.pages - 1, n)); b.t = Date.now(); look = null; quiz = null; original = null; stopSpeaking(); save(); };
+  const go = (n) => { if (n < 0 || n >= b.pages) return; b.page = n; b.t = Date.now(); look = null; quiz = null; stopSpeaking(); save(); };
   const prev = h('button', { type: 'button', class: 'btn sm', 'aria-label': 'หน้าก่อนหน้า' }, '◀');
   prev.disabled = p === 0;
   prev.addEventListener('click', () => go(p - 1));
@@ -194,9 +204,25 @@ function reader(l, root) {
   wrap.append(h('div', { class: 'row book-nav' }, prev, h('label', { class: 'small row' }, 'หน้า', jump, `/ ${b.pages}`), next,
     isRead ? el('span', 'chip good', '✓ อ่านแล้ว') : null));
 
-  // The page
+  // 📄 page picture or 📝 text
+  const mode = viewOf();
+  if (text.hasFile) {
+    const seg = h('div', { class: 'seg book-mode', role: 'radiogroup', 'aria-label': 'แบบการอ่าน' });
+    for (const [k, label] of [['page', '📄 หน้าจริง'], ['text', '📝 ข้อความ']]) {
+      const btn = h('button', { type: 'button', role: 'radio', 'aria-checked': String(mode === k), class: mode === k ? 'on' : '' }, label);
+      btn.addEventListener('click', () => { setView(k); look = null; renderBook(root); if (k === 'text') readCurrent(root); });
+      seg.append(btn);
+    }
+    wrap.append(seg);
+  } else wrap.append(el('p', 'xs muted', 'อยากอ่านแบบหน้าจริง (เขียน/ไฮไลต์ได้)? เลือกไฟล์ PDF เล่มนี้อีกครั้งที่ชั้นหนังสือ'));
+
+  if (mode === 'page') {
+    wrap.append(sheetView({ id: text.id, page: p, total: b.pages, onPage: go, onRegion: (c) => lookUpRegion(c, root), rerender: () => renderBook(root) }));
+  }
+
+  // The page as text
   const page = h('div', { class: 'card pad-lg book-page', lang: 'en' });
-  if (waiting) {
+  if (mode === 'page') { /* the picture above is the page */ } else if (waiting) {
     const doing = ocr?.at === p;
     page.append(el('p', 'small', doing ? 'กำลังให้ AI อ่านหน้านี้… (ราว 3–6 วินาที)' : 'หน้านี้เป็นภาพสแกน ยังไม่ได้แปลงเป็นข้อความ'));
     if (!doing) {
@@ -218,8 +244,8 @@ function reader(l, root) {
       page.append(h('div', { class: 'book-para' }, para, say));
     }
   }
-  wrap.append(page);
-  if (text.scan) wrap.append(scanTools(b, p, root));
+  if (mode === 'text') wrap.append(page);
+  if (mode === 'text' && text.scan) wrap.append(scanTools(b, p, root));
 
   // Look up by typing (keyboard users, or a word that is hard to tap)
   const typed = h('input', { type: 'text', class: 'input', lang: 'en', autocomplete: 'off', autocapitalize: 'none', spellcheck: 'false', placeholder: 'หรือพิมพ์คำที่อยากรู้', 'aria-label': 'พิมพ์คำภาษาอังกฤษที่อยากรู้ความหมาย' });
@@ -240,10 +266,11 @@ function reader(l, root) {
   // Finish the page
   const done = h('button', { type: 'button', class: 'btn primary' }, isRead ? (p < b.pages - 1 ? 'ไปหน้าถัดไป ▶' : 'กลับชั้นหนังสือ') : '✅ อ่านหน้านี้จบ');
   done.addEventListener('click', () => finishPage(b, p, root));
-  const ask = h('button', { type: 'button', class: 'btn' }, busy === 'quiz' ? 'กำลังสร้างคำถาม…' : '❓ คำถามท้ายหน้า');
-  ask.disabled = !!busy || pageChars(paras) < 300;
-  ask.addEventListener('click', () => makeQuiz(p, paras, root));
-  wrap.append(h('div', { class: 'row wrap-ok book-actions' }, done, ask, el('span', 'xs muted', pageChars(paras) < 300 ? 'หน้านี้สั้นเกินไปสำหรับคำถาม' : 'คำถาม 3 ข้อ ใช้ AI 1 ครั้ง')));
+  const ask = h('button', { type: 'button', class: 'btn' }, busy === 'quiz' ? 'กำลังสร้างคำถาม…' : ocr?.at === p ? 'กำลังอ่านหน้านี้…' : '❓ คำถามท้ายหน้า');
+  const short = !waiting && pageChars(paras) < 300;
+  ask.disabled = !!busy || !!ocr || short;
+  ask.addEventListener('click', () => makeQuiz(p, root));
+  wrap.append(h('div', { class: 'row wrap-ok book-actions' }, done, ask, el('span', 'xs muted', short ? 'หน้านี้สั้นเกินไปสำหรับคำถาม' : waiting ? 'AI อ่านหน้านี้ก่อน แล้วถาม 3 ข้อ (AI 2 ครั้ง)' : 'คำถาม 3 ข้อ ใช้ AI 1 ครั้ง')));
   if (quiz && quiz.page === p) wrap.append(quizCard(root));
 
   if (b.words.length) wrap.append(wordsCard(b));
@@ -266,48 +293,16 @@ function finishPage(b, p, root) {
   stopSpeaking();
   if (n < 0) { reading = false; save(); return; }
   b.page = n;
-  original = null;
   save();
   root.closest('.scroll')?.scrollTo?.(0, 0);
   readCurrent(root);
 }
 
 // ---------- scanned pages ----------
-async function loadPdfjs() {
-  const pdfjs = await import('../../vendor/pdfjs/pdf.min.mjs');
-  pdfjs.GlobalWorkerOptions.workerSrc = new URL('../../vendor/pdfjs/pdf.worker.min.mjs', import.meta.url).href;
-  return pdfjs;
-}
-function closePdf() { try { pdf?.doc.destroy(); } catch {} pdf = null; }
-async function pdfFor(id) {
-  if (pdf?.id === id) return pdf.doc;
-  const data = await getFile(id);
-  if (!data) throw new Error('ไม่พบไฟล์ PDF ของเล่มนี้ในเครื่อง เลือกไฟล์เดิมอีกครั้ง');
-  closePdf();
-  const doc = await (await loadPdfjs()).getDocument({ data: new Uint8Array(data), isEvalSupported: false, disableFontFace: true }).promise;
-  pdf = { id, doc };
-  return doc;
-}
-// One page drawn on a white canvas, at most maxSide pixels on its long side.
-async function drawPage(doc, i, maxSide) {
-  const page = await doc.getPage(i + 1);
-  const one = page.getViewport({ scale: 1 });
-  const viewport = page.getViewport({ scale: Math.min(4, maxSide / Math.max(one.width, one.height)) });
-  const canvas = document.createElement('canvas');
-  canvas.width = Math.round(viewport.width); canvas.height = Math.round(viewport.height);
-  const g = canvas.getContext('2d');
-  g.fillStyle = '#fff'; g.fillRect(0, 0, canvas.width, canvas.height);
-  // intent 'print' draws straight away; the screen intent waits for animation frames, which stop
-  // when the app is in the background, so a conversion would hang until the learner came back.
-  await page.render({ canvasContext: g, viewport, intent: 'print' }).promise;
-  page.cleanup();
-  return canvas;
-}
-
 // The page the learner is about to read: convert it if it is a scanned page (online only, quietly).
 function readCurrent(root) {
   const b = text && lib().books[text.id];
-  if (!b || !text.scan || text.pages[b.page] !== null || ocr || !settings.workerUrl || !navigator.onLine) return;
+  if (!b || viewOf() !== 'text' || !text.scan || text.pages[b.page] !== null || ocr || !settings.workerUrl || !navigator.onLine) return;
   convertPages([b.page], root);
 }
 
@@ -339,7 +334,7 @@ async function convertPages(list, root) {
   renderBook(root);
 }
 
-// Scanned books: get the next pages ready while online, and see the original picture of a page.
+// Scanned books in the text view: get the next pages ready as text while online.
 function scanTools(b, p, root) {
   const box = h('div', { class: 'row wrap-ok book-scan' });
   const ahead = pendingPages(text.pages, p + 1, 5);
@@ -349,19 +344,7 @@ function scanTools(b, p, root) {
     prep.addEventListener('click', () => convertPages(ahead, root));
     box.append(prep, el('span', 'xs muted', `ใช้ AI ${ahead.length} ครั้ง แล้วอ่านตอนไม่มีเน็ตได้`));
   }
-  const show = original?.id === text.id && original.page === p;
-  const pic = h('button', { type: 'button', class: 'btn sm ghost', 'aria-expanded': String(show) }, show ? 'ซ่อนภาพต้นฉบับ' : '🖼️ ดูภาพต้นฉบับ');
-  pic.addEventListener('click', async () => {
-    if (show) { original = null; renderBook(root); return; }
-    try {
-      const canvas = await drawPage(await pdfFor(text.id), p, 1400);
-      original = { id: text.id, page: p, src: canvas.toDataURL('image/jpeg', 0.8) };
-    } catch (e) { toast(e?.message || 'เปิดภาพไม่สำเร็จ', true); }
-    renderBook(root);
-  });
-  box.append(pic);
   const wrap = h('div', { class: 'book-scan-wrap' }, box);
-  if (show) wrap.append(h('img', { class: 'book-original', src: original.src, alt: `ภาพต้นฉบับหน้า ${p + 1}` }));
   return wrap;
 }
 
@@ -401,6 +384,27 @@ async function lookUp(word, sentence, root) {
   }
   renderBook(root);
 }
+// A boxed piece of the page picture → its words and meaning (one small AI request with a picture).
+async function lookUpRegion(canvas, root) {
+  if (!settings.workerUrl || !navigator.onLine) { look = { word: 'วงคำ', sentence: '', err: !navigator.onLine ? 'ไม่มีอินเทอร์เน็ต ดูความหมายด้วย AI ไม่ได้ตอนนี้' : 'ยังไม่ได้ใส่ลิงก์ Worker ในการตั้งค่า' }; renderBook(root); scrollToLook(root); return; }
+  const img = canvas.toDataURL('image/jpeg', 0.85);
+  const ticket = Symbol('look');
+  look = { word: '…', sentence: '', busy: true, img, ticket };
+  renderBook(root); scrollToLook(root);
+  try {
+    const r = parseRegion(await askTranscribe(REGION_PROMPT, canvasPhoto(canvas, 600000)));
+    if (look?.ticket !== ticket) return;
+    if (!r) throw new Error('อ่านคำในกรอบไม่ได้ ลองวงให้ครอบคำทั้งคำและชัดขึ้น');
+    look = { word: r.base, sentence: r.text, textTh: r.textTh, img, res: { word: r.base, base: r.base, pos: r.pos, th: r.th } };
+    const bk = lib().books[text.id];
+    bk.words.push({ word: r.base, th: r.th, pos: r.pos, page: bk.page });
+    state.library = cleanLibrary(state.library);
+    persist();
+  } catch (e) {
+    if (look?.ticket === ticket) look = { word: 'วงคำ', sentence: '', img, err: e.message };
+  }
+  renderBook(root);
+}
 const scrollToLook = (root) => root.querySelector('.book-look')?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
 
 function lookPanel(b, root) {
@@ -411,11 +415,13 @@ function lookPanel(b, root) {
   say.addEventListener('click', () => { unlockSpeech(); speak(look.res?.base || look.word, { plain: true }); });
   const r = look.res;
   box.append(h('div', { class: 'row' }, h('b', { class: 'grow book-look-word', lang: 'en' }, r && r.base.toLowerCase() !== look.word.toLowerCase() ? `${look.word} → ${r.base}` : look.word), say, close));
+  if (look.img) box.append(h('img', { class: 'book-look-img', src: look.img, alt: 'ส่วนที่วงไว้' }));
   if (look.busy) box.append(el('p', 'small muted', 'กำลังดูความหมาย…'));
   else if (look.err) box.append(el('p', 'small warn-text', look.err));
   else if (r) {
     box.append(h('p', { class: 'small' }, r.pos ? el('span', 'xs muted', `(${r.pos}) `) : null, el('b', '', r.th)));
     if (look.sentence) box.append(h('p', { class: 'xs muted book-look-sent', lang: 'en' }, `“${look.sentence}”`));
+    if (look.textTh) box.append(el('p', 'xs', `แปล: ${look.textTh}`));
     const inBank = state.vocab.some((v) => v.word.toLowerCase() === r.base.toLowerCase());
     const add = h('button', { type: 'button', class: 'btn sm primary' }, inBank ? '✓ อยู่ในคลังคำแล้ว' : '+ คลังคำ (ทบทวน)');
     add.disabled = inBank;
@@ -438,10 +444,14 @@ function wordsCard(b) {
 }
 
 // ---------- questions about the page ----------
-async function makeQuiz(p, paras, root) {
-  if (busy) return;
+async function makeQuiz(p, root) {
+  if (busy || ocr) return;
   if (!settings.workerUrl) { toast('ยังไม่ได้ใส่ลิงก์ Worker', true); return; }
   if (!navigator.onLine) { toast('ไม่มีอินเทอร์เน็ต', true); return; }
+  if (text.pages[p] === null) await convertPages([p], root);   // a scanned page: read it as text first
+  const paras = text.pages[p];
+  if (!paras) return;
+  if (pageChars(paras) < 300) { toast('หน้านี้สั้นเกินไปสำหรับคำถาม', true); return; }
   busy = 'quiz'; renderBook(root);
   try {
     const qs = parseQuiz(await askIelts(buildQuizPrompt(cefrOf()), pageForQuiz(paras)));

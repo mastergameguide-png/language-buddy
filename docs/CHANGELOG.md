@@ -1,5 +1,34 @@
 # Changelog
 
+## 📖 Book: page view like a note app (2026-11-11)
+
+The owner found the book page slow, because every scanned page waited for the AI to turn it into text. They asked for something like GoodNotes.
+
+- **📄 หน้าจริง (the new default):** the PDF page is drawn on the device straight away (`js/views/booksheet.js`), with no AI and no waiting. The next page is drawn ahead.
+  - Zoom 100/150/200/300% with scrolling. At 100%, swipe left or right to turn the page.
+- **Writing:** ✏️ pen (black, red, blue) and 🖍️ highlighter (yellow, pink, orange, see-through), by finger or Apple Pencil (pointer events, coalesced points). Also 🧽 an eraser that removes whole strokes, ↶ undo, and 🗑 clear page.
+  - Strokes are stored per page in IndexedDB (`ink` store, DB v3) as 0–1 coordinates, so they fit at any zoom. They are not synced.
+- **🔍 วงคำ:** drag a box around a word or sentence.
+  - Only that piece is cut from a sharp 2400 px drawing of the page and sent to the AI (`REGION_PROMPT`). It returns the text, the dictionary form, the part of speech, the Thai meaning, and a Thai translation of longer text.
+  - It is shown with the cut-out picture, saved to the book's words, and can be added to the word bank.
+- **📝 ข้อความ (the old view) still works:** the AI turns a scanned page into text only there, or when "❓ คำถามท้ายหน้า" needs it (the page is read first, then the questions are asked). The page view never reads whole pages automatically.
+- **Files:**
+  - Every new import keeps the PDF on the device, because the page view draws from it.
+  - Books added earlier as text PDFs show a note to pick the file again for the page view.
+  - Removing a book also removes its marks.
+- **Fixed during testing:** switching tools within 0.3 s of drawing lost the stroke, because the redraw read the older saved copy. The page's marks now live in memory first and are saved shortly after.
+- **Tests:** `book.test.mjs` 17 (+3), covering ink cleaning, eraser hits, crop box and the boxed-word reply.
+  - **Browser check, mock Worker, 375 px, a 3-page image-only PDF:**
+    - The page picture showed on opening, with no OCR request.
+    - The pen and highlighter drew and were saved. Undo removed a line.
+    - Boxing a sentence sent one 22 KB picture and showed the meaning with the cut-out picture.
+    - A left swipe turned to page 2.
+  - **Real AI test (Gemini through the live Worker, 3 requests):** boxes cut from a realistic scanned test page, with the cut-off letters at the edges a finger-drawn box makes. All three were read correctly, and the cut-off letters were ignored.
+    - **One word:** 4 KB, 1.8 s. "teenagers" → teenager (n) วัยรุ่น.
+    - **A phrase:** 7 KB, 3.5 s. "replaced by technology" → replace (v) แทนที่, translated as ถูกแทนที่ด้วยเทคโนโลยี.
+    - **A whole line:** 19 KB, 3.0 s. The text was exact, the word picked was replace (v), and the Thai translation was correct.
+  - **Not tried yet:** a real iPhone and Apple Pencil.
+
 ## 📥 My words: import a word-list file, random 10 a day (2026-11-10)
 
 The owner asked to bring in all their orange and pink words from the Oxford 5000 PDF they shared, and to get a random 10 a day to learn.

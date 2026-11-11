@@ -6,13 +6,14 @@
 const DB = 'lb_books';
 const STORE = 'books';
 const FILES = 'files';
+const INK = 'ink';           // { id: 'bookId:page', strokes } pen and highlighter marks per page
 
 function open() {
   return new Promise((resolve, reject) => {
     if (!('indexedDB' in globalThis)) { reject(new Error('เบราว์เซอร์นี้เก็บหนังสือในเครื่องไม่ได้')); return; }
-    const req = indexedDB.open(DB, 2);
+    const req = indexedDB.open(DB, 3);
     req.onupgradeneeded = () => {
-      for (const s of [STORE, FILES]) if (!req.result.objectStoreNames.contains(s)) req.result.createObjectStore(s, { keyPath: 'id' });
+      for (const s of [STORE, FILES, INK]) if (!req.result.objectStoreNames.contains(s)) req.result.createObjectStore(s, { keyPath: 'id' });
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error || new Error('เปิดที่เก็บหนังสือไม่ได้'));
@@ -33,7 +34,12 @@ async function run(mode, fn, store = STORE) {
 
 export const putBook = (book) => run('readwrite', (s) => s.put(book));
 export const getBook = (id) => run('readonly', (s) => s.get(id)).catch(() => null);
-export const deleteBook = (id) => run('readwrite', (s) => s.delete(id)).then(() => run('readwrite', (s) => s.delete(id), FILES));
+export const deleteBook = (id) => run('readwrite', (s) => s.delete(id))
+  .then(() => run('readwrite', (s) => s.delete(id), FILES))
+  .then(() => run('readwrite', (s) => s.delete(IDBKeyRange.bound(`${id}:`, `${id}:￿`)), INK));
+export const fileExists = (id) => run('readonly', (s) => s.count(id), FILES).then((n) => n > 0).catch(() => false);
+export const getInk = (key) => run('readonly', (s) => s.get(key), INK).then((r) => r?.strokes || []).catch(() => []);
+export const putInk = (key, strokes) => run('readwrite', (s) => (strokes.length ? s.put({ id: key, strokes }) : s.delete(key)), INK);
 export const putFile = (id, data) => run('readwrite', (s) => s.put({ id, data }), FILES);
 export const getFile = (id) => run('readonly', (s) => s.get(id), FILES).then((r) => r?.data || null).catch(() => null);
 export const bookIds = () => run('readonly', (s) => s.getAllKeys()).then((k) => k || []).catch(() => []);
