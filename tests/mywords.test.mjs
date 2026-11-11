@@ -77,7 +77,7 @@ await test('saving and merging two devices keeps every released word once', asyn
   const m = M.mergeMyWords(a, b);
   assert.deepEqual(m.done.map((d) => d.word), ['verdict', 'adhere']);
   assert.deepEqual(m.queue.map((q) => q.word), ['vessel', 'vague'], 'a word released on the other device leaves the queue');
-  assert.deepEqual(M.cleanMyWords(null), { perDay: 10, queue: [], done: [] });
+  assert.deepEqual(M.cleanMyWords(null), { perDay: 10, order: 'random', queue: [], done: [] });
 });
 
 await test('wiring: page, links, offline files, saved, synced; photos never stored', async () => {
@@ -92,6 +92,36 @@ await test('wiring: page, links, offline files, saved, synced; photos never stor
   assert.ok(!/photoData|state\.\w*photo/i.test(view), 'a photo is kept');
   assert.match(view, /preparePhoto\(f, \{ maxSide: 2000 \}\)/);
   assert.equal((view.match(/askIelts\(/g) || []).length, 1, 'one AI request per batch');
+});
+
+
+await test('word-list file: word + colour per line, notes skipped, plain lines like pasting', async () => {
+  const text = '\uFEFF# My words\nadhere\tpink\nallegation, orange\nverdict;ส้ม\nvessel - เรือ\n\nbad<x>\tpink\naccountable\n';
+  assert.deepEqual(M.parseImport(text), [
+    { word: 'adhere', th: '', color: 'pink' }, { word: 'allegation', th: '', color: 'orange' }, { word: 'verdict', th: '', color: 'orange' },
+    { word: 'vessel', th: 'เรือ' }, { word: 'accountable', th: '' },
+  ]);
+  const r = M.addToQueue(null, M.parseImport('adhere\tpink\nverdict\torange\naccountable'), 'pink');
+  assert.deepEqual(r.my.queue.map((q) => q.color), ['pink', 'orange', 'pink'], 'lines without a colour take the chosen one');
+  const letters = (i) => [...String(i).padStart(4, '0')].map((d) => 'abcdefghij'[d]).join('');
+  assert.equal(M.parseImport(Array.from({ length: 6000 }, (_, i) => `w${letters(i)}\tpink`).join('\n')).length, M.IMPORT_MAX);
+});
+
+await test('random order: same draw all day, another draw tomorrow, every word kept; colour order still there', async () => {
+  const letters = (i) => [...String(i).padStart(2, '0')].map((d) => 'abcdefghij'[d]).join('');
+  const queue = Array.from({ length: 50 }, (_, i) => ({ word: `word${letters(i)}`, color: i % 3 ? 'pink' : 'orange', t: i }));
+  const my = M.cleanMyWords({ perDay: 10, queue });
+  assert.equal(my.order, 'random', 'random is the default');
+  const a = M.nextBatch(my, '2026-11-10').map((q) => q.word);
+  assert.equal(a.length, 10);
+  assert.deepEqual(M.nextBatch(my, '2026-11-10').map((q) => q.word), a, 'stable within the day');
+  assert.deepEqual(M.nextBatch({ ...my, queue: my.queue.slice().reverse() }, '2026-11-10').map((q) => q.word), a, 'queue order does not matter');
+  assert.notDeepEqual(M.nextBatch(my, '2026-11-11').map((q) => q.word), a);
+  assert.deepEqual(M.shuffledFor(my.queue, 'x').map((q) => q.word).sort(), my.queue.map((q) => q.word).sort());
+  assert.ok(!a.every((w, i) => w === M.ordered(my.queue)[i].word), 'not just the colour order');
+  assert.ok(M.nextBatch({ ...my, order: 'color' }, '2026-11-10').every((q) => q.color === 'orange'), 'colour order: orange first');
+  assert.equal(M.cleanMyWords({ order: 'weird' }).order, 'random');
+  assert.equal(M.mergeMyWords({ order: 'color' }, { order: 'random' }).order, 'color');
 });
 
 done();

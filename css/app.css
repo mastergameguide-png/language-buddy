@@ -715,3 +715,4 @@ dialog.onboarding { overflow-y: auto; }
 .daily-corrected p { margin: 0 0 10px; }
 .daily-corrected p:last-child { margin-bottom: 0; }
 .daily-mine summary { cursor: pointer; min-height: 32px; display: flex; align-items: center; }
+.mw-order { margin-top: 12px; gap: 8px; }

@@ -1,5 +1,24 @@
 # Changelog
 
+## 📥 My words: import a word-list file, random 10 a day (2026-11-10)
+
+The owner asked to bring in all their orange and pink words from the Oxford 5000 PDF they shared, and to get a random 10 a day to learn.
+
+- **The list:** all 8 pages were read with the app's own method, run on the computer.
+  - The highlights were found by colour (938 boxes), cut into 30 numbered-strip images, and each image was read by real Gemini with `MOSAIC_PROMPT`. That took 34 requests, including retries after 3 × 503 "high demand" and 2 × 504.
+  - Several images returned far fewer words than boxes. Checking them showed those boxes were Thai handwriting in orange or pink ink, which the AI correctly skipped.
+  - Five misreads were fixed after checking the page images: "pul" was removed; "young" (half of "youngster") and "yellow" (pieces of "yell") were removed; "eptional" became "exceptional" and "indulg" became "indulge". The words of each image stay in alphabetical range page by page.
+  - **Result: 795 words (orange 312, pink 483)** in `my-words-oxford.txt`, one "word<TAB>colour" per line. It was given to the owner only, not put in the repo: the repo is public and the list is personal.
+- **Import:** a new "📄 นำเข้าไฟล์รายการคำ" button on the My words page, which uses no AI.
+  - `parseImport` reads "word<TAB>colour", "word, colour" or "word;ส้ม/ชมพู". Lines starting with # are skipped, other lines are read as when pasting, and at most 5,000 words are read.
+  - Known and queued words are skipped as before.
+- **Order:** "คำแต่ละวัน" has two choices:
+  - 🎲 สุ่ม (the new default): a random draw from the whole queue, seeded by the date, so the preview is exactly what gets released and stays the same all day.
+  - 🟧 ส้มก่อน: the old order, orange first.
+  - The choice is saved and synced in `mywords.order`.
+- **Tests:** `mywords.test.mjs` 10 (+2).
+  - **Browser check:** the 797-word file (before the last fixes) was imported with the right counts. Releasing today's 10 gave exactly the 10 previewed, mixed orange and pink, into the word bank.
+
 ## 📘 Today's words: B2–C1, never repeated, and an article to write (2026-11-10)
 
 The owner asked for:

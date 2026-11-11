@@ -8,7 +8,7 @@ import { recordWord } from '../stats.js';
 import { askIelts, askTranscribe } from '../ai.js';
 import { speak, unlockSpeech } from '../speech.js';
 import {
-  COLORS, PER_DAY_CHOICES, PHOTO_MAX, parsePasted, addToQueue, ordered, leftToday, nextBatch, buildQuiz,
+  COLORS, PER_DAY_CHOICES, PHOTO_MAX, ORDERS, parsePasted, parseImport, addToQueue, releaseOrder, leftToday, nextBatch, buildQuiz,
   EXTRACT_PROMPT, MOSAIC_PROMPT, buildEnrichPrompt, parseExtract, parseMosaic, parseEnrich, cleanMyWords, normWord,
 } from '../engine/mywords.js';
 import { findHighlights, chunk } from '../engine/highlights.js';
@@ -34,6 +34,7 @@ export function renderMyWords(root) {
     tile('ได้แล้ว', String(m.done.length), 'อยู่ในคลังคำ ไปทวนที่ "ทบทวน"'),
     tile('วันนี้', `${m.perDay - left}/${m.perDay}`, left ? `รับได้อีก ${left} คำ` : 'ครบแล้ว พรุ่งนี้รับใหม่'),
     perDayTile(m, root)));
+  root.append(orderRow(m, root));
 
   root.append(todayCard(m, today, left, root));
   root.append(addCard(root));
@@ -50,6 +51,18 @@ function perDayTile(m, root) {
   sel.value = String(m.perDay);
   sel.addEventListener('change', () => { state.mywords.perDay = Number(sel.value); save(); renderMyWords(root); });
   return h('div', { class: 'card stat' }, el('div', 'label', 'ต่อวัน'), sel, el('div', 'sub', 'แนะนำ 10 คำ'));
+}
+
+// How the day's words are picked from the queue.
+function orderRow(m, root) {
+  const seg = h('div', { class: 'seg', role: 'radiogroup', 'aria-label': 'ลำดับการปล่อยคำ' });
+  for (const [k, label] of Object.entries(ORDERS)) {
+    const b = h('button', { type: 'button', role: 'radio', 'aria-checked': String(m.order === k), class: m.order === k ? 'on' : '' }, label);
+    b.addEventListener('click', () => { state.mywords.order = k; save(); renderMyWords(root); });
+    seg.append(b);
+  }
+  return h('div', { class: 'row wrap-ok mw-order' }, el('span', 'small', 'คำแต่ละวัน:'), seg,
+    el('span', 'xs muted', m.order === 'random' ? 'สุ่มจากคิวทั้งหมด ได้ชุดเดิมตลอดวัน' : 'สีส้มก่อน แล้วค่อยสีชมพู'));
 }
 
 // ---------- today's words ----------
@@ -144,6 +157,20 @@ function addCard(root) {
     queueItems(items.map((i) => ({ ...i, color })), root);
   });
   card.append(ta, add);
+
+  // A word-list file (e.g. one made from the highlighted PDF): no AI needed.
+  const listFile = h('input', { type: 'file', accept: '.txt,.csv,.tsv,text/plain,text/csv', hidden: true });
+  listFile.addEventListener('change', async () => {
+    const f = listFile.files[0]; listFile.value = '';
+    if (!f) return;
+    if (f.size > 2 * 1024 * 1024) { toast('ไฟล์ใหญ่เกินไป', true); return; }
+    const items = parseImport(await f.text());
+    if (!items.length) { toast('ไม่พบคำในไฟล์นี้', true); return; }
+    queueItems(items, root);
+  });
+  const imp = h('button', { type: 'button', class: 'btn' }, '📄 นำเข้าไฟล์รายการคำ');
+  imp.addEventListener('click', () => listFile.click());
+  card.append(el('div', 'xs muted', 'หรือนำเข้าไฟล์ .txt/.csv: หนึ่งคำต่อบรรทัด ใส่สีต่อท้ายได้ เช่น "adhere<แท็บ>pink" (ไม่ใช้ AI)'), h('div', { class: 'row wrap-ok' }, imp), listFile);
 
   // Photo of a highlighted list: the AI lists only the highlighted words and their colour.
   const file = h('input', { type: 'file', accept: 'image/*', multiple: true, hidden: true });
@@ -266,7 +293,7 @@ function quizCard(m, root) {
 }
 
 function queueCard(m, root) {
-  const list = h('div', { class: 'chips' }, ...ordered(m.queue).slice(0, 120).map((q) => {
+  const list = h('div', { class: 'chips' }, ...releaseOrder(m, dayKey()).slice(0, 120).map((q) => {
     const b = h('button', { type: 'button', class: `chip mw-${q.color}`, 'aria-label': `เอา ${q.word} ออกจากคิว` }, `${q.word} ✕`);
     b.addEventListener('click', () => { state.mywords.queue = my().queue.filter((x) => x !== q && normWord(x.word) !== normWord(q.word)); save(); renderMyWords(root); });
     return b;

@@ -11,6 +11,11 @@ export const COLORS = {
 export const PER_DAY_CHOICES = [5, 10, 15];
 export const DEFAULT_PER_DAY = 10;
 export const PHOTO_MAX = 3;
+// Release order: 'random' (the owner's choice, 2026-11-10: a random 10 a day from the whole list)
+// or 'color' (orange first, then pink, oldest first).
+export const ORDERS = { random: '🎲 สุ่ม', color: '🟧 ส้มก่อน แล้วชมพู' };
+export const DEFAULT_ORDER = 'random';
+export const IMPORT_MAX = 5000;
 const ENRICH_MAX = 15;
 
 const clean = (v, n) => String(v ?? '').replace(/\s+/g, ' ').trim().slice(0, n);
@@ -62,13 +67,42 @@ export function addToQueue(my, items, color = 'none', have = [], now = Date.now(
 
 // The queue in release order: orange, then pink, then the rest; older first within a colour.
 export const ordered = (queue) => queue.slice().sort((a, b) => COLORS[a.color].rank - COLORS[b.color].rank || a.t - b.t);
+// The same random order all day (seeded by the day), so the preview is what gets released and
+// the batch does not change when the page redraws; a new day gives a new draw.
+export function shuffledFor(queue, day) {
+  let h = 2166136261;
+  for (const c of String(day)) h = Math.imul(h ^ c.charCodeAt(0), 16777619);
+  const rand = () => { h = Math.imul(h ^ (h >>> 15), 2246822519) + 0x9e3779b9; h ^= h >>> 13; return ((h >>> 0) % 1000003) / 1000003; };
+  const out = queue.slice().sort((a, b) => (normWord(a.word) < normWord(b.word) ? -1 : 1));
+  for (let i = out.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [out[i], out[j]] = [out[j], out[i]]; }
+  return out;
+}
+export const releaseOrder = (my, day) => { const m = cleanMyWords(my); return m.order === 'random' ? shuffledFor(m.queue, day) : ordered(m.queue); };
 
 // How many words can still be released today.
 export function leftToday(my, day) {
   const m = cleanMyWords(my);
   return Math.max(0, m.perDay - m.done.filter((d) => d.day === day).length);
 }
-export const nextBatch = (my, day) => ordered(cleanMyWords(my).queue).slice(0, leftToday(my, day));
+export const nextBatch = (my, day) => releaseOrder(my, day).slice(0, leftToday(my, day));
+
+// A word-list file: one word per line, "word<TAB>orange|pink" (or a comma), or "word - Thai" as
+// when pasting. Lines starting with # are notes. Colour words in Thai (ส้ม/ชมพู) work too.
+export function parseImport(text) {
+  const out = [];
+  for (const raw of String(text || '').replace(/^\uFEFF/, '').split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line || line.startsWith('#')) continue;
+    const m = line.match(/^(.+?)\s*[\t,;]\s*(orange|pink|none|ส้ม|ชมพู)\s*$/i);
+    if (m) {
+      const word = m[1].trim();
+      if (!isWord(word)) continue;
+      out.push({ word, th: '', color: /^(orange|ส้ม)$/i.test(m[2]) ? 'orange' : /^(pink|ชมพู)$/i.test(m[2]) ? 'pink' : 'none' });
+    } else out.push(...parsePasted(line));
+    if (out.length >= IMPORT_MAX) break;
+  }
+  return out;
+}
 
 // Gap-fill practice from released words that have an example containing the word: four options,
 // the others taken from released words of the same part of speech when possible.
@@ -176,7 +210,7 @@ export function parseEnrich(raw, asked) {
 }
 
 // ---------- saved data ----------
-// { perDay, queue: [{word, th, color, t}], done: [{word, th, color, day, pos, example, collocation, family, confusable, tip}] }
+// { perDay, order, queue: [{word, th, color, t}], done: [{word, th, color, day, pos, example, collocation, family, confusable, tip}] }
 export function cleanMyWords(v) {
   const o = v && typeof v === 'object' ? v : {};
   const perDay = PER_DAY_CHOICES.includes(Number(o.perDay)) ? Number(o.perDay) : DEFAULT_PER_DAY;
@@ -187,12 +221,12 @@ export function cleanMyWords(v) {
     pos: clean(d.pos, 12), example: clean(d.example, 220), collocation: clean(d.collocation, 80), family: clean(d.family, 80), confusable: clean(d.confusable, 80), tip: clean(d.tip, 140),
   }));
   const queue = (Array.isArray(o.queue) ? o.queue : []).filter(keep).slice(0, 5000).map((q) => ({ word: clean(q.word, 40), th: clean(q.th, 120), color: colorOf(q.color), t: Number(q.t) || 0 }));
-  return { perDay, queue, done };
+  return { perDay, order: ORDERS[o.order] ? o.order : DEFAULT_ORDER, queue, done };
 }
 // Two devices: every released word is kept once; the queue keeps what neither has released.
 export function mergeMyWords(a, b) {
   const x = cleanMyWords(a), y = cleanMyWords(b);
   const done = [...x.done, ...y.done];
   const released = new Set(done.map((d) => normWord(d.word)));
-  return cleanMyWords({ perDay: x.perDay, done, queue: [...x.queue, ...y.queue].filter((q) => !released.has(normWord(q.word))) });
+  return cleanMyWords({ perDay: x.perDay, order: x.order, done, queue: [...x.queue, ...y.queue].filter((q) => !released.has(normWord(q.word))) });
 }
