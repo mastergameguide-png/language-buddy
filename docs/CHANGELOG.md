@@ -1,5 +1,16 @@
 # Changelog
 
+## 🤖 Worker v14: test Cloudflare Workers AI directly (2026-11-12)
+
+- Worker v13 (Gemini → Groq → Cloudflare Workers AI) was deployed by the owner on 2026-11-12.
+- v14 adds `ai: "cloudflare"`, which sends a text request to Workers AI only. Workers AI is normally used only after Gemini and Groq both fail, so it could not be tested before. The app never sends this mode, and photos still go to Gemini only.
+- Real test (live Worker v14, model `@cf/google/gemma-4-26b-a4b-it`), 3 requests, all answered by `cloudflare` and all parsed correctly:
+  - mitigate → บรรเทา, ทำให้เบาบางลง (v), with a natural example;
+  - carry out → ดำเนินการ, ทำตาม (phrase);
+  - book lookup "allegations" → allegation, n, ข้อกล่าวหา.
+  - Times were 3.5–18.1 s (the first was slowest) and 540–967 tokens, slower than Gemini (about 1–2 s).
+- Test: `worker-route.test.mjs` adds a check that "cloudflare" mode goes straight to Workers AI.
+
 ## 📘 Word bank: Thai meaning filled in by AI (2026-11-11)
 
 The owner asked for words added to the word bank to come with a translation, so they do not have to look the meaning up.

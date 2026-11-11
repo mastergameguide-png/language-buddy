@@ -114,6 +114,10 @@ script = { gemini: err(503, 'x'), groq: err(503, 'x') }; cfCalls = [];
 r = await ask(env({ AI: fakeAI(cfOk) }), { ai: 'gemini' });
 check('"Gemini only" setting is respected', r.status === 503 && cfCalls.length === 0);
 
+script = { gemini: gemOk, groq: groqOk }; cfCalls = [];
+r = await ask(env({ AI: fakeAI(cfOk) }), { ai: 'cloudflare' });
+check('"cloudflare" test mode goes straight to Workers AI', r.status === 200 && r.json.provider === 'cloudflare' && cfCalls.length === 1);
+
 script = {}; cfCalls = [];
 r = await ask(env({ GEMINI_API_KEY: undefined, GROQ_API_KEY: undefined, AI: fakeAI(cfOk) }));
 check('only the AI binding set → still answers', r.json.provider === 'cloudflare');

@@ -20,7 +20,7 @@
 //   DB                (D1 binding, for sync) free SQL database, tables in schema.sql
 //   LIMITER           (rate-limit binding) requests per IP per minute, see wrangler.toml
 
-const WORKER_VERSION = 13;         // shown when you open the worker link; bump on every change
+const WORKER_VERSION = 14;         // shown when you open the worker link; bump on every change
 const MAX_TURNS = 60;
 const MAX_BODY_CHARS = 1500000;   // room for one resized photo
 const MAX_IMAGE_CHARS = 1400000;  // base64 length of a single photo
@@ -182,6 +182,7 @@ function routeFor(contents, mode) {
   if (contents.some((c) => c.parts.some((p) => p.inlineData))) return ['gemini'];
   if (mode === 'groq') return ['groq', 'gemini', 'cloudflare'];
   if (mode === 'gemini') return ['gemini'];
+  if (mode === 'cloudflare') return ['cloudflare'];   // the last fallback alone, so it can be tested
   return ['gemini', 'groq', 'cloudflare'];
 }
 
