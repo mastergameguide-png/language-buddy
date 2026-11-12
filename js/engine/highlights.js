@@ -8,7 +8,33 @@
 // does not fill the 4×4-pixel cells a highlight fills.
 
 const CELL = 4;
+const MAX_H = 45;   // one highlighted line is at most this tall (px, page scaled to 2000 px)
 export const COLOR_NAMES = ['orange', 'pink'];
+
+// Highlights on two lines next to each other touch and come out as one tall group. Cut it where
+// fewer cells are coloured (the rounded ends of the strokes meet there), so each line is its own
+// box. A solid block of colour has no such narrow row and is left whole (then dropped as too tall).
+function splitRows(cells, cw, y0, y1) {
+  const rows = y1 - y0 + 1;
+  if (rows * CELL <= MAX_H) return [cells];
+  const count = new Array(rows).fill(0);
+  for (const k of cells) count[Math.floor(k / cw) - y0]++;
+  const cuts = [];
+  let from = 0;
+  for (let r = 2; r < rows - 2; r++) {
+    if (r - from < 3) continue;
+    const above = Math.max(...count.slice(from, r)), below = Math.max(...count.slice(r + 1));
+    if (count[r] <= count[r - 1] && count[r] <= count[r + 1] && count[r] < 0.7 * Math.min(above, below)) { cuts.push(r); from = r + 1; }
+  }
+  if (!cuts.length) return [cells];
+  const parts = Array.from({ length: cuts.length + 1 }, () => []);
+  for (const k of cells) {
+    const r = Math.floor(k / cw) - y0;
+    let i = 0; while (i < cuts.length && r > cuts[i]) i++;
+    if (r !== cuts[i]) parts[i].push(k);   // the thin row itself belongs to neither line
+  }
+  return parts.filter((p) => p.length);
+}
 
 function hsv(r, g, b) {
   const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn || 1e-6;
@@ -48,17 +74,22 @@ export function findHighlights({ data, width, height }) {
     for (let start = 0; start < cells.length; start++) {
       if (!cells[start] || seen[start]) continue;
       const stack = [start]; seen[start] = 1;
-      let x0 = Infinity, y0 = Infinity, x1 = -1, y1 = -1, n = 0;
+      const group = [];
+      let gy0 = Infinity, gy1 = -1;
       while (stack.length) {
         const k = stack.pop(), x = k % cw, y = (k - x) / cw;
-        n++; x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y);
+        group.push(k); gy0 = Math.min(gy0, y); gy1 = Math.max(gy1, y);
         for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
           const nx = x + dx, ny = y + dy, nk = ny * cw + nx;
           if (nx >= 0 && nx < cw && ny >= 0 && ny < ch && cells[nk] && !seen[nk]) { seen[nk] = 1; stack.push(nk); }
         }
       }
-      const b = { x: x0 * CELL, y: y0 * CELL, w: (x1 - x0 + 1) * CELL, h: (y1 - y0 + 1) * CELL, area: n * CELL * CELL };
-      if (b.w >= 8 && b.h >= 8 && b.h <= 45) boxes.push(b);
+      for (const part of splitRows(group, cw, gy0, gy1)) {
+        let x0 = Infinity, y0 = Infinity, x1 = -1, y1 = -1;
+        for (const k of part) { const x = k % cw, y = (k - x) / cw; x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+        const b = { x: x0 * CELL, y: y0 * CELL, w: (x1 - x0 + 1) * CELL, h: (y1 - y0 + 1) * CELL, area: part.length * CELL * CELL };
+        if (b.w >= 8 && b.h >= 8 && b.h <= MAX_H) boxes.push(b);
+      }
     }
     // 3. join pieces of one highlight split by a pen line (same line, gap up to 16 px)
     boxes.sort((a, b) => a.x - b.x);
@@ -76,7 +107,7 @@ export function findHighlights({ data, width, height }) {
     }
     // 4. keep word-sized, mostly filled boxes; reading order: column by column, top to bottom
     const col = Math.max(1, Math.round(width / 6));
-    out[name] = merged.filter((b) => b.w >= 30 && b.h >= 10 && b.h <= 45 && b.area >= 0.45 * b.w * b.h)
+    out[name] = merged.filter((b) => b.w >= 30 && b.h >= 10 && b.h <= MAX_H && b.area >= 0.45 * b.w * b.h)
       .sort((a, b) => Math.floor(a.x / col) - Math.floor(b.x / col) || a.y - b.y)
       .map(({ x, y, w, h }) => ({ x, y, w, h }));
   }

@@ -1,5 +1,10 @@
 # Changelog
 
+## My words: touching highlights are no longer lost (2026-11-12)
+
+- **Fixed:** when two lines next to each other were highlighted in the same colour (for example "vanish" above "variable"), the highlights touch and the photo reader saw one tall shape. It dropped it as "not a word", so both words were lost. `findHighlights` now cuts such a shape at the thin row where the two strokes meet (`splitRows` in `js/engine/highlights.js`). A solid block of colour has no thin row and is still ignored. 1 new test.
+- Checked on the owner's 8 Oxford 5000 pages (new photos without pen marks): 929 → 1,161 boxes found. The owner's word file was read again: 1,058 words (375 orange, 683 pink) instead of 795. The file stays on this computer only (`Claude outputs/`, not in the repo).
+
 ## Five improvements in one batch (2026-11-12)
 
 The owner asked for every item on the suggested list.

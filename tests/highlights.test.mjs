@@ -48,6 +48,18 @@ await test('a highlight split by a blue pen line is joined back into one box', a
   assert.ok(r.pink[0].x <= 40 && r.pink[0].x + r.pink[0].w >= 180);
 });
 
+await test('highlights on two lines next to each other are two boxes, not one dropped tall box', async () => {
+  // like "vanish" above "variable" on the owner's page: the strokes touch, rounded ends meet in a thin row
+  const { img, paint } = page(400, 200);
+  paint(24, 40, 90, 24, ORANGE); paint(96, 64, 16, 4, ORANGE);       // the strokes touch only here
+  paint(20, 68, 150, 24, ORANGE);
+  paint(24, 120, 100, 22, PINK); paint(24, 142, 120, 24, PINK);   // pink touching with no thin row: left whole
+  const r = H.findHighlights(img);
+  assert.equal(r.orange.length, 2, JSON.stringify(r.orange));
+  assert.ok(r.orange[0].y < 44 && r.orange[1].y >= 64, JSON.stringify(r.orange));
+  assert.ok(r.orange.every((b) => b.h <= 30));
+});
+
 await test('chunks keep each mosaic to at most 40 pieces', async () => {
   assert.deepEqual(H.chunk([1, 2, 3, 4, 5], 2), [[1, 2], [3, 4], [5]]);
   assert.equal(H.chunk(Array(95).fill(0)).length, 3);
