@@ -6,6 +6,12 @@
 // no storage.
 
 export const DAILY_COUNT = 5;
+// The learner may ask for 10 a day instead (owner's request, 2026-11-12).
+export const DAILY_CHOICES = [5, 10];
+export const DAILY_MAX = 10;
+export const dailyCount = (n) => (DAILY_CHOICES.includes(Number(n)) ? Number(n) : DAILY_COUNT);
+// How many to ask the AI for when `need` new words are wanted.
+export const askCount = (need) => Math.max(1, Math.min(DAILY_MAX, Math.floor(need) || DAILY_COUNT)) + 3;
 // The AI is asked for a few more, because it sometimes repeats a word the learner already has
 // (seen with Gemini on 2026-11-06); those are dropped here and the first 5 new ones are kept.
 export const ASK_COUNT = DAILY_COUNT + 3;
@@ -56,7 +62,7 @@ const list = (v, n) => (Array.isArray(v) ? v : []).map((x) => s(x, 60)).filter(B
 
 // AI reply → [{word, pos, cefr, th, synonyms, collocations, example, note}]. Accepts {"words": [...]}
 // or a bare array (the original prompt), with or without a ```json fence. Bad items are dropped.
-export function parseDaily(raw, have = []) {
+export function parseDaily(raw, have = [], max = DAILY_COUNT) {
   let data;
   try {
     const text = String(raw || '').trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
@@ -83,7 +89,7 @@ export function parseDaily(raw, have = []) {
       example: s(it.example_sentence, 260),
       note: s(it.usage_note, 200),
     });
-    if (out.length >= DAILY_COUNT) break;
+    if (out.length >= max) break;
   }
   return out;
 }
@@ -105,7 +111,7 @@ export function cleanDaily(v) {
   const words = parseDaily(JSON.stringify((Array.isArray(v.words) ? v.words : []).map((w) => ({
     word: w?.word, thai_meaning: w?.th, part_of_speech: w?.pos, cefr_level: w?.cefr, academic_synonyms: w?.synonyms,
     common_collocations: w?.collocations, example_sentence: w?.example, usage_note: w?.note,
-  }))));
+  }))), [], DAILY_MAX);
   if (!words.length) return null;
   const names = new Set(words.map((w) => w.word));
   return {

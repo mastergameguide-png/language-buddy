@@ -1,5 +1,25 @@
 # Changelog
 
+## Five improvements in one batch (2026-11-12)
+
+The owner asked for every item on the suggested list.
+
+- **📘 Today's words, 5 or 10 a day.** A switch on the card (`settings.dailyWords`, synced). Choosing 10 after today's 5 are out shows "✨ ขออีก 5 คำ": today's set is kept and only the missing words are asked for (1 AI request). My words already had its own 5/10/15 chooser.
+- **📘 Word bank, translate all.** Words with no meaning show a card "มี N คำที่ยังไม่มีความหมาย · ✨ แปลทั้งหมด". The AI fills in the Thai meaning, part of speech and an example, 20 words per request (`define.js`: `buildDefineManyPrompt`, `parseDefineMany`). Words the AI cannot translate are left as they are; if the AI stops answering, what is done is kept.
+- **📖 Book handwriting syncs across devices.** One sync row per stroke (`n:<book>:<page>:<stroke>`, points packed as text so 2,000 points fit in a row). New file `js/inksync.js`.
+  - Strokes from two devices on the same page are both kept, and arrive on an open page without reloading.
+  - A stroke is deleted on the server only when it was removed on a device (eraser, undo, clear page, delete book). If the browser clears a device's storage, the strokes are downloaded again instead of being deleted everywhere.
+  - Strokes saved before this change get an id from their own content, so they sync too.
+- **📖 Quiz from the words looked up in a book.** "🧠 ทดสอบคำที่ค้นในเล่มนี้": 5 questions, choose the right Thai meaning out of 4. Made on the device, no AI (`buildWordQuiz`). Needs 4 looked-up words with different meanings.
+- **Polish pass** (all 14 pages checked at iPhone width: no console errors, no sideways overflow):
+  - Fixed: a PDF that does not carry its own fonts showed a blank page in the page view. The 14 standard PDF fonts from pdf.js are now shipped in `vendor/pdfjs/standard_fonts` (about 800 KB, loaded only when needed).
+  - Fixed: on a phone, the open practice tab (for example 📖 หนังสือ) was off the right edge of the tab row. It is now scrolled into view.
+- Tests: new `tests/inkquiz.test.mjs` (14); 24/24 files pass. One test caught a bug before release (old strokes all got the id "undefined").
+- **Real AI check (4 requests, approved by the owner).** Ask for 5 more: 5 + 5 words, 10 different, none repeated (Gemini 4.9 s, Groq 4.2 s). Translate all: 20 words in one request, 3.2 s and 4.2 s; the made-up word was left alone both times.
+  - Found: in a 20-word reply Gemini sometimes breaks a Thai meaning (a letter missing: "การ ักษา"; or English inside a Thai word: "อยู่andที่อื่น"), 3 of 20 in one run and 2 of 20 in the next.
+  - Fixed: `brokenThai()` in `define.js` refuses such a meaning, so the word stays in the "no meaning" list and can be translated again. Applies to adding one word too. 1 new test.
+- Checked in the browser with the local mock Worker and its test database: 5 → 10 words, translate all (23 of 24, the made-up word left alone), ink sync with a second simulated device (upload, live arrival, erase, storage-loss recovery, no repeated uploads), the word quiz, and the font fix. **Not yet tried with the real AI or on a real iPhone.** No Worker change.
+
 ## 🤖 Worker v14: test Cloudflare Workers AI directly (2026-11-12)
 
 - Worker v13 (Gemini → Groq → Cloudflare Workers AI) was deployed by the owner on 2026-11-12.

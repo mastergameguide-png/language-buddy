@@ -4,12 +4,12 @@
 // reviewed with the other cards. Then ✍️ the learner writes a short article using all five; one
 // AI request scores it (vocabulary, grammar, order, content) and shows the corrected article.
 import { el, h, icon, toast, dayKey, num } from '../util.js';
-import { settings, state, persist, isEnglish, cefrOf, ieltsBand, addWord, logActivity } from '../store.js';
+import { settings, saveSettings, state, persist, isEnglish, cefrOf, ieltsBand, addWord, logActivity } from '../store.js';
 import { recordWord, recordMessage } from '../stats.js';
 import { askIelts } from '../ai.js';
 import { speak, unlockSpeech } from '../speech.js';
 import {
-  buildDailyPrompt, parseDaily, DAILY_COUNT, LEVEL_TEXT, cleanSeen, countWords, wordsUsed, buildEssayPrompt, parseEssay,
+  buildDailyPrompt, parseDaily, DAILY_CHOICES, dailyCount, askCount, LEVEL_TEXT, cleanSeen, countWords, wordsUsed, buildEssayPrompt, parseEssay,
   CRITERIA, ESSAY_MIN_WORDS, ESSAY_MAX_WORDS, ESSAY_MAX_CHARS,
 } from '../engine/daily.js';
 
@@ -26,8 +26,18 @@ export function dailyCard(rerender) {
   card.append(h('div', { class: 'row' }, el('h2', 'sec grow', '📘 คำศัพท์วันนี้'), el('span', 'chip', `ระดับ ${LEVEL_TEXT}`)));
   card.append(h('a', { class: 'btn sm ghost', href: '#mywords' }, '📥 คำของฉัน (คำที่ท่องแล้วจำไม่ได้)'));
 
+  const want = dailyCount(settings.dailyWords);
+  // 5 or 10 words a day. Choosing 10 after today's 5 are out offers 5 more.
+  const pick = h('div', { class: 'seg', role: 'group', 'aria-label': 'จำนวนคำต่อวัน' });
+  for (const n of DAILY_CHOICES) {
+    const b = h('button', { type: 'button', class: n === want ? 'on' : '', 'aria-pressed': String(n === want) }, `${n} คำ/วัน`);
+    b.addEventListener('click', () => { if (n === want) return; settings.dailyWords = n; saveSettings(); rerender(); });
+    pick.append(b);
+  }
+  card.append(pick);
+
   if (!set) {
-    card.append(el('p', 'small muted', `AI จะเลือกคำระดับ ${LEVEL_TEXT} วันละ ${DAILY_COUNT} คำ ไม่ซ้ำกับวันก่อนๆ พร้อมความหมาย คำพ้อง คำที่มักใช้คู่กัน และประโยคตัวอย่าง แล้วให้แต่งบทความด้วยคำเหล่านี้ AI ให้คะแนนและแสดงบทความที่ถูกต้อง`));
+    card.append(el('p', 'small muted', `AI จะเลือกคำระดับ ${LEVEL_TEXT} วันละ ${want} คำ ไม่ซ้ำกับวันก่อนๆ พร้อมความหมาย คำพ้อง คำที่มักใช้คู่กัน และประโยคตัวอย่าง แล้วให้แต่งบทความด้วยคำเหล่านี้ AI ให้คะแนนและแสดงบทความที่ถูกต้อง`));
     const go = h('button', { type: 'button', class: 'btn primary' }, busy ? 'กำลังเลือกคำ…' : '✨ สร้างคำศัพท์วันนี้');
     go.disabled = busy;
     go.addEventListener('click', () => makeToday(rerender));
@@ -59,6 +69,13 @@ export function dailyCard(rerender) {
     body.append(h('div', { class: 'row wrap-ok' }, say, w.cefr ? el('span', 'chip', w.cefr) : null, h('span', { class: 'grow' }), add));
     item.append(body);
     card.append(item);
+  }
+  if (set.words.length < want) {
+    const need = want - set.words.length;
+    const more = h('button', { type: 'button', class: 'btn' }, busy ? 'กำลังเลือกคำ…' : `✨ ขออีก ${need} คำ`);
+    more.disabled = busy;
+    more.addEventListener('click', () => makeToday(rerender));
+    card.append(h('div', { class: 'row wrap-ok' }, more, el('span', 'xs muted', 'ใช้ AI 1 ครั้ง')));
   }
   const left = set.words.filter((w) => !inBank(w.word));
   if (left.length) {
@@ -201,10 +218,14 @@ async function makeToday(rerender) {
   try {
     // Never again: words in the word bank, and every word given on any earlier day.
     const have = [...state.vocab.map((v) => v.word), ...(state.dailySeen || []), ...(state.daily?.words || []).map((w) => w.word)];
-    const prompt = buildDailyPrompt({ cefr: cefrOf(), band: ieltsBand(), exclude: have });
-    const words = parseDaily(await askIelts(prompt, "Make today's words."), have);
+    // Today's set is kept when the learner asks for more (5 → 10); only the missing words are asked for.
+    const today = state.daily?.day === dayKey() ? state.daily : null;
+    const need = dailyCount(settings.dailyWords) - (today?.words.length || 0);
+    if (need <= 0) { busy = false; rerender(); return; }
+    const prompt = buildDailyPrompt({ cefr: cefrOf(), band: ieltsBand(), exclude: have, count: askCount(need) });
+    const words = parseDaily(await askIelts(prompt, "Make today's words."), have, need);
     if (!words.length) throw new Error('AI ส่งคำศัพท์กลับมาไม่ครบ ลองกดใหม่อีกครั้ง');
-    state.daily = { day: dayKey(), cefr: LEVEL_TEXT, words, added: [], draft: '', essay: null };
+    state.daily = today ? { ...today, words: [...today.words, ...words] } : { day: dayKey(), cefr: LEVEL_TEXT, words, added: [], draft: '', essay: null };
     state.dailySeen = cleanSeen([...(state.dailySeen || []), ...words.map((w) => w.word)]);
     persist();
   } catch (e) { toast(e.message, true); }

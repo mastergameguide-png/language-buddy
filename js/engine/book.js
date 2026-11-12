@@ -247,6 +247,28 @@ export function parseQuiz(raw) {
   return out;
 }
 
+// ---------- quiz from the words looked up in a book (no AI) ----------
+// "What does this word mean?" with 4 Thai choices. The wrong choices are the meanings of other
+// words from the same book (same part of speech first). Needs 4 words with different meanings.
+export const WORD_QUIZ_MIN = 4;
+export function buildWordQuiz(words, n = 5, r = Math.random) {
+  const seen = new Set(), ths = new Set(), pool = [];
+  for (const w of (Array.isArray(words) ? words : []).slice().reverse()) {   // the latest meaning of a word wins
+    const key = clean(w?.word, 40).toLowerCase(), th = clean(w?.th, 120);
+    if (!key || !th || seen.has(key) || ths.has(th)) continue;
+    seen.add(key); ths.add(th);
+    pool.push({ word: clean(w.word, 40), th, pos: clean(w.pos, 12), page: w.page });
+  }
+  if (pool.length < WORD_QUIZ_MIN) return [];
+  const mix = (list) => list.map((x) => [r(), x]).sort((a, b) => a[0] - b[0]).map(([, x]) => x);
+  return mix(pool).slice(0, n).map((d) => {
+    const others = pool.filter((x) => x !== d);
+    const same = others.filter((x) => x.pos && x.pos === d.pos), rest = others.filter((x) => !same.includes(x));
+    const options = mix([d.th, ...[...mix(same), ...mix(rest)].slice(0, 3).map((x) => x.th)]);
+    return { q: d.word, options, answer: options.indexOf(d.th), th: d.th, page: d.page };
+  });
+}
+
 // ---------- page view: ink (pen, highlighter) and boxed words ----------
 // Strokes are kept per page on this device: { tool: 'pen'|'hl', c: colour, w: width as a share of
 // the page width, p: [[x, y], …] with x, y from 0 to 1 across the page }.
@@ -274,8 +296,41 @@ export function simplifyPoints(pts, min = 0.0015) {
 }
 export function cleanStrokes(v) {
   return (Array.isArray(v) ? v : []).filter((s) => s && (s.tool === 'pen' || s.tool === 'hl') && INK_COLORS.has(s.c))
-    .map((s) => ({ tool: s.tool, c: s.c, w: Math.max(0.0005, Math.min(0.06, Number(s.w) || INK_WIDTH[s.tool])), p: simplifyPoints(s.p, 0) }))
-    .filter((s) => s.p.length).slice(-MAX_STROKES);
+    .map((s) => ({ tool: s.tool, c: s.c, w: Math.max(0.0005, Math.min(0.06, Number(s.w) || INK_WIDTH[s.tool])), p: simplifyPoints(s.p, 0), id: s.id, t: Math.max(0, Math.floor(Number(s.t)) || 0) }))
+    .filter((s) => s.p.length).slice(-MAX_STROKES)
+    .map((s) => ({ ...s, id: typeof s.id === 'string' && STROKE_ID.test(s.id) ? s.id : strokeId(s) }));
+}
+
+// ---------- ink sync: one row per stroke, so two devices can both write on a page ----------
+// A stroke has an id and a time `t` (its place in the drawing order). Strokes saved before ids
+// existed get one from their own content, which is the same on every device.
+const STROKE_ID = /^[\w-]{1,24}$/;
+export function strokeId(s) {
+  const text = `${s.tool}|${s.c}|${(s.p || []).map((q) => q.join(',')).join(';')}`;
+  let h1 = 0x811c9dc5, h2 = 0x01000193;
+  for (let i = 0; i < text.length; i++) { const c = text.charCodeAt(i); h1 = Math.imul(h1 ^ c, 16777619); h2 = Math.imul(h2 ^ c, 2246822507) + 0x9e3779b9; }
+  return 'k' + (h1 >>> 0).toString(36) + (h2 >>> 0).toString(36);
+}
+// Points as text, 3 base-36 digits per number (0–10000): 2,000 points fit in one sync row.
+const b36 = (n) => Math.round(n * 10000).toString(36).padStart(3, '0');
+export const packStroke = (s) => ({ tool: s.tool, c: s.c, w: s.w, t: s.t || 0, p: s.p.map(([x, y]) => b36(x) + b36(y)).join('') });
+export function unpackStroke(id, v) {
+  if (!v || typeof v !== 'object' || typeof v.p !== 'string' || !/^([0-9a-z]{6})+$/.test(v.p) || !STROKE_ID.test(String(id))) return null;
+  const p = [];
+  for (let i = 0; i < v.p.length; i += 6) p.push([parseInt(v.p.slice(i, i + 3), 36) / 10000, parseInt(v.p.slice(i + 3, i + 6), 36) / 10000]);
+  return cleanStrokes([{ tool: v.tool, c: v.c, w: v.w, t: v.t, p, id: String(id) }])[0] || null;
+}
+// Sync row key for a stroke: "n:<bookId>:<page>:<strokeId>"; the page key is "<bookId>:<page>".
+export const inkRowKey = (pageKey, id) => `n:${pageKey}:${id}`;
+export function parseInkRowKey(k) {
+  const m = /^n:([\w.-]+:\d+):([\w-]{1,24})$/.exec(String(k));
+  return m ? { pageKey: m[1], id: m[2] } : null;
+}
+// Changes from another device ([{ id, stroke | null }]) put into a page's strokes, in drawing order.
+export function mergeInk(strokes, changes) {
+  const map = new Map(cleanStrokes(strokes).map((s) => [s.id, s]));
+  for (const c of changes || []) { if (c.stroke) map.set(c.id, c.stroke); else map.delete(c.id); }
+  return [...map.values()].map((s, i) => [s, i]).sort((a, b) => a[0].t - b[0].t || a[1] - b[1]).map(([s]) => s).slice(-MAX_STROKES);
 }
 // Is (x, y) within r of the stroke? `aspect` = page height / width, so distances are in page widths.
 export function strokeNear(s, x, y, r, aspect = 1.4) {

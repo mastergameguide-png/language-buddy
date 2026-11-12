@@ -4,7 +4,7 @@ import { state, persist, emit, addWord, logActivity, cefrOf, CATEGORIES } from '
 import { schedule, preview, status, STATUS_TH, isDue } from '../srs.js';
 import { dueCards, recordReview, recordWord } from '../stats.js';
 import { askIelts } from '../ai.js';
-import { isEnglishWord, buildDefinePrompt, defineInput, parseDefine } from '../engine/define.js';
+import { isEnglishWord, buildDefinePrompt, defineInput, parseDefine, MANY_BATCH, needsMeaning, buildDefineManyPrompt, defineManyInput, parseDefineMany } from '../engine/define.js';
 import { speak } from '../speech.js';
 import { quiz } from '../conversation.js';
 import { emptyState, sectionHeader } from './ui.js';
@@ -168,6 +168,9 @@ function renderVocab(body, root) {
   word.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); submit(); } });
   body.append(h('div', { class: 'card' }, el('h3', '', 'เพิ่มคำเอง'), h('div', { class: 'grid md-2', style: 'margin-top:8px' }, word, meaning), note, h('div', { style: 'margin-top:8px' }, add)));
 
+  const bare = state.vocab.filter(needsMeaning);
+  if (bare.length || filling) body.append(fillCard(bare, root));
+
   const search = h('input', { class: 'input', type: 'search', placeholder: 'ค้นหาคำศัพท์', value: vQuery });
   search.addEventListener('input', () => { vQuery = search.value; draw(); });
   body.append(h('div', { class: 'search', style: 'margin-top:16px' }, icon('search'), search));
@@ -192,6 +195,50 @@ function renderVocab(body, root) {
     }
   }
   draw();
+}
+
+// Words that came in without a meaning (typed before, or from chat): the AI fills them in, 20 per request.
+let filling = null;        // { done, total, failed } while it runs
+function fillCard(bare, root) {
+  const card = h('div', { class: 'card', style: 'margin-top:12px' });
+  if (filling) {
+    card.append(el('div', 'small', `กำลังแปล… ${filling.done}/${filling.total} คำ`));
+    return card;
+  }
+  const go = h('button', { type: 'button', class: 'btn' }, `✨ แปลทั้งหมด (${bare.length})`);
+  go.addEventListener('click', () => fillAll(root));
+  card.append(el('div', 'small', `มี ${bare.length} คำที่ยังไม่มีความหมาย`),
+    h('div', { class: 'row wrap-ok', style: 'margin-top:8px' }, go, el('span', 'xs muted', `ใช้ AI ${Math.ceil(bare.length / MANY_BATCH)} ครั้ง`)));
+  return card;
+}
+async function fillAll(root) {
+  if (filling) return;
+  const todo = state.vocab.filter(needsMeaning).map((v) => v.word);
+  filling = { done: 0, total: todo.length, failed: 0 };
+  const redraw = () => { if (tab === 'vocab' && location.hash.startsWith('#review')) renderReview(root); };
+  redraw();
+  let filled = 0;
+  for (let i = 0; i < todo.length; i += MANY_BATCH) {
+    const part = todo.slice(i, i + MANY_BATCH);
+    try {
+      const got = parseDefineMany(await askIelts(buildDefineManyPrompt(cefrOf()), defineManyInput(part)), part);
+      for (const v of state.vocab) {
+        const d = got.get(v.word.toLowerCase());
+        if (!d || !needsMeaning(v)) continue;
+        v.meaning = d.meaning;
+        if (!v.example) v.example = d.example;
+        filled += 1;
+      }
+      persist();
+    } catch { filling.failed += 1; break; }   // out of quota or offline: stop, keep what is done
+    filling.done = Math.min(todo.length, i + part.length);
+    redraw();
+  }
+  const failed = filling.failed;
+  filling = null;
+  const left = state.vocab.filter(needsMeaning).length;
+  toast(failed ? `แปลได้ ${filled} คำ แล้วหยุด (AI ไม่ตอบ) ลองกดอีกครั้งภายหลัง` : left ? `แปลได้ ${filled} คำ เหลือ ${left} คำที่ AI แปลไม่ได้` : `แปลครบ ${filled} คำแล้ว`, !!failed);
+  emit('state'); redraw();
 }
 
 // ---------- Mistake Book ----------

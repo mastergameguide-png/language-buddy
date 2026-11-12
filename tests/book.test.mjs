@@ -156,7 +156,7 @@ await test('wired in: route, practice tab, offline shell, sync row, vendor licen
   assert.match(read('js/sync.js'), /x:library/);
   assert.ok(!/pages:\s*text|putBook/.test(read('js/sync.js')), 'the book text is never synced');
   assert.match(read('vendor/pdfjs/LICENSE'), /Apache License/);
-  assert.match(read('js/views/book.js'), /isEvalSupported: false/);
+  assert.match(read('js/views/booksheet.js'), /PDF_OPTS = { isEvalSupported: false, disableFontFace: true/); assert.match(read('js/views/book.js'), /...PDF_OPTS/);
   assert.match(read('js/views/book.js'), /askTranscribe\(OCR_PROMPT/);
   assert.match(read('js/bookdb.js'), /indexedDB\.open\(DB, 3\)/);
   assert.ok(read('sw.js').includes("'js/views/booksheet.js'"));

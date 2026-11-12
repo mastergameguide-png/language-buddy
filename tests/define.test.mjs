@@ -50,4 +50,12 @@ await test('wiring: the word bank form calls the AI when the meaning is empty; s
   assert.match(src('sw.js'), /'js\/engine\/define\.js'/);
 });
 
+await test('broken Thai from the AI is refused: a mark with no letter under it, or English inside a Thai word', () => {
+  for (const th of ['การควบคุมตัว, การ ักษาสิทธิ์', 'หมายศาล, ใบ ้', 'ข้อแก้ตัวว่าอยู่andที่อื่น']) {
+    assert.ok(D.brokenThai(th), th);
+    assert.equal(D.parseDefine(JSON.stringify({ word: 'custody', pos: 'n', th, example: 'x y z.' }), 'custody'), null);
+  }
+  for (const th of ['ผู้สมรู้ร่วมคิด, ผู้ร่วมกระทำผิด', 'เกี่ยวกับนิติวิทยาศาสตร์', 'เขตอำนาจศาล, อำนาจหน้าที่', 'ละเอียดลออ, ถี่ถ้วน', 'อีเมล (email)', 'ไม่เต็มใจ, ลังเล']) assert.ok(!D.brokenThai(th), th);
+});
+
 done();

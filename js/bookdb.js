@@ -40,6 +40,9 @@ export const deleteBook = (id) => run('readwrite', (s) => s.delete(id))
 export const fileExists = (id) => run('readonly', (s) => s.count(id), FILES).then((n) => n > 0).catch(() => false);
 export const getInk = (key) => run('readonly', (s) => s.get(key), INK).then((r) => r?.strokes || []).catch(() => []);
 export const putInk = (key, strokes) => run('readwrite', (s) => (strokes.length ? s.put({ id: key, strokes }) : s.delete(key)), INK);
+// Every page's marks, for sync. Fails loudly (no catch): "cannot read" must not look like "no marks".
+export const allInk = () => run('readonly', (s) => s.getAll(), INK).then((r) => r || []);
+export const inkKeysOf = (id) => run('readonly', (s) => s.getAllKeys(IDBKeyRange.bound(`${id}:`, `${id}:￿`)), INK).then((k) => k || []).catch(() => []);
 export const putFile = (id, data) => run('readwrite', (s) => s.put({ id, data }), FILES);
 export const getFile = (id) => run('readonly', (s) => s.get(id), FILES).then((r) => r?.data || null).catch(() => null);
 export const bookIds = () => run('readonly', (s) => s.getAllKeys()).then((k) => k || []).catch(() => []);

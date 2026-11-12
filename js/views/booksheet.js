@@ -4,7 +4,10 @@
 // to the AI). Also holds the pdf.js helpers the book page uses.
 import { el, h, icon, toast } from '../util.js';
 import { getFile, getInk, putInk } from '../bookdb.js';
-import { INK, INK_WIDTH, cleanStrokes, simplifyPoints, strokeNear, cropBox } from '../engine/book.js';
+import { INK, INK_WIDTH, cleanStrokes, simplifyPoints, strokeNear, cropBox, mergeInk } from '../engine/book.js';
+import { on } from '../store.js';
+import { uid } from '../util.js';
+import { inkDeleted } from '../inksync.js';
 
 // ---------- pdf.js ----------
 let pdf = null;                 // { id, doc } the open book's PDF
@@ -15,7 +18,18 @@ const ratio = new Map();        // 'id:page' → height / width
 // so a redraw (new tool, zoom) right after a stroke never reads an older saved copy.
 const inkMem = new Map();
 const dpr = () => Math.min(2, globalThis.devicePixelRatio || 1);
+// Marks that arrived from another device (sync): update the copy in memory and the page on screen.
+let live = null;               // { key, set(strokes) } the page being shown
+on('ink', ({ pageKey, changes }) => {
+  if (!inkMem.has(pageKey)) return;
+  const merged = mergeInk(inkMem.get(pageKey), changes);
+  inkMem.set(pageKey, merged);
+  if (live?.key === pageKey) live.set(merged);
+});
 
+// No eval and no web fonts (the page's security rules forbid both): letters are drawn as shapes.
+// A PDF that does not carry its own fonts needs the 14 standard ones, kept in vendor/pdfjs.
+export const PDF_OPTS = { isEvalSupported: false, disableFontFace: true, standardFontDataUrl: new URL('../../vendor/pdfjs/standard_fonts/', import.meta.url).href };
 export async function loadPdfjs() {
   const pdfjs = await import('../../vendor/pdfjs/pdf.min.mjs');
   pdfjs.GlobalWorkerOptions.workerSrc = new URL('../../vendor/pdfjs/pdf.worker.min.mjs', import.meta.url).href;
@@ -27,7 +41,7 @@ export async function pdfFor(id) {
   const data = await getFile(id);
   if (!data) throw new Error('ไม่พบไฟล์ PDF ของเล่มนี้ในเครื่อง เลือกไฟล์เดิมอีกครั้ง');
   closePdf();
-  const doc = await (await loadPdfjs()).getDocument({ data: new Uint8Array(data), isEvalSupported: false, disableFontFace: true }).promise;
+  const doc = await (await loadPdfjs()).getDocument({ data: new Uint8Array(data), ...PDF_OPTS }).promise;
   pdf = { id, doc };
   return doc;
 }
@@ -126,6 +140,7 @@ export function sheetView(ctx) {
   ink.style.touchAction = ui.tool === 'view' ? (ui.zoom > 1 ? 'pan-x pan-y' : 'pan-y') : 'none';
 
   let strokes = inkMem.get(key) || [];
+  let known = new Set(strokes.map((s) => s.id));   // ids last saved, to tell which strokes the learner removed
   let cur = null, drag = null, start = null, saveTimer = null;
   const size = () => ({ W: ink.width, H: ink.height });
   const draw = () => {
@@ -144,6 +159,9 @@ export function sheetView(ctx) {
     g.globalAlpha = 1;
   };
   const store = () => {
+    const now = new Set(strokes.map((s) => s.id));
+    inkDeleted(key, [...known].filter((x) => !now.has(x)));   // removed here → removed on the other devices too
+    known = now;
     inkMem.set(key, strokes);
     clearTimeout(saveTimer);
     const list = strokes.slice();
@@ -160,7 +178,7 @@ export function sheetView(ctx) {
     if (ui.tool === 'view') { start = { x: e.clientX, y: e.clientY, t: Date.now() }; return; }
     e.preventDefault();
     try { ink.setPointerCapture(e.pointerId); } catch {}
-    if (ui.tool === 'pen' || ui.tool === 'hl') { cur = { tool: ui.tool, c: ui[ui.tool], w: INK_WIDTH[ui.tool], p: [pt] }; draw(); }
+    if (ui.tool === 'pen' || ui.tool === 'hl') { cur = { id: uid().replace(/-/g, '').slice(0, 16), t: Date.now(), tool: ui.tool, c: ui[ui.tool], w: INK_WIDTH[ui.tool], p: [pt] }; draw(); }
     else if (ui.tool === 'erase') { cur = null; drag = 'erase'; erase(pt); }
     else if (ui.tool === 'look') { drag = { a: pt, b: pt }; showBox(); }
   });
@@ -216,7 +234,8 @@ export function sheetView(ctx) {
       sheet.insertBefore(pic, ink);
       status.remove();
       ink.width = Math.round(sheet.clientWidth * dpr()); ink.height = Math.round(sheet.clientHeight * dpr());
-      if (!inkMem.has(key)) { strokes = [...cleanStrokes(await getInk(key)), ...strokes]; inkMem.set(key, strokes); }
+      if (!inkMem.has(key)) { strokes = [...cleanStrokes(await getInk(key)), ...strokes]; inkMem.set(key, strokes); known = new Set(strokes.map((s) => s.id)); }
+      live = { key, set: (list) => { strokes = list; known = new Set(list.map((s) => s.id)); if (!cur) draw(); } };
       draw();
       if (page + 1 < ctx.total) { pageRatio(id, page + 1).then(() => screenCanvas(id, page + 1, cssW)).catch(() => {}); }
     } catch (e) { status.textContent = e?.message || 'เปิดหน้านี้ไม่ได้'; status.classList.add('warn-text'); }

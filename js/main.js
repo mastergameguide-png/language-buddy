@@ -69,6 +69,9 @@ function route() {
   try { VIEWS[v].render(); } catch (e) { reportError(e); }
   const sc = $(VIEWS[v].el).querySelector('.scroll');
   if (sc) sc.scrollTop = 0;
+  // On a phone the row of practice links is wider than the screen: bring the open page's link into view.
+  const tab = $(VIEWS[v].el).querySelector('.ptabs a[aria-current="page"]');
+  if (tab) { const row = tab.parentElement; row.scrollLeft = Math.max(0, tab.offsetLeft - row.offsetLeft - (row.clientWidth - tab.offsetWidth) / 2); }
   updateBadges();
 }
 

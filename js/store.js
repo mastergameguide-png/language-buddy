@@ -63,6 +63,7 @@ export const DEFAULT_SETTINGS = {
   goalMinutes: 15,
   goalMessages: 10,
   goalReviews: 10,
+  dailyWords: 5,                // 📘 Today's words: 5 or 10 a day
   feedback: 'gentle',           // gentle: only clear errors; detailed: also naturalness tips
   theme: 'dark',
   voice: true,

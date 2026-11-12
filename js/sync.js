@@ -1,7 +1,8 @@
 // Backup + sync across devices through the Worker's D1 (SQL) database.
 // Every learner item becomes one row ("c:" chat message, "m:" mistake, "w:" word, "f:" fact,
 // "r:" role-play result, "a:" activity, "d:" day stats, "s:" settings, "k:" character memory,
-// "x:" skills/topics/plan/courses/levels/mywords/library, "i:" IELTS practice attempts, "v:" shadowing/listening progress per sentence). This device remembers a
+// "x:" skills/topics/plan/courses/levels/mywords/library, "i:" IELTS practice attempts, "v:" shadowing/listening progress per sentence,
+// "n:" one pen or highlighter stroke on a book page, see js/inksync.js). This device remembers a
 // short hash of each row it last sent or received, so a sync only uploads what changed here
 // (a missing row = deleted) and downloads what other devices changed since `cursor`.
 import { settings, state, load, save, persist, emit, setSettings, DEFAULT_SETTINGS, normalizeState } from './store.js';
@@ -11,6 +12,7 @@ import { mergeLevels } from './engine/levels.js';
 import { mergeMyWords } from './engine/mywords.js';
 import { mergeSeen } from './engine/daily.js';
 import { mergeLibrary } from './engine/book.js';
+import { inkLocalRows, readInkRow, applyInk, wasDeleted, forgetDeleted } from './inksync.js';
 
 const KEY = 'lb_sync';
 const BATCH = 250;                 // rows per upload (the Worker accepts up to 300)
@@ -104,6 +106,11 @@ function applyRow(k, d) {
     else if (name === 'mywords') state.mywords = mergeMyWords(state.mywords, v);
     else if (name === 'dailyseen') state.dailySeen = mergeSeen(state.dailySeen, v);
     else if (name === 'library') state.library = mergeLibrary(state.library, v);
+  } else if (kind === 'n') {
+    // A stroke on a book page: kept in IndexedDB, so it is written after the batch (flushInk).
+    const c = readInkRow(k, v);
+    if (!c) throw new Error('bad ink row');
+    inkQueue.push(c);
   } else if (kind === 'v') {
     // Practice progress for one sentence; two devices: keep the better record.
     const key = k.slice(2);
@@ -153,6 +160,32 @@ export function runSync() {
   return running;
 }
 
+// Strokes from other devices waiting to be written to IndexedDB.
+let inkQueue = [];
+async function flushInk() {
+  const list = inkQueue; inkQueue = [];
+  if (list.length) await applyInk(list).catch((e) => console.warn('ink not saved', e));
+}
+// This device's strokes as rows, or null when its storage cannot be read (then ink is left alone).
+const readInk = () => inkLocalRows().catch(() => null);
+// The browser cleared this device's book storage: its strokes are on the server, so get them back.
+// The server never returns a device its own rows, so this asks as a new device, from the start.
+let recovered = false;
+async function recoverInk(keys) {
+  recovered = true;                 // once per app start, in case storage cannot be written at all
+  for (const k of keys) delete sync.fp[k];
+  sync.device = uid();
+  saveSync();
+  let cursor = 0, more = true;
+  while (more) {
+    const res = await api('', { device: sync.device, cursor, rows: [] });
+    applyAll((res.rows || []).filter((r) => r.k.startsWith('n:')));
+    cursor = res.cursor; more = res.more;
+  }
+  await flushInk();
+  saveSync();
+}
+
 async function doSync() {
   const firstTime = !sync.cursor && !Object.keys(sync.fp).length;
   let changed = false;
@@ -160,10 +193,21 @@ async function doSync() {
     // A device joining an existing code downloads first, so its defaults do not overwrite the
     // learner's real settings and nothing already on the server is uploaded again.
     if (firstTime) changed = await pull();
+    let ink = await readInk();
+    if (ink && !recovered) {
+      const lost = Object.keys(sync.fp).filter((k) => k.startsWith('n:') && !ink.has(k) && !wasDeleted(k));
+      if (lost.length) { await recoverInk(lost); ink = await readInk(); }
+    }
     const local = localRows();
+    if (ink) for (const [k, v] of ink) local.set(k, stable(v));
     const up = [];
     for (const [k, s] of local) if (sync.fp[k] !== hash(s)) up.push({ k, d: s });
-    for (const k of Object.keys(sync.fp)) if (!local.has(k)) up.push({ k, d: null });
+    for (const k of Object.keys(sync.fp)) {
+      if (local.has(k)) continue;
+      // A stroke is deleted on the server only when the learner removed it on this device.
+      if (k.startsWith('n:') && (!ink || !wasDeleted(k))) continue;
+      up.push({ k, d: null });
+    }
     do {
       const part = up.splice(0, BATCH);
       const sentCursor = sync.cursor;
@@ -174,7 +218,9 @@ async function doSync() {
         return doSync();
       }
       for (const r of part) { if (r.d === null) delete sync.fp[r.k]; else sync.fp[r.k] = hash(r.d); }
+      forgetDeleted(part.filter((r) => r.d === null && r.k.startsWith('n:')).map((r) => r.k));
       changed = applyAll(res.rows) || changed;
+      await flushInk();
       sync.cursor = res.cursor;
       saveSync();
       if (res.more && !up.length) changed = (await pull()) || changed;   // more waiting on the server
@@ -195,6 +241,7 @@ async function pull() {
   while (more) {
     const res = await api('', { device: sync.device, cursor: sync.cursor, rows: [] });
     changed = applyAll(res.rows) || changed;
+    await flushInk();
     sync.cursor = res.cursor;
     more = res.more;
     saveSync();

@@ -13,11 +13,12 @@ import { today, recordWord } from '../stats.js';
 import { askIelts, askTranscribe } from '../ai.js';
 import { speak, unlockSpeech, stopSpeaking } from '../speech.js';
 import { putBook, getBook, deleteBook, putFile, fileExists, keepStorage } from '../bookdb.js';
-import { sheetView, pdfFor, closePdf, drawPage, loadPdfjs } from './booksheet.js';
+import { sheetView, pdfFor, closePdf, drawPage, loadPdfjs, PDF_OPTS } from './booksheet.js';
+import { inkDeleteBook } from '../inksync.js';
 import {
   GOAL_CHOICES, MIN_PAGE_CHARS, pageParagraphs, pageChars, bookId, titleFromFile, wordAt, sentenceAround,
   cleanLibrary, addBook, percentRead, daysLeft, nextUnread, buildLookupPrompt, lookupInput, parseLookup,
-  buildQuizPrompt, pageForQuiz, parseQuiz, isScanned, markForScan, pendingPages, bytesId, OCR_PROMPT, parseOcr, REGION_PROMPT, parseRegion,
+  buildQuizPrompt, pageForQuiz, parseQuiz, buildWordQuiz, WORD_QUIZ_MIN, isScanned, markForScan, pendingPages, bytesId, OCR_PROMPT, parseOcr, REGION_PROMPT, parseRegion,
 } from '../engine/book.js';
 
 let busy = '';          // '' | 'import' | 'open' | 'quiz'
@@ -26,6 +27,7 @@ let text = null;        // { id, title, pages } of the open book, from IndexedDB
 let reading = false;    // reader on screen (false = the shelf)
 let look = null;        // { word, sentence, busy, res, err }
 let quiz = null;        // { page, qs, answers, checked }
+let wquiz = null;       // { qs, answers, checked } quiz from the words looked up in this book
 let missing = '';       // id of a book whose text is not on this device
 let ocr = null;         // { at: page index being read by the AI, left } while scanned pages are converted
 
@@ -106,7 +108,7 @@ async function importPdf(f, root) {
   try {
     const bytes = new Uint8Array(await f.arrayBuffer());
     // pdf.js takes over the buffer it is given, so it gets a copy; a scanned book keeps the original.
-    doc = await (await loadPdfjs()).getDocument({ data: bytes.slice(), isEvalSupported: false, disableFontFace: true }).promise;
+    doc = await (await loadPdfjs()).getDocument({ data: bytes.slice(), ...PDF_OPTS }).promise;
     if (doc.numPages > 2000) throw new Error('หนังสือยาวเกิน 2,000 หน้า');
     const pages = [];
     for (let i = 1; i <= doc.numPages; i++) {
@@ -170,6 +172,7 @@ async function openBook(id, root) {
 async function removeBook(id, root) {
   const b = lib().books[id];
   if (!b || !confirm(`ลบ "${b.title}" ออกจากชั้น? ความคืบหน้าและคำที่ค้นในเล่มนี้จะหายไปด้วย (ไฟล์ PDF ต้นฉบับในเครื่องไม่ถูกลบ)`)) return;
+  await inkDeleteBook(id);
   try { await deleteBook(id); } catch {}
   delete state.library.books[id];
   if (text?.id === id) { text = null; closePdf(); }
@@ -186,7 +189,7 @@ function reader(l, root) {
   const paras = text.pages[p] || [];
   const wrap = h('div', { class: 'book-reader' });
   const back = h('button', { type: 'button', class: 'btn ghost sm' }, icon('back'), 'ชั้นหนังสือ');
-  back.addEventListener('click', () => { reading = false; look = null; quiz = null; stopSpeaking(); renderBook(root); });
+  back.addEventListener('click', () => { reading = false; look = null; quiz = null; wquiz = null; stopSpeaking(); renderBook(root); });
   const isRead = b.read.includes(p);
   wrap.append(h('div', { class: 'row wrap-ok book-top' }, back, h('b', { class: 'grow small', lang: 'en' }, b.title),
     el('span', 'chip', `วันนี้ ${pagesToday()}/${l.goal} หน้า`)));
@@ -274,6 +277,7 @@ function reader(l, root) {
   if (quiz && quiz.page === p) wrap.append(quizCard(root));
 
   if (b.words.length) wrap.append(wordsCard(b));
+  if (b.words.length >= WORD_QUIZ_MIN || wquiz) wrap.append(wordQuizCard(b, root));
   return wrap;
 }
 
@@ -441,6 +445,42 @@ function lookPanel(b, root) {
 function wordsCard(b) {
   const list = h('div', { class: 'chips' }, ...b.words.slice().reverse().slice(0, 150).map((w) => h('span', { class: 'chip' }, h('b', { lang: 'en' }, w.word), ` ${w.th}`)));
   return h('details', { class: 'card book-words' }, h('summary', { class: 'small' }, `คำที่ค้นในเล่มนี้ ${b.words.length} คำ`), list);
+}
+
+// ---------- quiz from the words looked up in this book (made on the device, no AI) ----------
+function wordQuizCard(b, root) {
+  const card = h('div', { class: 'card pad-lg' }, el('h2', 'sec', '🧠 ทดสอบคำที่ค้นในเล่มนี้'));
+  const fresh = () => ({ qs: buildWordQuiz(b.words, 5), answers: {}, checked: false });
+  if (!wquiz) {
+    const start = h('button', { type: 'button', class: 'btn primary' }, 'เริ่ม 5 ข้อ');
+    start.addEventListener('click', () => { wquiz = fresh(); renderBook(root); });
+    card.append(el('p', 'small muted', 'เลือกความหมายที่ถูกของคำที่คุณเคยค้นในเล่มนี้ (ไม่ใช้ AI)'), start);
+    return card;
+  }
+  if (!wquiz.qs.length) { card.append(el('p', 'small muted', 'ต้องมีคำที่ค้นไว้อย่างน้อย 4 คำที่ความหมายต่างกัน')); wquiz = null; return card; }
+  wquiz.qs.forEach((q, i) => {
+    const pick = wquiz.answers[i];
+    const ok = wquiz.checked ? pick === q.answer : null;
+    const say = h('button', { type: 'button', class: 'icon-btn', 'aria-label': `ฟังคำว่า ${q.q}` }, icon('speaker'));
+    say.addEventListener('click', () => { unlockSpeech(); speak(q.q, { plain: true }); });
+    const box = h('div', { class: 'lq' + (ok === true ? ' ok' : ok === false ? ' bad' : '') }, h('div', { class: 'row' }, h('b', { class: 'grow', lang: 'en' }, `${i + 1}. ${q.q}`), say));
+    q.options.forEach((o, j) => {
+      const r = h('input', { type: 'radio', name: `wq${i}`, value: String(j) });
+      r.checked = pick === j;
+      r.disabled = wquiz.checked;
+      r.addEventListener('change', () => { wquiz.answers[i] = j; });
+      box.append(h('label', { class: 'small opt' }, r, ' ', `${'ABCD'[j]}  ${o}`));
+    });
+    if (wquiz.checked) box.append(el('div', 'xs tep-why', `${ok ? '✓' : `✗ คำตอบ: ${'ABCD'[q.answer]}  ${q.th}`}${Number.isInteger(q.page) ? ` · หน้า ${q.page + 1}` : ''}`));
+    card.append(box);
+  });
+  if (wquiz.checked) card.append(el('div', 'small', `ได้ ${wquiz.qs.filter((q, i) => wquiz.answers[i] === q.answer).length}/${wquiz.qs.length}`));
+  const again = h('button', { type: 'button', class: 'btn primary' }, wquiz.checked ? 'ทำชุดใหม่' : 'ตรวจคำตอบ');
+  again.addEventListener('click', () => { if (wquiz.checked) wquiz = fresh(); else wquiz.checked = true; renderBook(root); });
+  const close = h('button', { type: 'button', class: 'btn ghost' }, 'ปิด');
+  close.addEventListener('click', () => { wquiz = null; renderBook(root); });
+  card.append(h('div', { class: 'row wrap-ok' }, again, close));
+  return card;
 }
 
 // ---------- questions about the page ----------
